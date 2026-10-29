@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { tooltipText } from "../port/describe";
+import { tooltipText, wikiTerm, wikiUrl } from "../port/describe";
 import { COLNO, ROWNO, type GameState } from "../port/state";
 import { drawTile, type TileSheet } from "../tiles";
 import { drawMarks } from "./marks";
@@ -20,6 +20,15 @@ interface Tooltip {
   top: number;
 }
 
+interface ContextMenu {
+  x: number;
+  y: number;
+  left: number;
+  top: number;
+  /** What to search the wiki for; null while farlook is asked, or when it has nothing to say. */
+  term: string | null;
+}
+
 const TOOLTIP_DELAY = 500;
 
 // CLICK_1 / CLICK_2 in the core
@@ -32,6 +41,7 @@ export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const hover = useRef<{ x: number; y: number; timer: number } | null>(null);
   const [petMark, setPetMark] = useState<HTMLImageElement | null>(null);
+  const [menu, setMenu] = useState<ContextMenu | null>(null);
 
   useEffect(() => {
     const image = new Image();
@@ -94,8 +104,40 @@ export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props
     e.preventDefault();
     cancelTooltip();
     const at = square(e);
-    if (at) onClick(at.x, at.y, e.button === 2 ? CLICK_SECONDARY : CLICK_PRIMARY);
+    if (at) onClick(at.x, at.y, CLICK_PRIMARY);
   };
+
+  const openMenu = (e: MouseEvent) => {
+    e.preventDefault();
+    cancelTooltip();
+    const at = square(e);
+    if (!at) return;
+    const opened = { ...at, left: e.clientX, top: e.clientY, term: null };
+    setMenu(opened);
+    describe(at.x, at.y).then((text) => {
+      const term = text ? wikiTerm(text) : "";
+      if (term) setMenu((m) => (m === opened ? { ...opened, term } : m));
+    });
+  };
+
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    // any other key closes the menu and still plays
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      close();
+    };
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("blur", close);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("blur", close);
+    };
+  }, [menu]);
 
   const move = (e: MouseEvent) => {
     const at = square(e);
@@ -112,13 +154,20 @@ export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props
 
   return (
     <div class="map-pane">
-      <div class="map" ref={scroller} onScroll={cancelTooltip}>
+      <div
+        class="map"
+        ref={scroller}
+        onScroll={() => {
+          cancelTooltip();
+          setMenu(null);
+        }}
+      >
         <canvas
           ref={canvas}
           width={COLNO * cell}
           height={ROWNO * cell}
           onClick={click}
-          onContextMenu={click}
+          onContextMenu={openMenu}
           onMouseMove={move}
           onMouseLeave={cancelTooltip}
         />
@@ -127,6 +176,32 @@ export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props
         <button aria-label="Zoom out" onClick={() => onZoom(-1)}>−</button>
         <button aria-label="Zoom in" onClick={() => onZoom(1)}>+</button>
       </div>
+      {menu ? (
+        <div class="context-backdrop" onMouseDown={() => setMenu(null)} onContextMenu={(e) => e.preventDefault()}>
+          <div class="context-menu" role="menu" style={{ left: `${menu.left}px`, top: `${menu.top}px` }} onMouseDown={(e) => e.stopPropagation()}>
+            <button
+              role="menuitem"
+              onClick={() => {
+                setMenu(null);
+                onClick(menu.x, menu.y, CLICK_SECONDARY);
+              }}
+            >
+              Look here
+            </button>
+            {menu.term ? (
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setMenu(null);
+                  window.open(wikiUrl(menu.term!), "_blank", "noopener");
+                }}
+              >
+                Search the NetHack Wiki for ‘{menu.term}’
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       {tooltip ? (
         <div class="map-tooltip" role="tooltip" style={{ left: `${tooltip.left}px`, top: `${tooltip.top}px` }}>
           {tooltip.text}

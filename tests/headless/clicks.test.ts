@@ -27,3 +27,13 @@ test("a click on unexplored ground far away does nothing", async () => {
   expect(g.hero).toMatchObject({ x, y });
   expect(turn(g)).toBe(before);
 });
+
+test("a secondary click describes the square, even unexplored ground far away", async () => {
+  const g = await (await Session.start({ options: "pettype:none" })).skipText();
+  const { x, y } = g.hero;
+  const far = { x: x > COLNO / 2 ? 2 : COLNO - 3, y: y > ROWNO / 2 ? 1 : ROWNO - 2 };
+  const before = turn(g);
+  await g.click(far.x, far.y, 2);
+  expect(g.messages.at(-1)).toMatch(/unexplored/);
+  expect(turn(g)).toBe(before);
+});

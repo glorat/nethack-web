@@ -29,6 +29,7 @@ const NHW_MAP = 3;
 const NHW_MENU = 4;
 const NHW_TEXT = 5;
 
+const CLICK_PRIMARY = 1;
 const MENU_BEHAVE_PERMINV = 1;
 const MENU_ITEMFLAGS_SELECTED = 1;
 const ESC = 27;
@@ -403,7 +404,7 @@ export class Game {
       const input = await this.input();
       if ("key" in input) return input.key;
       const { x, y, button } = input.click;
-      if (commanding && this.travelsIntoUnknown(x, y)) {
+      if (commanding && button === CLICK_PRIMARY && this.travelsIntoUnknown(x, y)) {
         this.emit({ type: "bell" });
         continue;
       }

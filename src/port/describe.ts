@@ -10,3 +10,19 @@ export function tooltipText(farlook: string): string {
   if (close < 0) return body.slice(open + 1).trim();
   return (body.slice(open + 1, close) + body.slice(close + 1)).trim();
 }
+
+const NOT_SEARCHED = ["tame", "invisible", "peaceful", "a", "an", "the"];
+
+/** What Cocoa searches the wiki for: the tooltip without its [notes] or the words that aren't the thing's name. */
+export function wikiTerm(farlook: string): string {
+  let words = tooltipText(farlook).split("[")[0].split(/\s+/).filter(Boolean);
+  for (const word of NOT_SEARCHED) {
+    const at = words.indexOf(word);
+    if (at >= 0) words = [...words.slice(0, at), ...words.slice(at + 1)];
+  }
+  return words.join(" ");
+}
+
+export function wikiUrl(term: string): string {
+  return `https://nethackwiki.com/mediawiki/index.php?search=${encodeURIComponent(term)}`;
+}

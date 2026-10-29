@@ -71,6 +71,14 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   padding: 3px 8px; font-size: 12px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
 }
 .map canvas { display: block; cursor: crosshair; }
+.context-backdrop { position: fixed; inset: 0; z-index: 6; }
+.context-menu {
+  position: fixed; display: flex; flex-direction: column; padding: 4px; min-width: 160px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+.context-menu button { text-align: left; background: none; border: none; padding: 4px 10px; border-radius: 4px; }
+.context-menu button:hover { background: var(--border); }
 
 /* stats */
 .stats { width: 250px; padding: 8px 10px; overflow: hidden; flex: none; }

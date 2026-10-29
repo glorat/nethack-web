@@ -219,3 +219,31 @@ test("a menu's column headings line up with the columns", async ({ page }) => {
     expect(Math.abs(head!.x - cell!.x)).toBeLessThan(1);
   }
 });
+
+test("right-clicking the map offers a look and a wiki search", async ({ page, context }) => {
+  await startGame(page, `Ctx${Date.now() % 100000}`);
+  const view = (await page.locator(".map").boundingBox())!;
+  const middle = { x: view.x + view.width / 2, y: view.y + view.height / 2 };
+  const menu = page.getByRole("menu");
+
+  await page.mouse.click(middle.x, middle.y, { button: "right" });
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+
+  await page.mouse.click(middle.x, middle.y, { button: "right" });
+  const search = menu.getByRole("menuitem", { name: /Search the NetHack Wiki for ‘.+’/ });
+  await expect(search).toBeVisible();
+  await page.screenshot({ path: "test-results/context-menu.png" });
+  await context.route("https://nethackwiki.com/**", (route) => route.fulfill({ body: "wiki" }));
+  const [wiki] = await Promise.all([page.waitForEvent("popup"), search.click()]);
+  expect(wiki.url()).toMatch(/^https:\/\/nethackwiki\.com\/mediawiki\/index\.php\?search=\S+/);
+  await wiki.close();
+  await expect(menu).toBeHidden();
+
+  const before = await page.locator(".message").count();
+  await page.mouse.click(middle.x, middle.y, { button: "right" });
+  await menu.getByRole("menuitem", { name: "Look here" }).click();
+  await expect(menu).toBeHidden();
+  await expect.poll(() => page.locator(".message").count()).toBeGreaterThan(before);
+});
