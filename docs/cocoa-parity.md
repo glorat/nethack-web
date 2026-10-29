@@ -12,8 +12,7 @@ Decided for the web:
 
 ## Map
 
-- [ ] Map marks (`MainView.m` `drawMarks`): pet heart, peaceful dot, steed saddle, item-pile badge, dashed outline on sensed-but-unseen monsters. Cocoa turns on `hilite_pet` and `hilite_pile`; the marks need the peaceful and ridden flags passed through.
-- [ ] A distant click on a never-seen square beeps instead of travelling (`MainView.m` `mouseDown`).
+- [x] Map marks (`MainView.m` `drawMarks`): pet heart, peaceful dot, steed saddle, item-pile badge, dashed outline on sensed-but-unseen monsters. Cocoa turns on `hilite_pet` and `hilite_pile`; the marks need the peaceful and ridden flags passed through.
 - [ ] Right-click menu: "Search the NetHack Wiki for '…'", with the description cleaned of tame/peaceful/articles (`menuForEvent`, `cleanTileDescription`), plus an item for the core's secondary click.
 - [ ] Two arrow keys held together move diagonally (`MainView.m` `keyDown`/`keyUp`).
 - [ ] ASCII mode: characters and colours instead of tiles, cell sized to the font (`enableAsciiMode`), with brighter blue, green and brown.

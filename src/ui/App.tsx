@@ -29,7 +29,7 @@ function savedCell(): number {
   } catch {}
   return 32;
 }
-const BASE_OPTIONS = "perm_invent,!autopickup,menucolors,time,showexp";
+const BASE_OPTIONS = "perm_invent,!autopickup,menucolors,time,showexp,hilite_pet,hilite_pile";
 
 interface Pending {
   id: number;

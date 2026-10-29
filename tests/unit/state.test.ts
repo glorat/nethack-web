@@ -3,7 +3,7 @@ import { applyEvents, cellAt, initialState, MAX_MESSAGES, nextBatch } from "../.
 import type { MapCell } from "../../src/protocol";
 
 const cell = (x: number, y: number, tile = 1): MapCell => ({
-  x, y, glyph: 0, tile, bgTile: -1, ch: 46, color: 7, glyphFlags: 0,
+  x, y, glyph: 0, tile, bgTile: -1, ch: 46, color: 7, glyphFlags: 0, marks: 0,
 });
 
 test("map batches update cells and map_clear empties the map", () => {

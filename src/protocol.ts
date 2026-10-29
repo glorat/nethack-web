@@ -13,6 +13,8 @@ export interface MapCell {
   ch: number;
   color: number;
   glyphFlags: number;
+  /** MARK_* bits from port/marks. */
+  marks: number;
 }
 
 export interface MenuItem {

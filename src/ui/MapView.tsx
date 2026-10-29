@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { tooltipText } from "../port/describe";
 import { COLNO, ROWNO, type GameState } from "../port/state";
 import { drawTile, type TileSheet } from "../tiles";
+import { drawMarks } from "./marks";
+import petMarkUrl from "./petmark.png";
 
 interface Props {
   state: GameState;
@@ -29,6 +31,13 @@ export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props
   const scroller = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const hover = useRef<{ x: number; y: number; timer: number } | null>(null);
+  const [petMark, setPetMark] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    const image = new Image();
+    image.onload = () => setPetMark(image);
+    image.src = petMarkUrl;
+  }, []);
 
   const cancelTooltip = () => {
     if (hover.current) clearTimeout(hover.current.timer);
@@ -51,6 +60,7 @@ export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props
         if (!c) continue;
         drawTile(ctx, sheet, c.bgTile, x * cell, y * cell, cell);
         drawTile(ctx, sheet, c.tile, x * cell, y * cell, cell);
+        if (c.marks) drawMarks(ctx, c.marks, x * cell, y * cell, cell, petMark);
       }
     }
     if (state.cursor) {
@@ -58,7 +68,7 @@ export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props
       ctx.lineWidth = 1;
       ctx.strokeRect(state.cursor.x * cell + 0.5, state.cursor.y * cell + 0.5, cell - 1, cell - 1);
     }
-  }, [state.map, state.cursor, sheet, cell]);
+  }, [state.map, state.cursor, sheet, cell, petMark]);
 
   // keep the hero in view, as cliparound asks
   useEffect(() => {

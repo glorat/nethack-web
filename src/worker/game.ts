@@ -7,6 +7,7 @@ import type {
   MenuItem,
   StatusValue,
 } from "../protocol";
+import { MARK_PEACEFUL } from "../port/marks";
 import { COLNO } from "../port/state";
 import {
   type GlyphInfo,
@@ -67,8 +68,8 @@ export class Game {
   private mapBatch: MapCell[] = [];
   private status: Record<string, StatusValue> = {};
   private floorTile: number | undefined;
-  /** The glyph last drawn on each map square, by y * COLNO + x. */
-  private glyphs = new Map<number, number>();
+  /** The cell last drawn on each map square, by y * COLNO + x. */
+  private cells = new Map<number, MapCell>();
   private mapCursor = { x: 0, y: 0 };
 
   constructor(
@@ -97,11 +98,13 @@ export class Game {
   }
 
   private async ask(request: GameRequest): Promise<Answer | null> {
+    this.refreshPeaceful();
     this.flush();
     return this.host.request(request);
   }
 
   private async input(): Promise<Input> {
+    this.refreshPeaceful();
     this.flush();
     return this.host.nextInput({ kind: "poskey", inventoryKey: this.m._nhweb_inventory_key() });
   }
@@ -254,7 +257,7 @@ export class Game {
     if (!w) return 0;
     if (w.kind === NHW_MAP) {
       this.mapBatch = [];
-      this.glyphs.clear();
+      this.cells.clear();
       this.emit({ type: "map_clear" });
     }
     w.lines = [];
@@ -303,8 +306,7 @@ export class Game {
   private printGlyph(x: number, y: number, giPtr: number, bkPtr: number): number {
     const gi = readGlyphInfo(this.m, giPtr);
     if (!gi) return 0;
-    this.glyphs.set(y * COLNO + x, gi.glyph);
-    this.mapBatch.push({
+    const cell: MapCell = {
       x,
       y,
       glyph: gi.glyph,
@@ -313,8 +315,22 @@ export class Game {
       ch: gi.ch,
       color: gi.color,
       glyphFlags: gi.glyphFlags,
-    });
+      marks: this.m._nhweb_map_marks(x, y, gi.glyph, gi.glyphFlags),
+    };
+    this.cells.set(y * COLNO + x, cell);
+    this.mapBatch.push(cell);
     return 0;
+  }
+
+  /** A monster can be angered or pacified without being redrawn, as Cocoa found. */
+  private refreshPeaceful(): void {
+    for (const [at, cell] of this.cells) {
+      const marks = this.m._nhweb_map_marks(cell.x, cell.y, cell.glyph, cell.glyphFlags);
+      if ((marks & MARK_PEACEFUL) === (cell.marks & MARK_PEACEFUL)) continue;
+      const redrawn = { ...cell, marks };
+      this.cells.set(at, redrawn);
+      this.mapBatch.push(redrawn);
+    }
   }
 
   private backgroundTile(glyph: number, bk: GlyphInfo | null): number {
@@ -398,7 +414,7 @@ export class Game {
 
   /** A distant click travels, and travel to a square never seen guesses a route through unknown ground. */
   private travelsIntoUnknown(x: number, y: number): boolean {
-    const glyph = this.glyphs.get(y * COLNO + x);
+    const glyph = this.cells.get(y * COLNO + x)?.glyph;
     const unknown = glyph === undefined || glyph === this.glyphConstant("GLYPH_UNEXPLORED");
     return unknown && (Math.abs(x - this.mapCursor.x) > 1 || Math.abs(y - this.mapCursor.y) > 1);
   }
