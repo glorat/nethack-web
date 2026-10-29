@@ -1,0 +1,7 @@
+node_modules/
+dist/
+public/nethack.js
+public/nethack.wasm
+test-results/
+playwright-report/
+.DS_Store

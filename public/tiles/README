@@ -1,0 +1,12 @@
+tiles64.png: painted tiles for NetHack 5.0, copied from
+https://github.com/glorat/nethack-cocoa win/cocoa/Resources/tiles/ at commit
+c3ddf07e99b2d9ddfb9077f405f80dfec0480362.
+
+Copyright (c) 2026 Kevin Tam (glorat, https://github.com/glorat)
+
+Derived from the NetHack tiles and distributed under the NetHack General
+Public License (see nethack/dat/license).
+
+The sheet uses tile2bmp's order (monsters, objects, other, then a greyscale
+copy of every monster tile for statues), 40 tiles per row; glyph_info's
+gm.tileidx indexes it.
