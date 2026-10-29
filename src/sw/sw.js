@@ -27,8 +27,9 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {
-      // ignoreSearch: the page may be opened with a query string
-      const cached = await cache.match(request, { ignoreSearch: true });
+      // ignoreSearch: the page may be opened with a query string. ignoreVary: servers may
+      // send Vary: Origin, and the precache requests had no Origin but crossorigin ones do
+      const cached = await cache.match(request, { ignoreSearch: true, ignoreVary: true });
       if (cached) return cached;
       if (request.mode === "navigate") {
         const index = await cache.match("./index.html");
