@@ -33,9 +33,19 @@ npm run build           # dist/, a static site that works offline
 ## Testing
 
 ```sh
-npm test                # unit tests, plus the worker driving the real core in Node
+npm test                # unit tests, plus scenarios played on the real core in Node
 npm run test:e2e        # Playwright: play, save/restore, offline
-npm run test:headless   # quick smoke test of public/nethack.js
 ```
+
+Scenario tests in `tests/headless` drive the core through `Session` in `tests/headless/harness.ts`. Each step resolves once the core is waiting again, with what it asks for in `session.prompt` and the map, messages, status and inventory in `session.state`.
+
+```ts
+const g = await (await Session.start({ wizard: true })).skipText();
+await g.send("\x17");            // ^W: wish
+await g.getlin("long sword");
+expect(g.state.inventory.some((i) => /long sword/.test(i.text))).toBe(true);
+```
+
+Games are repeatable: the seed (`NETHACK_SEED`) and the date are fixed, so the same keys give the same dungeon, monsters and luck. Debug mode (`wizard: true`) sets up situations directly: `^W` to wish, `^F` to map the level, `session.teleport(x, y)` to move the hero.
 
 Saved games live in the browser's IndexedDB, under the character's name.
