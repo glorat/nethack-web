@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, vi } from "vitest";
-import type { Answer, GameRequest, MapCell } from "../../src/protocol";
+import type { Answer, GameEvent, GameRequest, MapCell } from "../../src/protocol";
 import { applyEvents, cellAt, initialState, type GameState } from "../../src/port/state";
 import { Game, type Input } from "../../src/worker/game";
 import type { EmscriptenFS, NetHackModule } from "../../src/worker/memory";
@@ -57,6 +57,8 @@ export class Session {
   state: GameState = initialState();
   prompt: GameRequest | null = null;
   ended = false;
+  /** When it returns true for a batch of events, posting that batch throws once, as a bug in the UI side would. */
+  failPost: ((events: GameEvent[]) => boolean) | null = null;
   /** Every cell drawn, in order, including ones drawn and erased within a turn, like a zap's beam. */
   drawn: MapCell[] = [];
   /** While the core waits for a key: what the UI would type to open an item's actions, 0 inside a prompt. */
@@ -64,7 +66,7 @@ export class Session {
   /** What the core printed outside its windows, such as errors before the game starts. */
   output: string[] = [];
 
-  private queue: number[] = [];
+  private queue: Input[] = [];
   private giveInput: ((input: Input) => void) | null = null;
   private giveAnswer: ((answer: Answer | null) => void) | null = null;
   private settled: { resolve(): void; reject(e: unknown): void } | null = null;
@@ -125,7 +127,15 @@ export class Session {
 
   /** Types keys as the player would; arrows and the like as their vi-key letters. */
   send(keys: string): Promise<this> {
-    this.queue.push(...[...keys].map((c) => c.charCodeAt(0)));
+    this.queue.push(...[...keys].map((c) => ({ key: c.charCodeAt(0) })));
+    const settled = this.untilSettled();
+    this.feed();
+    return settled.then(() => this);
+  }
+
+  /** Clicks a map square; button 1 is the primary button. */
+  click(x: number, y: number, button = 1): Promise<this> {
+    this.queue.push({ click: { x, y, button } });
     const settled = this.untilSettled();
     this.feed();
     return settled.then(() => this);
@@ -211,7 +221,11 @@ export class Session {
 
   private host() {
     return {
-      post: (events: Parameters<typeof applyEvents>[1]) => {
+      post: (events: GameEvent[]) => {
+        if (this.failPost?.(events)) {
+          this.failPost = null;
+          throw new Error("failPost");
+        }
         this.state = applyEvents(this.state, events);
         for (const e of events) if (e.type === "map") this.drawn.push(...e.cells);
         if (events.some((e) => e.type === "game_over")) this.end();
@@ -242,9 +256,9 @@ export class Session {
     const give = this.giveInput;
     if (!give || !this.queue.length) return;
     this.giveInput = null;
-    const key = this.queue.shift()!;
+    const input = this.queue.shift()!;
     // a macrotask, or a core that only ever waits on resolved promises starves timers
-    setTimeout(() => give({ key }), 0);
+    setTimeout(() => give(input), 0);
   }
 
   private untilSettled(): Promise<void> {

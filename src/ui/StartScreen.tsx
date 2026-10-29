@@ -1,4 +1,5 @@
 import { useState } from "preact/hooks";
+import { playerName } from "../port/name";
 
 const NAME_KEY = "nethack-web.name";
 
@@ -10,21 +11,17 @@ function savedName(): string {
   }
 }
 
-// options the core reads before the first window opens; commas and colons would break NETHACKOPTIONS
-function cleanName(name: string): string {
-  return name.replace(/[,:=]/g, "").trim().slice(0, 31);
-}
 
 export function StartScreen({ onStart }: { onStart(name: string): void }) {
   const [name, setName] = useState(savedName);
-  const valid = cleanName(name).length > 0;
+  const valid = playerName(name).length > 0;
   return (
     <div class="start">
       <form
         class="start-card"
         onSubmit={(e) => {
           e.preventDefault();
-          const n = cleanName(name);
+          const n = playerName(name);
           if (!n) return;
           try {
             localStorage.setItem(NAME_KEY, n);

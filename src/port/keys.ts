@@ -44,3 +44,20 @@ export function keyCode(e: KeyLike): number | null {
   if (e.altKey) return code | 0x80;
   return code;
 }
+
+/**
+ * Keys typed ahead into a prompt that takes a line (#, getlin), as tty takes them:
+ * printable keys are the text, Backspace edits it, Return or Escape ends it.
+ * Removes what it uses from `keys`; a line not yet ended leaves `end` null.
+ */
+export function takeLine(keys: KeyLike[]): { text: string; end: "return" | "escape" | null } {
+  let text = "";
+  while (keys.length) {
+    const k = keys.shift()!;
+    if (k.key === "Enter") return { text, end: "return" };
+    if (k.key === "Escape") return { text, end: "escape" };
+    if (k.key === "Backspace") text = text.slice(0, -1);
+    else if (k.key.length === 1 && !k.ctrlKey && !k.metaKey) text += k.key;
+  }
+  return { text, end: null };
+}

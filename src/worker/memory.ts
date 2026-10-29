@@ -9,6 +9,7 @@ export interface NetHackModule {
   stringToUTF8(str: string, ptr: number, maxBytes: number): void;
   ccall(name: string, ret: string | null, argTypes: string[], args: unknown[]): unknown;
   _malloc(size: number): number;
+  _free(ptr: number): void;
   _nhweb_extcmd_name(i: number): number;
   _nhweb_extcmd_desc(i: number): number;
   _nhweb_extcmd_status(i: number): number;
@@ -131,6 +132,15 @@ export function readExtCommands(m: NetHackModule): { index: number; name: string
 
 const GENDERS = 2;
 const ALIGNS = 3;
+
+/** A data file as display_file() would show it, or null if the core can't open it. */
+export function readDataFile(m: NetHackModule, name: string): string | null {
+  const ptr = m.ccall("nhweb_read_file", "number", ["string"], [name]) as number;
+  if (!ptr) return null;
+  const text = m.UTF8ToString(ptr);
+  m._free(ptr);
+  return text;
+}
 
 /** Farlook's text for a square, or null outside play. */
 export function describeSquare(m: NetHackModule, x: number, y: number): string | null {

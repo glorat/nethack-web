@@ -172,3 +172,50 @@ test("zooming the map is kept across a reload", async ({ page }) => {
   await untilPlaying(page);
   await expect(canvas).toHaveAttribute("width", zoomed!);
 });
+
+test("keys typed into an open window stay there", async ({ page }) => {
+  await startGame(page, `Keys${Date.now() % 100000}`);
+  const turn = async () => page.locator(".stat", { hasText: "T" }).last().innerText();
+  const before = await turn();
+  const dialog = page.getByRole("dialog");
+
+  // ^X lists attributes in a read-only menu
+  await page.keyboard.press("Control+x");
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("s");
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  // space closes a text window without reaching the game, where it would be an unknown command
+  await page.keyboard.press("#");
+  await page.keyboard.type("history");
+  await page.keyboard.press("Enter");
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press(" ");
+  await expect(dialog).toBeHidden();
+  await page.waitForTimeout(300);
+  await expect(page.locator(".messages")).not.toContainText(/unknown command/i);
+  expect(await turn()).toBe(before);
+});
+
+test("a menu's column headings line up with the columns", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Who are you?").fill(`Cols${Date.now() % 100000}`);
+  await page.getByRole("button", { name: "Play" }).click();
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  await picker.getByRole("option", { name: /Priest/ }).click();
+  await picker.getByRole("button", { name: "Play" }).click();
+  await untilPlaying(page);
+  await page.keyboard.press("Shift+Z");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText(/Retention/);
+  await dialog.screenshot({ path: "test-results/spell-menu.png" });
+  const heads = dialog.locator(".menu-heading.columns .menu-field");
+  const cells = dialog.locator(".menu-item").first().locator(".menu-field");
+  expect(await heads.count()).toBeGreaterThan(2);
+  for (let i = 0; i < (await heads.count()); i++) {
+    const [head, cell] = [await heads.nth(i).boundingBox(), await cells.nth(i).boundingBox()];
+    expect(Math.abs(head!.x - cell!.x)).toBeLessThan(1);
+  }
+});

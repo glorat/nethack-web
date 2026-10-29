@@ -53,3 +53,25 @@ test("the high score list is kept between games", async () => {
   const scores = await quit(second);
   expect(scores.some((line) => /Tester-Val/.test(line))).toBe(true);
 });
+
+test("a restored game, and one recovered after that, show the saved state", async () => {
+  const g = await (await Session.start({ options: "pettype:none" })).skipText();
+  const shieldOn = g.state.status.BL_AC?.text;
+  await g.send("T");
+  if (g.prompt?.kind === "yn") await g.yn(g.state.inventory.find((i) => /shield/.test(i.text))!.accelerator);
+  const shieldOff = g.state.status.BL_AC?.text;
+  expect(Number(shieldOff)).toBeGreaterThan(Number(shieldOn));
+  await g.send("S");
+  await g.yn("y");
+
+  const restored = await (await Session.start({ saves: g.saves() })).skipText();
+  expect(restored.state.status.BL_AC?.text).toBe(shieldOff);
+  expect(restored.state.equipment[5]).toEqual({ letter: "", tile: -1 });
+  expect(restored.state.inventory.some((i) => /small shield/.test(i.text))).toBe(true);
+
+  // the restore wrote a checkpoint, which is what recovery starts from
+  const recovered = await Session.start({ saves: restored.saves() });
+  await (await recovered.yn("r")).skipText();
+  expect(recovered.state.status.BL_AC?.text).toBe(shieldOff);
+  expect(recovered.state.equipment[5]).toEqual({ letter: "", tile: -1 });
+});

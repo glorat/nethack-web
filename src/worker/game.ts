@@ -7,17 +7,20 @@ import type {
   MenuItem,
   StatusValue,
 } from "../protocol";
+import { COLNO } from "../port/state";
 import {
   type GlyphInfo,
   type NetHackModule,
   readEquipment,
   readExtCommands,
   readGlyphInfo,
+  readDataFile,
   readPlayerChoices,
   writeLine,
   writeMenuSelection,
   writePosition,
 } from "./memory";
+import { keyText, ynAnswer, ynQuestion } from "../port/yn";
 
 // window types from include/wintype.h
 const NHW_MESSAGE = 1;
@@ -64,6 +67,9 @@ export class Game {
   private mapBatch: MapCell[] = [];
   private status: Record<string, StatusValue> = {};
   private floorTile: number | undefined;
+  /** The glyph last drawn on each map square, by y * COLNO + x. */
+  private glyphs = new Map<number, number>();
+  private mapCursor = { x: 0, y: 0 };
 
   constructor(
     private readonly m: NetHackModule,
@@ -100,8 +106,42 @@ export class Game {
     return this.host.nextInput({ kind: "poskey", inventoryKey: this.m._nhweb_inventory_key() });
   }
 
-  // Dispatched from the shim with already-decoded arguments; see winshim.c for each signature.
+  /**
+   * Dispatched from the shim with already-decoded arguments; see winshim.c for each signature.
+   * Never rejects: the shim has no handler for that, and the core would wait forever.
+   */
   async callback(name: string, args: unknown[]): Promise<unknown> {
+    try {
+      return await this.dispatch(name, args);
+    } catch (e) {
+      console.error(`${name} failed`, e);
+      this.pending = [];
+      this.mapBatch = [];
+      return this.fallback(name, args);
+    }
+  }
+
+  /** What a failed callback tells the core: the player cancelled, as Cocoa's window code does. */
+  private fallback(name: string, args: unknown[]): unknown {
+    switch (name) {
+      case "shim_nhgetch":
+      case "shim_nh_poskey":
+      case "shim_yn_function":
+        return ESC;
+      case "shim_select_menu":
+      case "shim_get_ext_cmd":
+        return -1;
+      case "shim_getlin":
+        writeLine(this.m, args[1] as number, "\x1b");
+        return 0;
+      case "shim_player_selection_or_tty":
+        return true;
+      default:
+        return 0;
+    }
+  }
+
+  private async dispatch(name: string, args: unknown[]): Promise<unknown> {
     const a = args as number[];
     switch (name) {
       case "shim_init_nhwindows":
@@ -116,10 +156,15 @@ export class Game {
       case "shim_destroy_nhwindow":
         this.windows.delete(a[0]);
         return 0;
+      case "shim_display_file":
+        return this.displayFile(args[0] as string, !!a[1]);
       case "shim_display_nhwindow":
         return this.displayWindow(a[0], !!a[1]);
       case "shim_curs":
-        if (this.windows.get(a[0])?.kind === NHW_MAP) this.emit({ type: "cursor", x: a[1], y: a[2] });
+        if (this.windows.get(a[0])?.kind === NHW_MAP) {
+          this.mapCursor = { x: a[1], y: a[2] };
+          this.emit({ type: "cursor", x: a[1], y: a[2] });
+        }
         return 0;
       case "shim_cliparound":
         this.emit({ type: "cursor", x: a[0], y: a[1] });
@@ -159,6 +204,10 @@ export class Game {
         const answer = await this.ask({ kind: "ext_cmd", commands: readExtCommands(this.m) });
         return answer?.kind === "ext_cmd" ? answer.index : -1;
       }
+      case "shim_status_enablefield":
+        // a field the core stops showing, such as Xp while polymorphed, is no longer updated
+        if (!a[3]) delete this.status[this.statusFieldName(a[0])];
+        return 0;
       case "shim_status_update":
         return this.statusUpdate(a[0], a[1], a[3], a[4]);
       case "shim_nhbell":
@@ -205,6 +254,7 @@ export class Game {
     if (!w) return 0;
     if (w.kind === NHW_MAP) {
       this.mapBatch = [];
+      this.glyphs.clear();
       this.emit({ type: "map_clear" });
     }
     w.lines = [];
@@ -222,6 +272,16 @@ export class Game {
     } else if (blocking || w.kind === NHW_MAP) {
       this.flush();
     }
+    return 0;
+  }
+
+  private async displayFile(name: string, complain: boolean): Promise<number> {
+    const text = readDataFile(this.m, name);
+    if (text === null) {
+      if (complain) this.emit({ type: "message", text: `Cannot open ${name}.`, attr: 0 });
+      return 0;
+    }
+    await this.ask({ kind: "text", lines: text.replace(/\n$/, "").split("\n").map((line) => ({ attr: 0, text: line })) });
     return 0;
   }
 
@@ -243,6 +303,7 @@ export class Game {
   private printGlyph(x: number, y: number, giPtr: number, bkPtr: number): number {
     const gi = readGlyphInfo(this.m, giPtr);
     if (!gi) return 0;
+    this.glyphs.set(y * COLNO + x, gi.glyph);
     this.mapBatch.push({
       x,
       y,
@@ -321,10 +382,25 @@ export class Game {
   }
 
   private async poskey(xPtr: number, yPtr: number, modPtr: number): Promise<number> {
-    const input = await this.input();
-    if ("key" in input) return input.key;
-    writePosition(this.m, xPtr, yPtr, modPtr, input.click.x, input.click.y, input.click.button);
-    return 0;
+    for (;;) {
+      const commanding = this.m._nhweb_inventory_key() !== 0;
+      const input = await this.input();
+      if ("key" in input) return input.key;
+      const { x, y, button } = input.click;
+      if (commanding && this.travelsIntoUnknown(x, y)) {
+        this.emit({ type: "bell" });
+        continue;
+      }
+      writePosition(this.m, xPtr, yPtr, modPtr, x, y, button);
+      return 0;
+    }
+  }
+
+  /** A distant click travels, and travel to a square never seen guesses a route through unknown ground. */
+  private travelsIntoUnknown(x: number, y: number): boolean {
+    const glyph = this.glyphs.get(y * COLNO + x);
+    const unknown = glyph === undefined || glyph === this.glyphConstant("GLYPH_UNEXPLORED");
+    return unknown && (Math.abs(x - this.mapCursor.x) > 1 || Math.abs(y - this.mapCursor.y) > 1);
   }
 
   private async yn(query: string, choices: string, def: number): Promise<number> {
@@ -334,7 +410,9 @@ export class Game {
       choices: choices ?? "",
       defaultChoice: def ? String.fromCharCode(def) : "",
     });
-    const code = answer?.kind === "yn" && answer.key ? answer.key.charCodeAt(0) : ESC;
+    const code = ynAnswer(answer?.kind === "yn" ? answer.key : null, choices ?? "", def ? String.fromCharCode(def) : "");
+    // the log keeps the question with its answer, as tty's message line does
+    this.emit({ type: "message", text: `${ynQuestion(query, choices ?? "", def ? String.fromCharCode(def) : "")} ${keyText(code)}`, attr: 0 });
     // the shim returns a C char; a wider value throws in the callback and hangs the core
     return code > 0 && code < 128 ? code : ESC;
   }
@@ -343,13 +421,20 @@ export class Game {
     const answer = await this.ask({ kind: "getlin", query });
     const text = answer?.kind === "getlin" ? answer.text : null;
     writeLine(this.m, bufPtr, text ?? "\x1b");
+    this.emit({ type: "message", text: `${query} ${text ?? ""}`.trimEnd(), attr: 0 });
     return 0;
+  }
+
+  private statusFieldName(field: number): string {
+    const constants = (globalThis as { nethackGlobal?: { constants?: Record<string, Record<string | number, string | number>> } })
+      .nethackGlobal?.constants;
+    return String(constants?.STATUS_FIELD?.[field] ?? field);
   }
 
   private statusUpdate(field: number, ptr: number, percent: number, color: number): number {
     const constants = (globalThis as { nethackGlobal?: { constants?: Record<string, Record<string | number, string | number>> } })
       .nethackGlobal?.constants;
-    const name = String(constants?.STATUS_FIELD?.[field] ?? field);
+    const name = this.statusFieldName(field);
     switch (name) {
       case "BL_FLUSH":
       case "BL_RESET":

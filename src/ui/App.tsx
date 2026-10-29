@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { GameClient } from "../client";
-import { keyCode } from "../port/keys";
+import { commandToRun, listCommands } from "../port/extcmd";
+import { keyCode, takeLine, type KeyLike } from "../port/keys";
 import { applyEvents, initialState, nextBatch } from "../port/state";
 import type { Answer, GameRequest } from "../protocol";
 import { loadTileSheet, type TileSheet } from "../tiles";
@@ -33,6 +34,8 @@ const BASE_OPTIONS = "perm_invent,!autopickup,menucolors,time,showexp";
 interface Pending {
   id: number;
   request: Exclude<GameRequest, { kind: "key" } | { kind: "poskey" }>;
+  /** Text typed ahead into a # or getlin prompt. */
+  typed?: string;
 }
 
 export function App() {
@@ -44,6 +47,26 @@ export function App() {
   // non-zero only while the core waits for a command with no keys queued
   const inventoryKey = useRef(0);
   const pendingPick = useRef<string | null>(null);
+  // keys typed while the core is busy: each goes to the next thing that asks, as in tty
+  const typeAhead = useRef<KeyLike[]>([]);
+  const waitingForKey = useRef(false);
+  // read by the key handler, which can run before a new dialog has rendered
+  const pendingRef = useRef<Pending | null>(null);
+  const answered = useRef(0);
+
+  const show = (p: Pending | null) => {
+    pendingRef.current = p;
+    setPending(p);
+  };
+
+  const sendKey = (k: KeyLike) => {
+    const code = keyCode(k);
+    if (code === null) return;
+    waitingForKey.current = false;
+    inventoryKey.current = 0;
+    setState(nextBatch);
+    client.key(code);
+  };
 
   const client = useMemo(
     () =>
@@ -54,10 +77,24 @@ export function App() {
           const letter = pendingPick.current;
           pendingPick.current = null;
           if (request.kind === "key" || request.kind === "poskey") {
+            const next = typeAhead.current.shift();
+            if (next) return sendKey(next);
+            waitingForKey.current = true;
             inventoryKey.current = request.kind === "poskey" ? request.inventoryKey : 0;
             return;
           }
+          waitingForKey.current = false;
           inventoryKey.current = 0;
+          if (request.kind === "ext_cmd" || request.kind === "getlin") {
+            const line = takeLine(typeAhead.current);
+            if (line.end === "escape") return client.answer(id, request.kind === "getlin" ? { kind: "getlin", text: null } : { kind: "ext_cmd", index: -1 });
+            if (line.end === "return") {
+              if (request.kind === "getlin") return client.answer(id, { kind: "getlin", text: line.text });
+              const run = commandToRun(request.commands, line.text, listCommands(request.commands, line.text)[0]);
+              return client.answer(id, { kind: "ext_cmd", index: run?.index ?? -1 });
+            }
+            return show({ id, request, typed: line.text });
+          }
           if (letter && request.kind === "menu") {
             const item = request.items.find((i) => i.identifier !== 0 && i.accelerator === letter);
             if (item) {
@@ -65,7 +102,7 @@ export function App() {
               return;
             }
           }
-          setPending({ id, request });
+          show({ id, request });
         },
       }),
     [],
@@ -79,28 +116,38 @@ export function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!playing || pending) return;
-      const code = keyCode(e);
-      if (code === null) return;
+      if (!playing || pendingRef.current) return;
+      if (keyCode(e) === null) return;
       e.preventDefault();
-      inventoryKey.current = 0;
-      setState(nextBatch);
-      client.key(code);
+      const k = { key: e.key, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey };
+      if (waitingForKey.current) sendKey(k);
+      else typeAhead.current.push(k);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [playing, pending, client]);
+  }, [playing, client]);
+
+  // keys typed before a dialog opened are its first keys; its listeners are attached by now
+  useLayoutEffect(() => {
+    while (pending && answered.current !== pending.id && typeAhead.current.length) {
+      const k = typeAhead.current.shift()!;
+      window.dispatchEvent(new KeyboardEvent("keydown", { ...k, cancelable: true }));
+    }
+  }, [pending]);
 
   const answer = (a: Answer) => {
-    if (!pending) return;
-    client.answer(pending.id, a);
-    setPending(null);
+    const p = pendingRef.current;
+    if (!p) return;
+    answered.current = p.id;
+    client.answer(p.id, a);
+    show(null);
   };
 
   const chooseItem = (letter: string) => {
     const key = inventoryKey.current;
-    if (!key || pending) return;
+    if (!key || pendingRef.current) return;
     inventoryKey.current = 0;
+    waitingForKey.current = false;
     pendingPick.current = letter;
     setState(nextBatch);
     client.key(key);
@@ -178,7 +225,7 @@ function PendingDialog({ pending, sheet, answer }: { pending: Pending; sheet: Ti
         />
       );
     case "getlin":
-      return <InputDialog query={r.query} onDone={(text) => answer({ kind: "getlin", text })} />;
+      return <InputDialog query={r.query} initial={pending.typed} onDone={(text) => answer({ kind: "getlin", text })} />;
     case "menu":
       return (
         <MenuDialog
@@ -193,7 +240,7 @@ function PendingDialog({ pending, sheet, answer }: { pending: Pending; sheet: Ti
     case "text":
       return <TextDialog lines={r.lines} onDone={() => answer({ kind: "text" })} />;
     case "ext_cmd":
-      return <ExtCommandDialog commands={r.commands} onDone={(index) => answer({ kind: "ext_cmd", index })} />;
+      return <ExtCommandDialog commands={r.commands} initial={pending.typed} onDone={(index) => answer({ kind: "ext_cmd", index })} />;
     case "player":
       return <PlayerDialog choices={r.choices} sheet={sheet} onDone={(pick) => answer({ kind: "player", ...pick })} />;
   }

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { keyCode } from "../../src/port/keys";
+import { keyCode, takeLine } from "../../src/port/keys";
 
 const k = (key: string, mods: Partial<{ ctrlKey: boolean; altKey: boolean; metaKey: boolean }> = {}) =>
   keyCode({ key, ctrlKey: false, altKey: false, metaKey: false, ...mods });
@@ -26,4 +26,15 @@ test("special keys and ignored keys", () => {
   expect(k("Escape")).toBe(27);
   expect(k("Shift")).toBeNull();
   expect(k("F5")).toBeNull();
+});
+
+test("keys typed ahead into a line prompt make its text", () => {
+  const press = (...keys: string[]) => keys.map((key) => ({ key, ctrlKey: false, altKey: false, metaKey: false }));
+  expect(takeLine(press("p", "r", "a", "y", "Enter", "l"))).toEqual({ text: "pray", end: "return" });
+  expect(takeLine(press("p", "x", "Backspace", "r"))).toEqual({ text: "pr", end: null });
+  expect(takeLine(press("a", "Escape"))).toEqual({ text: "a", end: "escape" });
+
+  const rest = press("y", "Enter", "j");
+  takeLine(rest);
+  expect(rest).toEqual(press("j"));
 });

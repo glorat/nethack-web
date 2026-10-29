@@ -61,15 +61,22 @@ export function MenuDialog({ how, prompt, items, sheet, onDone }: Props) {
     return () => window.removeEventListener("keydown", onKey, true);
   });
 
+  // with menu_tab_sep the core separates columns with tabs; a grid lines them up,
+  // and a heading row of columns starts where the items' text does
+  const columns = Math.max(...items.map((item) => item.text.split("\t").length));
+  const fields = (text: string) => text.split("\t").map((f) => <span class="menu-field">{f}</span>);
+
   return (
     <div class="dialog-backdrop">
       <div class="dialog menu-dialog" role="dialog">
         {prompt ? <div class="dialog-title">{prompt}</div> : null}
-        <div class="menu-items">
+        <div class={columns > 1 ? "menu-items tabbed" : "menu-items"} style={{ "--menu-columns": columns }}>
           {items.map((item, i) =>
             item.identifier === 0 ? (
-              <div class={`menu-heading${item.attr === ATR_INVERSE || item.attr === ATR_BOLD ? " strong" : ""}`}>
-                {item.text || " "}
+              <div
+                class={`menu-heading${item.attr === ATR_INVERSE || item.attr === ATR_BOLD ? " strong" : ""}${item.text.includes("\t") ? " columns" : ""}`}
+              >
+                {item.text.includes("\t") ? fields(item.text) : item.text || " "}
               </div>
             ) : (
               <button
@@ -79,7 +86,7 @@ export function MenuDialog({ how, prompt, items, sheet, onDone }: Props) {
               >
                 <span class="inv-icon" style={tileStyle(sheet, item.tile, ICON)} />
                 <span class="inv-letter">{item.accelerator}</span>
-                <span class="menu-text">{item.text}</span>
+                {columns > 1 ? fields(item.text) : <span class="menu-text">{item.text}</span>}
               </button>
             ),
           )}
