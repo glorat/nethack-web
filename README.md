@@ -24,17 +24,17 @@ out next to this repository as `../emsdk`.
 
 ```sh
 git submodule update --init
-npm install
-npm run build:wasm      # nethack/ -> public/nethack.{js,wasm}
-npm run dev             # http://localhost:5173
-npm run build           # dist/, a static site that works offline
+pnpm install
+pnpm run build:wasm      # nethack/ -> public/nethack.{js,wasm}
+pnpm run dev             # http://localhost:5173
+pnpm run build           # dist/, a static site that works offline
 ```
 
 ## Testing
 
 ```sh
-npm test                # unit tests, plus scenarios played on the real core in Node
-npm run test:e2e        # Playwright: play, save/restore, offline
+pnpm test                # unit tests, plus scenarios played on the real core in Node
+pnpm run test:e2e        # Playwright: play, save/restore, offline
 ```
 
 Scenario tests in `tests/headless` drive the core through `Session` in `tests/headless/harness.ts`. Each step resolves once the core is waiting again, with what it asks for in `session.prompt` and the map, messages, status and inventory in `session.state`.

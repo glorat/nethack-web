@@ -140,6 +140,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   padding: 14px; min-width: 320px; max-width: min(720px, 92vw); max-height: 86vh;
   display: flex; flex-direction: column; gap: 10px;
 }
+.input-dialog form { display: contents; }
 .dialog-title { font-weight: 600; }
 .dialog-buttons { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
 .hint { color: var(--muted); }
