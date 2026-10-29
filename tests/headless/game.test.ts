@@ -33,3 +33,24 @@ test("a saved game restores", async () => {
   const restored = await (await Session.start({ saves: g.saves() })).skipText();
   expect(restored.messages.some((t) => /welcome back/i.test(t))).toBe(true);
 });
+
+test("an item's actions are offered only while the core waits for a command", async () => {
+  const g = await (await Session.start()).skipText();
+  expect(g.inventoryKey).toBe("i".charCodeAt(0));
+  // _ travels, and its position picker reads keys too
+  await g.send("_");
+  expect(g.prompt).toBeNull();
+  expect(g.inventoryKey).toBe(0);
+});
+
+test("a character left open in the options is picked through the player request", async () => {
+  const g = await Session.start({ character: "" });
+  if (g.prompt?.kind !== "player") throw new Error(`expected the character picker, have ${JSON.stringify(g.prompt)}`);
+  const { roles, races } = g.prompt.choices;
+  const wizard = roles.findIndex((r) => r.name === "Wizard");
+  const elf = races.findIndex((r) => r.name === "elf");
+  expect(g.prompt.choices.validRace[wizard][elf]).toBe(true);
+
+  await (await g.answer({ kind: "player", role: wizard, race: elf, gender: 1, align: 2 })).skipText();
+  expect(g.messages.join(" ")).toMatch(/chaotic female elven Wizard/);
+});

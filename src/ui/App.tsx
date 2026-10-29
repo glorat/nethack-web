@@ -7,6 +7,7 @@ import { loadTileSheet, type TileSheet } from "../tiles";
 import { ExtCommandDialog } from "./dialogs/ExtCommandDialog";
 import { InputDialog } from "./dialogs/InputDialog";
 import { MenuDialog } from "./dialogs/MenuDialog";
+import { PlayerDialog } from "./dialogs/PlayerDialog";
 import { TextDialog } from "./dialogs/TextDialog";
 import { YesNoDialog } from "./dialogs/YesNoDialog";
 import { EquipmentView } from "./EquipmentView";
@@ -17,7 +18,16 @@ import { StartScreen } from "./StartScreen";
 import { StatsView } from "./StatsView";
 
 const TILE_SIZE = 64;
-const MAP_CELL = 32;
+const MAP_CELLS = [16, 24, 32, 48, 64];
+const ZOOM_KEY = "nethack.mapCell";
+
+function savedCell(): number {
+  try {
+    const saved = Number(localStorage.getItem(ZOOM_KEY));
+    if (MAP_CELLS.includes(saved)) return saved;
+  } catch {}
+  return 32;
+}
 const BASE_OPTIONS = "perm_invent,!autopickup,menucolors,time,showexp";
 
 interface Pending {
@@ -30,8 +40,9 @@ export function App() {
   const [state, setState] = useState(initialState);
   const [pending, setPending] = useState<Pending | null>(null);
   const [playing, setPlaying] = useState(false);
-  // true while the core sits in nh_poskey waiting for a command
-  const awaitingCommand = useRef(false);
+  const [cell, setCell] = useState(savedCell);
+  // non-zero only while the core waits for a command with no keys queued
+  const inventoryKey = useRef(0);
   const pendingPick = useRef<string | null>(null);
 
   const client = useMemo(
@@ -39,13 +50,14 @@ export function App() {
       new GameClient({
         events: (events) => setState((s) => applyEvents(s, events)),
         request: (id, request) => {
-          if (request.kind === "key" || request.kind === "poskey") {
-            awaitingCommand.current = true;
-            return;
-          }
-          awaitingCommand.current = false;
+          // a pick is for the menu the inventory key opens next, or nothing
           const letter = pendingPick.current;
           pendingPick.current = null;
+          if (request.kind === "key" || request.kind === "poskey") {
+            inventoryKey.current = request.kind === "poskey" ? request.inventoryKey : 0;
+            return;
+          }
+          inventoryKey.current = 0;
           if (letter && request.kind === "menu") {
             const item = request.items.find((i) => i.identifier !== 0 && i.accelerator === letter);
             if (item) {
@@ -71,7 +83,7 @@ export function App() {
       const code = keyCode(e);
       if (code === null) return;
       e.preventDefault();
-      awaitingCommand.current = false;
+      inventoryKey.current = 0;
       setState(nextBatch);
       client.key(code);
     };
@@ -86,11 +98,12 @@ export function App() {
   };
 
   const chooseItem = (letter: string) => {
-    if (!awaitingCommand.current || pending) return;
-    awaitingCommand.current = false;
+    const key = inventoryKey.current;
+    if (!key || pending) return;
+    inventoryKey.current = 0;
     pendingPick.current = letter;
     setState(nextBatch);
-    client.key("i".charCodeAt(0));
+    client.key(key);
   };
 
   const start = (name: string) => {
@@ -116,10 +129,18 @@ export function App() {
         <MapView
           state={state}
           sheet={sheet}
-          cell={MAP_CELL}
+          cell={cell}
+          describe={(x, y) => client.describe(x, y)}
+          onZoom={(step) => {
+            const next = MAP_CELLS[Math.min(MAP_CELLS.length - 1, Math.max(0, MAP_CELLS.indexOf(cell) + step))];
+            setCell(next);
+            try {
+              localStorage.setItem(ZOOM_KEY, String(next));
+            } catch {}
+          }}
           onClick={(x, y, button) => {
             if (pending) return;
-            awaitingCommand.current = false;
+            inventoryKey.current = 0;
             setState(nextBatch);
             client.click(x, y, button);
           }}
@@ -173,5 +194,7 @@ function PendingDialog({ pending, sheet, answer }: { pending: Pending; sheet: Ti
       return <TextDialog lines={r.lines} onDone={() => answer({ kind: "text" })} />;
     case "ext_cmd":
       return <ExtCommandDialog commands={r.commands} onDone={(index) => answer({ kind: "ext_cmd", index })} />;
+    case "player":
+      return <PlayerDialog choices={r.choices} sheet={sheet} onDone={(pick) => answer({ kind: "player", ...pick })} />;
   }
 }

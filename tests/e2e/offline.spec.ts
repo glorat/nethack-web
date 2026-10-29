@@ -13,5 +13,5 @@ test("the production build plays offline after one visit", async ({ page, contex
   await page.reload();
   await page.getByLabel("Who are you?").fill(`Off${Date.now() % 100000}`);
   await page.getByRole("button", { name: "Play" }).click();
-  await expect(page.getByRole("dialog")).toContainText(/Shall I pick/i, { timeout: 15_000 });
+  await expect(page.getByRole("dialog", { name: "Choose your character" })).toBeVisible({ timeout: 15_000 });
 });

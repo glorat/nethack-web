@@ -57,6 +57,12 @@ export class Session {
   state: GameState = initialState();
   prompt: GameRequest | null = null;
   ended = false;
+  /** Every cell drawn, in order, including ones drawn and erased within a turn, like a zap's beam. */
+  drawn: MapCell[] = [];
+  /** While the core waits for a key: what the UI would type to open an item's actions, 0 inside a prompt. */
+  inventoryKey = 0;
+  /** What the core printed outside its windows, such as errors before the game starts. */
+  output: string[] = [];
 
   private queue: number[] = [];
   private giveInput: ((input: Input) => void) | null = null;
@@ -79,8 +85,9 @@ export class Session {
     const m: Module = await createModule({
       noInitialRun: true,
       wasmBinary: readFileSync(resolve(ROOT, "public/nethack.wasm")),
-      print: () => {},
-      printErr: () => {},
+      print: (line: string) => session?.output.push(line),
+      printErr: (line: string) => session?.output.push(line),
+      onExit: () => session?.end(),
       onAbort: (what: unknown) => session?.settled?.reject(new Error(`core aborted: ${String(what)}`)),
       preRun: [
         (mod: Module) => {
@@ -206,10 +213,8 @@ export class Session {
     return {
       post: (events: Parameters<typeof applyEvents>[1]) => {
         this.state = applyEvents(this.state, events);
-        if (events.some((e) => e.type === "game_over")) {
-          this.ended = true;
-          this.settle();
-        }
+        for (const e of events) if (e.type === "map") this.drawn.push(...e.cells);
+        if (events.some((e) => e.type === "game_over")) this.end();
       },
       request: (request: GameRequest) =>
         new Promise<Answer | null>((give) => {
@@ -217,14 +222,20 @@ export class Session {
           this.giveAnswer = give;
           this.settle();
         }),
-      nextInput: () =>
+      nextInput: (request: { inventoryKey: number }) =>
         new Promise<Input>((give) => {
+          this.inventoryKey = request.inventoryKey;
           this.giveInput = give;
           if (this.queue.length) this.feed();
           else this.settle();
         }),
       persist: async () => {},
     };
+  }
+
+  private end(): void {
+    this.ended = true;
+    this.settle();
   }
 
   private feed(): void {

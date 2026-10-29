@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
+import { tooltipText } from "../port/describe";
 import { COLNO, ROWNO, type GameState } from "../port/state";
 import { drawTile, type TileSheet } from "../tiles";
 
@@ -7,15 +8,36 @@ interface Props {
   sheet: TileSheet;
   cell: number;
   onClick(x: number, y: number, button: number): void;
+  describe(x: number, y: number): Promise<string | null>;
+  onZoom(step: -1 | 1): void;
 }
+
+interface Tooltip {
+  text: string;
+  left: number;
+  top: number;
+}
+
+const TOOLTIP_DELAY = 500;
 
 // CLICK_1 / CLICK_2 in the core
 const CLICK_PRIMARY = 1;
 const CLICK_SECONDARY = 2;
 
-export function MapView({ state, sheet, cell, onClick }: Props) {
+export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const [tooltip, setTooltip] = useState<Tooltip | null>(null);
+  const hover = useRef<{ x: number; y: number; timer: number } | null>(null);
+
+  const cancelTooltip = () => {
+    if (hover.current) clearTimeout(hover.current.timer);
+    hover.current = null;
+    setTooltip(null);
+  };
+
+  // what was under the mouse may have moved or gone
+  useEffect(cancelTooltip, [state.map]);
 
   useEffect(() => {
     const ctx = canvas.current?.getContext("2d");
@@ -51,23 +73,55 @@ export function MapView({ state, sheet, cell, onClick }: Props) {
       el.scrollTop = cy - el.clientHeight / 2;
   }, [state.cursor, cell]);
 
-  const click = (e: MouseEvent) => {
-    e.preventDefault();
+  const square = (e: MouseEvent) => {
     const rect = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect();
     const x = Math.floor((e.clientX - rect.left) / cell);
     const y = Math.floor((e.clientY - rect.top) / cell);
-    if (x >= 1 && x < COLNO && y >= 0 && y < ROWNO) onClick(x, y, e.button === 2 ? CLICK_SECONDARY : CLICK_PRIMARY);
+    return x >= 1 && x < COLNO && y >= 0 && y < ROWNO ? { x, y } : null;
+  };
+
+  const click = (e: MouseEvent) => {
+    e.preventDefault();
+    cancelTooltip();
+    const at = square(e);
+    if (at) onClick(at.x, at.y, e.button === 2 ? CLICK_SECONDARY : CLICK_PRIMARY);
+  };
+
+  const move = (e: MouseEvent) => {
+    const at = square(e);
+    if (at && hover.current?.x === at.x && hover.current.y === at.y) return;
+    cancelTooltip();
+    if (!at) return;
+    const { clientX, clientY } = e;
+    const timer = window.setTimeout(async () => {
+      const text = await describe(at.x, at.y);
+      if (text && hover.current?.timer === timer) setTooltip({ text: tooltipText(text), left: clientX + 12, top: clientY + 16 });
+    }, TOOLTIP_DELAY);
+    hover.current = { ...at, timer };
   };
 
   return (
-    <div class="map" ref={scroller}>
-      <canvas
-        ref={canvas}
-        width={COLNO * cell}
-        height={ROWNO * cell}
-        onClick={click}
-        onContextMenu={click}
-      />
+    <div class="map-pane">
+      <div class="map" ref={scroller} onScroll={cancelTooltip}>
+        <canvas
+          ref={canvas}
+          width={COLNO * cell}
+          height={ROWNO * cell}
+          onClick={click}
+          onContextMenu={click}
+          onMouseMove={move}
+          onMouseLeave={cancelTooltip}
+        />
+      </div>
+      <div class="map-zoom">
+        <button aria-label="Zoom out" onClick={() => onZoom(-1)}>−</button>
+        <button aria-label="Zoom in" onClick={() => onZoom(1)}>+</button>
+      </div>
+      {tooltip ? (
+        <div class="map-tooltip" role="tooltip" style={{ left: `${tooltip.left}px`, top: `${tooltip.top}px` }}>
+          {tooltip.text}
+        </div>
+      ) : null}
     </div>
   );
 }

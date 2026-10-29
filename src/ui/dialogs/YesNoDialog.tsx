@@ -16,8 +16,14 @@ function buttons(choices: string): string[] {
   return [...visible].filter((c) => c !== "#");
 }
 
+// a query such as "Destroy [y], Recover [r], or Cancel [n]?" names its own answers
+function namedAnswers(query: string): Record<string, string> {
+  return Object.fromEntries([...query.matchAll(/(\w+) \[(\w)\]/g)].map((m) => [m[2], m[1]]));
+}
+
 export function YesNoDialog({ query, choices, defaultChoice, onDone }: Props) {
   const keys = buttons(choices);
+  const named = namedAnswers(query);
   // layout effect: listen before the dialog is painted, or a fast key press is lost
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -45,7 +51,7 @@ export function YesNoDialog({ query, choices, defaultChoice, onDone }: Props) {
         <div class="dialog-buttons">
           {keys.map((k) => (
             <button class={k === defaultChoice ? "primary" : undefined} onClick={() => onDone(k)}>
-              {LABELS[k] ?? k}
+              {named[k] ?? LABELS[k] ?? k}
             </button>
           ))}
           {!keys.length ? <span class="hint">Press a key</span> : null}

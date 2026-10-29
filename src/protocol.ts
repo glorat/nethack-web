@@ -62,14 +62,37 @@ export type GameEvent =
 
 export type MenuHow = "none" | "one" | "any";
 
+/** Indexes into the core's roles[], races[], genders[] (male, female) and aligns[] (lawful, neutral, chaotic). */
+export interface PlayerPick {
+  role: number;
+  race: number;
+  gender: number;
+  align: number;
+}
+
+export interface PlayerChoices {
+  roles: { name: string; femaleName: string; tile: number; femaleTile: number }[];
+  races: { name: string; tile: number; femaleTile: number }[];
+  /** validRace[role][race] */
+  validRace: boolean[][];
+  /** validGender[role][race][gender] */
+  validGender: boolean[][][];
+  /** validAlign[role][race][align] */
+  validAlign: boolean[][][];
+  /** What the options chose already; negative where still open. */
+  chosen: PlayerPick;
+}
+
 export type GameRequest =
   | { kind: "key" }
-  | { kind: "poskey" }
+  /** inventoryKey is 0 unless the core is waiting for a command. */
+  | { kind: "poskey"; inventoryKey: number }
   | { kind: "yn"; query: string; choices: string; defaultChoice: string }
   | { kind: "getlin"; query: string }
   | { kind: "menu"; how: MenuHow; prompt: string; items: MenuItem[] }
   | { kind: "text"; lines: { attr: number; text: string }[] }
-  | { kind: "ext_cmd"; commands: ExtCommand[] };
+  | { kind: "ext_cmd"; commands: ExtCommand[] }
+  | { kind: "player"; choices: PlayerChoices };
 
 export interface MenuSelection {
   identifier: number;
@@ -82,11 +105,13 @@ export type Answer =
   | { kind: "getlin"; text: string | null }
   | { kind: "menu"; selection: MenuSelection[] | null }
   | { kind: "text" }
-  | { kind: "ext_cmd"; index: number };
+  | { kind: "ext_cmd"; index: number }
+  | ({ kind: "player" } & PlayerPick);
 
 export type WorkerMessage =
   | { type: "events"; events: GameEvent[] }
-  | { type: "request"; id: number; request: GameRequest };
+  | { type: "request"; id: number; request: GameRequest }
+  | { type: "description"; id: number; text: string | null };
 
 export interface StartOptions {
   /** Base URL that nethack.js and nethack.wasm are served from. */
@@ -99,4 +124,6 @@ export type UiMessage =
   | { type: "start"; start: StartOptions }
   | { type: "key"; code: number }
   | { type: "click"; x: number; y: number; button: number }
-  | { type: "answer"; id: number; answer: Answer };
+  | { type: "answer"; id: number; answer: Answer }
+  /** Farlook's text for a map square; answered with a "description" message of the same id. */
+  | { type: "describe"; id: number; x: number; y: number };

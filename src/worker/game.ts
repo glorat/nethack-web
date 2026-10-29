@@ -13,6 +13,7 @@ import {
   readEquipment,
   readExtCommands,
   readGlyphInfo,
+  readPlayerChoices,
   writeLine,
   writeMenuSelection,
   writePosition,
@@ -40,7 +41,7 @@ export interface GameHost {
   post(events: GameEvent[]): void;
   request(request: GameRequest): Promise<Answer | null>;
   /** Resolves with the next key or click the player makes. */
-  nextInput(): Promise<Input>;
+  nextInput(request: Extract<GameRequest, { kind: "poskey" }>): Promise<Input>;
   persist(): Promise<void>;
 }
 
@@ -96,7 +97,7 @@ export class Game {
 
   private async input(): Promise<Input> {
     this.flush();
-    return this.host.nextInput();
+    return this.host.nextInput({ kind: "poskey", inventoryKey: this.m._nhweb_inventory_key() });
   }
 
   // Dispatched from the shim with already-decoded arguments; see winshim.c for each signature.
@@ -107,7 +108,7 @@ export class Game {
       case "shim_status_init":
         return 0;
       case "shim_player_selection_or_tty":
-        return true;
+        return this.playerSelection();
       case "shim_create_nhwindow":
         return this.createWindow(a[0]);
       case "shim_clear_nhwindow":
@@ -183,6 +184,16 @@ export class Game {
     }
   }
 
+  /** Returns true for the core's own setup, which asks nothing once all four are chosen. */
+  private async playerSelection(): Promise<boolean> {
+    const choices = readPlayerChoices(this.m);
+    const { role, race, gender, align } = choices.chosen;
+    if (role >= 0 && race >= 0 && gender >= 0 && align >= 0) return true;
+    const answer = await this.ask({ kind: "player", choices });
+    if (answer?.kind === "player") this.m._nhweb_choose(answer.role, answer.race, answer.gender, answer.align);
+    return true;
+  }
+
   private createWindow(type: number): number {
     const id = this.nextWindowId++;
     this.windows.set(id, { kind: type, lines: [], menu: null });
@@ -249,10 +260,10 @@ export class Game {
     if (!bk || bk.glyph === glyph) return -1;
     const unexplored = this.glyphConstant("GLYPH_UNEXPLORED");
     if (bk.glyph !== unexplored) return this.m._nhweb_glyph_tile(bk.glyph);
-    // a cmap glyph is terrain itself; anything else (monster, object) stands on lit floor
-    const cmapStart = this.glyphConstant("GLYPH_CMAP_OFF");
-    const cmapEnd = this.glyphConstant("GLYPH_EXPLODE_OFF");
-    if (glyph >= cmapStart && glyph < cmapEnd) return -1;
+    // terrain is drawn whole; anything else (a monster, an object, a zap's beam) stands on lit floor
+    const terrainStart = this.glyphConstant("GLYPH_CMAP_OFF");
+    const terrainEnd = this.glyphConstant("GLYPH_ZAP_OFF");
+    if (glyph >= terrainStart && glyph < terrainEnd) return -1;
     if (glyph === unexplored || glyph === this.glyphConstant("GLYPH_NOTHING")) return -1;
     this.floorTile ??= this.m._nhweb_floor_tile();
     return this.floorTile;

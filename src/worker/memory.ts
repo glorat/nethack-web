@@ -1,5 +1,6 @@
 // Reads and writes of core structs through the Emscripten heap. Offsets are
 // for wasm32 and must track include/wintype.h.
+import type { PlayerChoices } from "../protocol";
 
 export interface NetHackModule {
   getValue(ptr: number, type: string): number;
@@ -15,6 +16,17 @@ export interface NetHackModule {
   _nhweb_glyph_tile(glyph: number): number;
   _nhweb_equip_letter(slot: number): number;
   _nhweb_equip_tile(slot: number): number;
+  _nhweb_inventory_key(): number;
+  _nhweb_role_name(role: number, female: number): number;
+  _nhweb_race_name(race: number): number;
+  _nhweb_role_tile(role: number, female: number): number;
+  _nhweb_race_tile(race: number, female: number): number;
+  _nhweb_valid_race(role: number, race: number): number;
+  _nhweb_valid_gender(role: number, race: number, gender: number): number;
+  _nhweb_valid_align(role: number, race: number, align: number): number;
+  _nhweb_chosen(facet: number): number;
+  _nhweb_choose(role: number, race: number, gender: number, align: number): void;
+  _nhweb_describe(x: number, y: number): number;
   _main(argc: number, argv: number): number;
   ENV: Record<string, string>;
   FS: EmscriptenFS;
@@ -115,4 +127,38 @@ export function readExtCommands(m: NetHackModule): { index: number; name: string
     });
   }
   return out;
+}
+
+const GENDERS = 2;
+const ALIGNS = 3;
+
+/** Farlook's text for a square, or null outside play. */
+export function describeSquare(m: NetHackModule, x: number, y: number): string | null {
+  const ptr = m._nhweb_describe(x, y);
+  return ptr ? m.UTF8ToString(ptr) : null;
+}
+
+export function readPlayerChoices(m: NetHackModule): PlayerChoices {
+  const roles: PlayerChoices["roles"] = [];
+  for (let ro = 0; m._nhweb_role_name(ro, 0); ro++) {
+    roles.push({
+      name: m.UTF8ToString(m._nhweb_role_name(ro, 0)),
+      femaleName: m.UTF8ToString(m._nhweb_role_name(ro, 1)),
+      tile: m._nhweb_role_tile(ro, 0),
+      femaleTile: m._nhweb_role_tile(ro, 1),
+    });
+  }
+  const races: PlayerChoices["races"] = [];
+  for (let ra = 0; m._nhweb_race_name(ra); ra++) {
+    races.push({ name: m.UTF8ToString(m._nhweb_race_name(ra)), tile: m._nhweb_race_tile(ra, 0), femaleTile: m._nhweb_race_tile(ra, 1) });
+  }
+  const each = <T>(n: number, f: (i: number) => T) => Array.from({ length: n }, (_, i) => f(i));
+  return {
+    roles,
+    races,
+    validRace: each(roles.length, (ro) => each(races.length, (ra) => !!m._nhweb_valid_race(ro, ra))),
+    validGender: each(roles.length, (ro) => each(races.length, (ra) => each(GENDERS, (g) => !!m._nhweb_valid_gender(ro, ra, g)))),
+    validAlign: each(roles.length, (ro) => each(races.length, (ra) => each(ALIGNS, (a) => !!m._nhweb_valid_align(ro, ra, a)))),
+    chosen: { role: m._nhweb_chosen(0), race: m._nhweb_chosen(1), gender: m._nhweb_chosen(2), align: m._nhweb_chosen(3) },
+  };
 }

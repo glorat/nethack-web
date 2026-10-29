@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import type { Answer, GameEvent, GameRequest, StartOptions, UiMessage, WorkerMessage } from "../protocol";
 import { Game, type Input } from "./game";
-import type { NetHackModule } from "./memory";
+import { describeSquare, type NetHackModule } from "./memory";
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -36,6 +36,25 @@ function syncfs(populate: boolean): Promise<void> {
   });
 }
 
+let persisting: Promise<void> | null = null;
+let persistAgain = false;
+
+/** Writes /save to IndexedDB; a call made while one is running queues one more. */
+function persist(): Promise<void> {
+  if (persisting) {
+    persistAgain = true;
+    return persisting;
+  }
+  persisting = syncfs(false).then(() => {
+    persisting = null;
+    if (persistAgain) {
+      persistAgain = false;
+      return persist();
+    }
+  });
+  return persisting;
+}
+
 async function start({ assetBase, options }: StartOptions): Promise<void> {
   const url = new URL("nethack.js", assetBase).href;
   const { default: createModule } = (await import(/* @vite-ignore */ url)) as {
@@ -51,13 +70,15 @@ async function start({ assetBase, options }: StartOptions): Promise<void> {
       send({ type: "request", id, request });
       return new Promise((resolve) => answerWaiters.set(id, resolve));
     },
-    nextInput(): Promise<Input> {
+    nextInput(request: Extract<GameRequest, { kind: "poskey" }>): Promise<Input> {
       const queued = inputs.shift();
       if (queued) return Promise.resolve(queued);
-      send({ type: "request", id: nextRequestId++, request: { kind: "poskey" } });
+      // the core has finished its turn: a restore has deleted its save, a level change written level files
+      void persist();
+      send({ type: "request", id: nextRequestId++, request });
       return new Promise((resolve) => (inputWaiter = resolve));
     },
-    persist: () => syncfs(false),
+    persist,
   };
 
   module = await createModule({
@@ -101,6 +122,10 @@ self.onmessage = (ev: MessageEvent<UiMessage>) => {
       break;
     case "click":
       pushInput({ click: { x: msg.x, y: msg.y, button: msg.button } });
+      break;
+    case "describe":
+      // messages only arrive while the core is paused in a callback, so the map is settled
+      send({ type: "description", id: msg.id, text: module ? describeSquare(module, msg.x, msg.y) : null });
       break;
     case "answer": {
       const resolve = answerWaiters.get(msg.id);

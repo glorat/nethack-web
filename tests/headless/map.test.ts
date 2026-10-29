@@ -15,3 +15,18 @@ test("a redraw at a direction prompt keeps the corridor under the hero", async (
   await g.yn("\x12");
   expect(g.hero.bgTile).toBe(corridor.tile);
 });
+
+test("a zapped beam is drawn over the floor it crosses", async () => {
+  const g = await (await Session.start({ wizard: true })).skipText();
+  await g.send("\x17");
+  await g.getlin("wand of sleep");
+  await g.send("z");
+  await g.yn(g.state.inventory.find((i) => /wand/.test(i.text))!.accelerator);
+  const from = g.drawn.length;
+  await g.yn("l");
+
+  const glyphs = (globalThis as { nethackGlobal: { constants: { GLYPH: Record<string, number> } } }).nethackGlobal.constants.GLYPH;
+  const beam = g.drawn.slice(from).filter((c) => c.glyph >= glyphs.GLYPH_ZAP_OFF && c.glyph < glyphs.GLYPH_SWALLOW_OFF);
+  expect(beam.length).toBeGreaterThan(0);
+  expect(beam.every((c) => c.bgTile >= 0)).toBe(true);
+});
