@@ -90,7 +90,7 @@ export function applyEvents(state: GameState, events: GameEvent[]): GameState {
         next = { ...next, inventory: event.items, equipment: event.equipment };
         break;
       case "game_over":
-        next = { ...next, gameOver: event.text || "Game over" };
+        next = { ...next, gameOver: event.text };
         break;
       case "error":
         next = { ...next, error: event.text };

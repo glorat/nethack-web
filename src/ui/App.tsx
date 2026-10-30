@@ -10,6 +10,7 @@ import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port
 import { loadTileSheet, type TileSheet } from "../tiles";
 import { DirectionDialog } from "./dialogs/DirectionDialog";
 import { ExtCommandDialog } from "./dialogs/ExtCommandDialog";
+import { GameOverDialog } from "./dialogs/GameOverDialog";
 import { InputDialog } from "./dialogs/InputDialog";
 import { MenuDialog } from "./dialogs/MenuDialog";
 import { OptionsDialog } from "./dialogs/OptionsDialog";
@@ -144,6 +145,7 @@ export function App() {
   const [playing, setPlaying] = useState(false);
   const [cell, setCellState] = useState(savedCell);
   const [editingOptions, setEditingOptions] = useState(false);
+  const [quit, setQuit] = useState(false);
   /** False if the browser wouldn't keep it, which the editor says. */
   const saveOptions = (text: string | null): boolean => {
     if (text !== null)
@@ -470,6 +472,8 @@ export function App() {
         // not over a question, whose keys the editor's text would answer
         { title: "Edit Options File...", disabled: !!pending, run: () => setEditingOptions(true) },
         ...GAME_MENU.slice(1).map(command),
+        null,
+        { title: "New Game", disabled: state.gameOver === null, run: () => location.reload() },
       ],
     },
     {
@@ -544,7 +548,7 @@ export function App() {
             onZoom={zoom}
             onShowInventory={showInventory ? undefined : () => setShowInventory(true)}
             onClick={(x, y, button) => {
-              if (pending) return;
+              if (pending || state.gameOver !== null) return;
               setInventoryKey(0);
               setCommandKey(0);
               setState(nextBatch);
@@ -563,17 +567,16 @@ export function App() {
           />
         ) : null}
         {!state.started ? <div class="overlay-note">Starting…</div> : null}
-        {state.gameOver ? (
-          <div class="dialog-backdrop">
-            <div class="dialog">
-              <div class="dialog-title">{state.gameOver}</div>
-              <div class="dialog-buttons">
-                <button class="primary" onClick={() => location.reload()}>
-                  New game
-                </button>
-              </div>
-            </div>
-          </div>
+        {state.gameOver !== null && !quit && !editingOptions ? (
+          <GameOverDialog
+            text={state.gameOver}
+            onNewGame={() => location.reload()}
+            onQuit={() => {
+              // a page can only close itself if it was opened by a script; otherwise the last screen stays to look at
+              window.close();
+              setQuit(true);
+            }}
+          />
         ) : null}
         {optionsDialog}
         {pending ? <PendingDialog pending={pending} sheet={sheet} answer={answer} passOn={(k) => typeAhead.current.unshift(k)} /> : null}

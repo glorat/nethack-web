@@ -913,3 +913,30 @@ test("tile_file in the options file chooses the tile set, and an unknown one fal
   await expect(page.locator(".inv-icon").first()).toHaveCSS("background-image", /tiles64\.png/);
   await expect(page.locator(".messages")).toContainText(/The tile set "nope\.png" can't be used/);
 });
+
+test("when the game ends, a dialog offers a new game or to quit, which leaves the last screen", async ({ page }) => {
+  await startGame(page, `End${Date.now() % 100000}`);
+  await page.keyboard.press("Shift+S");
+  await expect(page.getByRole("dialog")).toContainText(/Really save\?/);
+  await page.keyboard.press("y");
+  const over = page.getByRole("dialog", { name: "The game is over" });
+  // the core's farewell, then Cocoa's question
+  await expect(over).toContainText(/Be seeing you.*Start a new game, or quit NetHack\./);
+  await expect(over.getByRole("button", { name: "New Game" })).toBeVisible();
+
+  // the options editor's keys are its own, not the dialog's
+  const bar = page.getByRole("menubar");
+  await bar.getByRole("menuitem", { name: "Game" }).click();
+  await page.getByRole("menu", { name: "Game" }).getByRole("menuitem", { name: /Edit Options File/ }).click();
+  const editor = page.getByRole("dialog", { name: "Options file" });
+  await editor.locator("textarea").press("Enter");
+  await expect(editor).toBeVisible();
+  await editor.getByRole("button", { name: "Cancel" }).click();
+
+  // Escape quits, leaving the last screen; a new game is then in the Game menu
+  await page.keyboard.press("Escape");
+  await expect(over).toBeHidden();
+  await bar.getByRole("menuitem", { name: "Game" }).click();
+  await page.getByRole("menu", { name: "Game" }).getByRole("menuitem", { name: "New Game" }).click();
+  await expect(page.getByLabel("Who are you?")).toBeVisible();
+});
