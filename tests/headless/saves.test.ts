@@ -115,6 +115,64 @@ test("checkpointing each turn doesn't make a priest greet the hero again soon af
   expect(g.messages.slice(left).some((t) => /intones/.test(t))).toBe(false);
 });
 
+/** Debug mode only: the luck ^X reports. */
+async function luck(g: Session): Promise<string | undefined> {
+  await g.send("\x18");
+  if (g.prompt?.kind !== "menu") throw new Error("no attributes");
+  const line = g.prompt.items.map((item) => item.text).find((t) => /lucky|luck is/.test(t));
+  await g.dismiss();
+  return line?.trim();
+}
+
+test("a game recovered on a full moon is as lucky as it was", async () => {
+  // a full moon
+  const date = "2024-01-25T12:00:00";
+  const g = await (await Session.start({ wizard: true, date, options: "pettype:none" })).skipText();
+  expect(g.messages.some((t) => /Full moon tonight/.test(t))).toBe(true);
+  await (await g.send("s")).skipText();
+  const before = await luck(g);
+  expect(before).toBe("You are lucky (1).");
+
+  const next = await Session.start({ saves: g.saves(), wizard: true, date });
+  // debug mode asks whether to keep the save file it restores
+  await (await next.yn("n")).skipText();
+  expect(await luck(next)).toBe(before);
+});
+
+test("checkpointing doesn't bring back what's been rubbed off the start of an engraving", async () => {
+  const g = await (await Session.start({ seed: 1, options: "pettype:none" })).skipText();
+  // off the stairs, where nothing can be written
+  await (await g.send("j")).skipText();
+  await g.send("E");
+  await (await g.yn("-")).skipText();
+  await (await g.getlin(".x")).skipText();
+  // stepping off smudges it: with seed 1 the leading '.' is rubbed out
+  await (await g.send("kj:")).skipText();
+  const read = g.messages.findLast((t) => t.startsWith("You read:"));
+  expect(read).toBe('You read: "x".');
+});
+
+test("a meal on the floor that was stopped carries on after recovery", async () => {
+  const g = await (await Session.start({ wizard: true, seed: 1, options: "pettype:none" })).skipText();
+  await g.send("\x17");
+  await (await g.getlin("food ration")).skipText();
+  await g.send("d");
+  await (await g.yn(g.state.inventory.find((i) => /food ration/.test(i.text))!.accelerator)).skipText();
+  // a newt beside the hero stops the meal after a bite
+  await g.send("\x07");
+  await (await g.getlin("newt")).skipText();
+  await g.send("e");
+  await (await g.yn("y")).skipText();
+  expect(g.messages.at(-1)).toBe("You stop eating the food ration.");
+
+  const next = await Session.start({ saves: g.saves(), wizard: true });
+  // debug mode asks whether to keep the save file it restores
+  await (await next.yn("n")).skipText();
+  await next.send("e");
+  await (await next.yn("y")).skipText();
+  expect(next.messages).toContain("You resume your meal.");
+});
+
 test("restoring a save removes it, leaving the game to recovery", async () => {
   const saved = await (await Session.start()).skipText();
   await saved.send("S");
