@@ -56,7 +56,7 @@ Decided for the web:
 - [x] Options file (`.nethackrc`) kept in the browser, editable, read at start.
 - [x] `#saveoptions` writes to a file the game doesn't keep; copy it back into the browser's options file, minus the default menu colours it writes out as the player's own.
 - [x] Tile set choice between 64px and classic 16px, and the `tile_file` option (`setTileSet`).
-- [x] Game-over dialog offers Quit as well as New Game (`showGameOver`).
+- [x] Game-over dialog offers Quit as well as New Game (`showGameOver`). Unlike Cocoa, Quit goes to the landing page, and Save & Quit goes there without the dialog, as a page can't close its own tab.
 - [x] Help: what a key does, NetHack Wiki search.
 
 ## Second pass

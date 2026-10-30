@@ -25,13 +25,15 @@ function serviceWorker(): Plugin {
     generateBundle(_options, bundle) {
       const files = [
         "./",
-        "./index.html",
-        ...Object.keys(bundle).filter((f) => !f.endsWith(".map")).map((f) => `./${f}`),
+        "./play/",
+        ...Object.keys(bundle).filter((f) => !/\.(map|html)$/.test(f)).map((f) => `./${f}`),
         ...publicFiles(publicDir).map((f) => `./${relative(publicDir, f).split("\\").join("/")}`),
       ];
       const hash = createHash("sha256");
       for (const f of Object.values(bundle)) hash.update(f.type === "chunk" ? f.code : f.source);
       for (const f of publicFiles(publicDir)) hash.update(readFileSync(f));
+      // the pages aren't in the bundle yet, and an unchanged sw.js would never fetch them again
+      for (const f of ["./index.html", "./play/index.html"]) hash.update(readFileSync(new URL(f, import.meta.url)));
       const source = readFileSync(new URL("./src/sw/sw.js", import.meta.url), "utf8");
       this.emitFile({
         type: "asset",
@@ -50,10 +52,14 @@ function nethackVersion(): string {
 }
 
 export default defineConfig({
-  base: "./",
   define: { __NETHACK_VERSION__: JSON.stringify(nethackVersion()) },
   plugins: [preact(), serviceWorker()],
   worker: { format: "es" },
+  build: {
+    rollupOptions: {
+      input: { landing: new URL("./index.html", import.meta.url).pathname, play: new URL("./play/index.html", import.meta.url).pathname },
+    },
+  },
   test: {
     include: ["tests/unit/**/*.test.ts", "tests/headless/**/*.test.ts"],
   },

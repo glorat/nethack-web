@@ -4,6 +4,10 @@ NetHack 5.0 in the browser, playable offline. The game core is upstream
 NetHack compiled to WebAssembly with Emscripten; the UI follows the layout of
 the [NetHack Cocoa](https://github.com/glorat/nethack-cocoa) front end.
 
+## Licence
+
+NetHack and this web port are under the NetHack General Public License ([LICENSE](LICENSE)). The site also includes the software listed in `public/third-party-licenses.txt`.
+
 ## Layout
 
 - `nethack/`: upstream NetHack (git submodule) on the `web` branch, which
@@ -13,6 +17,8 @@ the [NetHack Cocoa](https://github.com/glorat/nethack-cocoa) front end.
   window port (`win/shim/winshim.c`) on top of it.
 - `src/protocol.ts`: the messages between the worker and the UI.
 - `src/port/`: UI-side game state, without DOM code.
+- `index.html`, `src/landing.tsx`: the landing page at `/`, which loads none of the game.
+- `play/index.html`, `src/main.tsx`: the game at `/play/`.
 - `src/ui/`: map, stats, equipment, messages, inventory, and dialogs.
 - `src/sw/sw.js`: service worker; the build adds the precache list.
 

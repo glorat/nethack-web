@@ -32,8 +32,9 @@ self.addEventListener("fetch", (event) => {
       const cached = await cache.match(request, { ignoreSearch: true, ignoreVary: true });
       if (cached) return cached;
       if (request.mode === "navigate") {
-        const index = await cache.match("./index.html");
-        if (index) return index;
+        // not index.html: hosts that redirect it to the directory would cache a redirect, which a navigation can't take
+        const page = await cache.match(/\/play\/?$/.test(new URL(request.url).pathname) ? "./play/" : "./");
+        if (page) return page;
       }
       return fetch(request);
     }),

@@ -9,3 +9,25 @@ export function playerName(typed: string): string {
     .map((c, i) => (/[A-Za-z@-]/.test(c) || (/[0-9]/.test(c) && i > 0) ? c : "_"))
     .join("");
 }
+
+export const PLAY_PATH = `${import.meta.env.BASE_URL}play/`;
+
+const NAME_KEY = "nethack-web.name";
+
+export function savedName(): string {
+  try {
+    return localStorage.getItem(NAME_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** False if the browser wouldn't keep it. */
+export function saveName(name: string): boolean {
+  try {
+    localStorage.setItem(NAME_KEY, name);
+    return true;
+  } catch {
+    return false;
+  }
+}

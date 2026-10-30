@@ -22,7 +22,15 @@ export function AboutDialog({ onClose }: { onClose(): void }) {
           <a href="https://www.nethack.org/" target="_blank" rel="noopener">
             NetHack {__NETHACK_VERSION__}
           </a>{" "}
-          by the NetHack DevTeam, distributed under the NetHack General Public License.
+          by the NetHack DevTeam, distributed under the{" "}
+          <a href={`${import.meta.env.BASE_URL}license.txt`} target="_blank" rel="noopener">
+            NetHack General Public License
+          </a>
+          . This web port is unofficial, and not affiliated with the DevTeam. It also includes{" "}
+          <a href={`${import.meta.env.BASE_URL}third-party-licenses.txt`} target="_blank" rel="noopener">
+            other open source software
+          </a>
+          .
         </p>
         <p>
           Web version by Kevin Tam (

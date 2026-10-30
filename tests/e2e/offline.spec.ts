@@ -11,7 +11,12 @@ test("the production build plays offline after one visit", async ({ page, contex
 
   await context.setOffline(true);
   await page.reload();
+  await expect(page.locator(".landing-shot")).toHaveJSProperty("naturalWidth", 1280);
   await page.getByLabel("Who are you?").fill(`Off${Date.now() % 100000}`);
   await page.getByRole("button", { name: "Play" }).click();
-  await expect(page.getByRole("dialog", { name: "Choose your character" })).toBeVisible({ timeout: 15_000 });
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  await expect(picker).toBeVisible({ timeout: 15_000 });
+
+  await page.reload();
+  await expect(picker).toBeVisible({ timeout: 15_000 });
 });

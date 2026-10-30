@@ -264,6 +264,24 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .player-choice button.selected { background: #23395d; border-color: var(--accent); }
 .player-choice button:disabled { opacity: 0.35; }
 
+/* landing page */
+.landing { height: 100%; overflow-y: auto; }
+.landing-bar { display: flex; align-items: center; justify-content: space-between; padding: 4px 16px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
+.landing-title { font-weight: 600; }
+.landing-main { display: flex; flex-direction: column; gap: 16px; max-width: 1120px; margin: 0 auto; padding: 24px 16px; }
+.landing-hero { display: flex; gap: 16px; align-items: stretch; }
+.landing-hero .start-card { flex: none; }
+.landing-shot { flex: 1; min-width: 0; object-fit: cover; object-position: left top; border: 1px solid var(--border); border-radius: 12px; }
+.landing-panels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.landing-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.landing-panel h2 { margin: 0 0 8px; font-size: 15px; }
+.landing-panel p { margin: 8px 0 0; }
+.landing-panel ul { margin: 0; padding-left: 18px; }
+.landing-panel li + li { margin-top: 4px; }
+.landing-panel a { color: var(--accent); }
+.landing-panel kbd { font: 12px var(--mono); }
+.landing-warning { color: #e3b341; }
+
 /* start screen */
 .start, .loading, .fatal { height: 100%; display: flex; align-items: center; justify-content: center; }
 .fatal { color: var(--danger); white-space: pre-wrap; font-family: var(--mono); padding: 24px; }
@@ -276,6 +294,9 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .overlay-note { position: fixed; bottom: 12px; left: 12px; color: var(--muted); }
 
 @media (max-width: 900px) {
+  .landing-hero { flex-direction: column; }
+  .landing-hero .start-card { width: 100%; }
+  .landing-panels { grid-template-columns: 1fr; }
   .inventory, .inv-resize, .show-inventory { display: none; }
   .top { height: auto; flex-wrap: wrap; }
 }

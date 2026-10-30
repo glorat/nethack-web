@@ -24,7 +24,7 @@ export function GameOverDialog({ text, onNewGame, onQuit }: Props) {
     <div class="dialog-backdrop">
       <div class="dialog" role="dialog" aria-label="The game is over">
         <div class="dialog-title">The game is over</div>
-        <div>{text ? `${text} ` : ""}Start a new game, or quit NetHack.</div>
+        <div>{text ? `${text} ` : ""}Start a new game, or quit to the home page.</div>
         <div class="dialog-buttons">
           <button onClick={onQuit}>Quit</button>
           <button class="primary" onClick={onNewGame}>

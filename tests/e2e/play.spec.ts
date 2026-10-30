@@ -4,10 +4,19 @@ import { clipAround } from "../../src/ui/scroll";
 
 /** Answers the character-creation prompts until the map is showing. */
 async function startGame(page: Page, name: string) {
-  await page.goto("/");
-  await page.getByLabel("Who are you?").fill(name);
-  await page.getByRole("button", { name: "Play" }).click();
+  await enterGame(page, name);
   await untilPlaying(page);
+}
+
+/** Goes through the landing page as this character, whatever name it remembers. */
+async function enterGame(page: Page, name: string) {
+  await page.goto("/");
+  const play = page.getByRole("button", { name: /^Play/ });
+  await play.waitFor();
+  const change = page.getByRole("button", { name: "Change Name" });
+  if (await change.isVisible()) await change.click();
+  await page.getByLabel("Who are you?").fill(name);
+  await play.click();
 }
 
 /** Answers whatever the game asks, the picker taking its defaults, until play has settled. */
@@ -35,9 +44,7 @@ async function untilPlaying(page: Page) {
 
 /** Starts a game as the role picked in the character picker. */
 async function startAs(page: Page, name: string, role: RegExp) {
-  await page.goto("/");
-  await page.getByLabel("Who are you?").fill(name);
-  await page.getByRole("button", { name: "Play" }).click();
+  await enterGame(page, name);
   const picker = page.getByRole("dialog", { name: "Choose your character" });
   await picker.getByRole("option", { name: role }).click();
   await picker.getByRole("button", { name: "Play" }).click();
@@ -66,27 +73,63 @@ test("start a game, move, and see status and inventory", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("a saved game survives a reload", async ({ page }) => {
+test("Save & Quit goes to the landing page, and Play and a reload both bring the game back", async ({ page }) => {
   const name = `Save${Date.now() % 100000}`;
   await startGame(page, name);
   const title = await page.locator(".stats-title").innerText();
 
   // Save & Quit doesn't ask again, as in Cocoa
   await page.keyboard.press("S");
-  await expect(page.getByRole("button", { name: "New game" })).toBeVisible();
+  const play = page.getByRole("button", { name: `Play as ${name}` });
+  await expect(play).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe("/");
 
-  await page.reload();
-  await page.getByLabel("Who are you?").fill(name);
-  await page.getByRole("button", { name: "Play" }).click();
+  await play.click();
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
   await expect(page.locator(".stats-title")).toHaveText(title);
 
-  // the restore deleted the save, so another reload recovers the game in progress
+  // the restore deleted the save, so a reload recovers the game in progress
   await page.reload();
-  await page.getByLabel("Who are you?").fill(name);
-  await page.getByRole("button", { name: "Play" }).click();
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
   await expect(page.locator(".stats-title")).toHaveText(title);
+});
+
+test("the landing page opens without loading the game, and Back returns to it from a game", async ({ page }) => {
+  const core: string[] = [];
+  page.on("request", (r) => /nethack\.(js|wasm)/.test(r.url()) && core.push(r.url()));
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "NetHack", exact: true })).toBeVisible();
+  await expect(page.getByText(/unofficial web port/)).toBeVisible();
+  await expect(page.locator(".landing-shot")).toHaveJSProperty("complete", true);
+  expect(core).toEqual([]);
+
+  const licence = await page.request.get("/license.txt");
+  expect(await licence.text()).toContain("NETHACK GENERAL PUBLIC LICENSE");
+
+  await enterGame(page, `Back${Date.now() % 100000}`);
+  await untilPlaying(page);
+  expect(new URL(page.url()).pathname).toBe("/play/");
+  await page.goBack();
+  await expect(page.getByRole("button", { name: /^Play as Back/ })).toBeVisible();
+});
+
+test("the game page without a name goes to the landing page", async ({ page }) => {
+  await page.goto("/play/");
+  await expect(page.getByLabel("Who are you?")).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe("/");
+});
+
+test("a browser that won't keep the name still starts the game, from the address", async ({ page }) => {
+  await page.addInitScript(() => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === "nethack-web.name") throw new Error("blocked");
+      setItem.call(this, key, value);
+    };
+  });
+  await enterGame(page, `Addr${Date.now() % 100000}`);
+  await untilPlaying(page);
+  expect(new URL(page.url()).searchParams.get("name")).toMatch(/^Addr/);
 });
 
 test("a game in progress comes back after a reload without asking", async ({ page }) => {
@@ -97,8 +140,6 @@ test("a game in progress comes back after a reload without asking", async ({ pag
   await page.waitForTimeout(500);
 
   await page.reload();
-  await page.getByLabel("Who are you?").fill(name);
-  await page.getByRole("button", { name: "Play" }).click();
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
   await expect(page.locator(".messages")).not.toContainText(/old game in progress/i);
   await expect(page.locator(".stats-title")).toHaveText(title);
@@ -110,9 +151,7 @@ test("a game playing in another tab is asked about, not taken over", async ({ pa
   await page.keyboard.press("s");
 
   const other = await context.newPage();
-  await other.goto("/");
-  await other.getByLabel("Who are you?").fill(name);
-  await other.getByRole("button", { name: "Play" }).click();
+  await enterGame(other, name);
   await expect(other.getByRole("dialog")).toContainText(/old game in progress/i, { timeout: 15_000 });
 });
 
@@ -158,9 +197,7 @@ test("arrow keys answer a direction prompt", async ({ page }) => {
 });
 
 test("the character picker starts the chosen role", async ({ page }) => {
-  await page.goto("/");
-  await page.getByLabel("Who are you?").fill(`Pick${Date.now() % 100000}`);
-  await page.getByRole("button", { name: "Play" }).click();
+  await enterGame(page, `Pick${Date.now() % 100000}`);
   const picker = page.getByRole("dialog", { name: "Choose your character" });
   await picker.getByRole("option", { name: "Wizard" }).click();
   await picker.getByRole("option", { name: "elf" }).click();
@@ -193,9 +230,7 @@ test("zooming the map is kept across a reload", async ({ page }) => {
   await expect.poll(async () => Number(await canvas.getAttribute("width"))).toBeGreaterThan(width);
   const zoomed = await canvas.getAttribute("width");
 
-  await page.reload();
-  await page.getByLabel("Who are you?").fill(`${name}b`);
-  await page.getByRole("button", { name: "Play" }).click();
+  await enterGame(page, `${name}b`);
   await untilPlaying(page);
   await expect(canvas).toHaveAttribute("width", zoomed!);
 });
@@ -302,9 +337,7 @@ test("ASCII mode draws the map as text and is kept across a reload", async ({ pa
   await page.screenshot({ path: "test-results/ascii.png" });
   const ascii = await canvas.getAttribute("width");
 
-  await page.reload();
-  await page.getByLabel("Who are you?").fill(`${name}b`);
-  await page.getByRole("button", { name: "Play" }).click();
+  await enterGame(page, `${name}b`);
   await untilPlaying(page);
   await expect(page.getByRole("button", { name: "ASCII" })).toHaveAttribute("aria-pressed", "true");
   await expect(canvas).toHaveAttribute("width", ascii!);
@@ -559,9 +592,7 @@ test("Sort A–Z sorts a menu's items under each heading by name, and unticking 
 });
 
 test("a short question from the game shows a button for each answer", async ({ page }) => {
-  await page.goto("/");
-  await page.getByLabel("Who are you?").fill(`Ask${Date.now() % 100000}`);
-  await page.getByRole("button", { name: "Play" }).click();
+  await enterGame(page, `Ask${Date.now() % 100000}`);
   await page.getByRole("dialog", { name: "Choose your character" }).getByRole("button", { name: "Play" }).click();
   // the tutorial offer, after the intro, is a menu of a few short answers
   const dialog = page.getByRole("dialog");
@@ -709,9 +740,7 @@ test("the inventory sidebar can be hidden and shown, and stays as it was left", 
   await expect(sidebar).toBeHidden();
   expect((await map.boundingBox())!.width).toBeGreaterThan(width);
 
-  await page.reload();
-  await page.getByLabel("Who are you?").fill(`${name}b`);
-  await page.getByRole("button", { name: "Play" }).click();
+  await enterGame(page, `${name}b`);
   await untilPlaying(page);
   await expect(sidebar).toBeHidden();
 
@@ -761,9 +790,7 @@ test("dragging the inventory's edge resizes it, within limits, and the width is 
   await drag(500);
   const kept = Math.round((await sidebar.boundingBox())!.width);
 
-  await page.reload();
-  await page.getByLabel("Who are you?").fill(`${name}b`);
-  await page.getByRole("button", { name: "Play" }).click();
+  await enterGame(page, `${name}b`);
   await untilPlaying(page);
   expect(Math.round((await sidebar.boundingBox())!.width)).toBe(kept);
 });
@@ -792,9 +819,7 @@ test("Cmd-Option = and - change the text size, which is kept, and the sidebar gr
   await page.keyboard.press("n");
   await expect(question).toBeHidden();
 
-  await page.reload();
-  await page.getByLabel("Who are you?").fill(`${name}b`);
-  await page.getByRole("button", { name: "Play" }).click();
+  await enterGame(page, `${name}b`);
   await untilPlaying(page);
   expect(await size()).toBe(16);
   await page.keyboard.press("Meta+Alt+Minus");
@@ -898,9 +923,7 @@ test("the View menu switches between the painted and classic tiles, and the choi
   await expect(icon).toHaveCSS("background-image", /tiles16\.bmp/);
   await page.screenshot({ path: "test-results/classic-tiles.png" });
 
-  await page.reload();
-  await page.getByLabel("Who are you?").fill(`${name}b`);
-  await page.getByRole("button", { name: "Play" }).click();
+  await enterGame(page, `${name}b`);
   await untilPlaying(page);
   await expect(page.locator(".inv-icon").first()).toHaveCSS("background-image", /tiles16\.bmp/);
 });
@@ -909,9 +932,7 @@ test("tile_file in the options file chooses the tile set, and an unknown one fal
   const play = async (name: string, options: string) => {
     await page.goto("/");
     await page.evaluate((options) => localStorage.setItem("nethack.options", options), options);
-    await page.reload();
-    await page.getByLabel("Who are you?").fill(name);
-    await page.getByRole("button", { name: "Play" }).click();
+    await enterGame(page, name);
     await untilPlaying(page);
   };
   const id = Date.now() % 100000;
@@ -925,13 +946,23 @@ test("tile_file in the options file chooses the tile set, and an unknown one fal
   await expect(page.locator(".messages")).toContainText(/The tile set "nope\.png" can't be used/);
 });
 
-test("when the game ends, a dialog offers a new game or to quit, which leaves the last screen", async ({ page }) => {
-  await startGame(page, `End${Date.now() % 100000}`);
-  await page.keyboard.press("Shift+S");
+test("when the game ends, a dialog offers a new game under the same name, or the landing page", async ({ page }) => {
+  const name = `End${Date.now() % 100000}`;
+  await startGame(page, name);
+  await expect(page.locator(".stats-title")).toBeVisible();
   const over = page.getByRole("dialog", { name: "The game is over" });
-  // the core's farewell, then Cocoa's question
-  await expect(over).toContainText(/Be seeing you.*Start a new game, or quit NetHack\./);
-  await expect(over.getByRole("button", { name: "New Game" })).toBeVisible();
+  const quitGame = async () => {
+    await page.keyboard.press("#");
+    await page.keyboard.type("quit");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("y");
+    for (let i = 0; i < 40 && !(await over.isVisible()); i++) {
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(150);
+    }
+    await expect(over).toContainText("Start a new game, or quit to the home page.");
+  };
+  await quitGame();
 
   // the options editor's keys are its own, not the dialog's
   const bar = page.getByRole("menubar");
@@ -942,12 +973,15 @@ test("when the game ends, a dialog offers a new game or to quit, which leaves th
   await expect(editor).toBeVisible();
   await editor.getByRole("button", { name: "Cancel" }).click();
 
-  // Escape quits, leaving the last screen; a new game is then in the Game menu
+  // Return starts another game at once, without going through the landing page
+  await page.keyboard.press("Enter");
+  await untilPlaying(page);
+  expect(new URL(page.url()).pathname).toBe("/play/");
+
+  // Escape goes to the landing page
+  await quitGame();
   await page.keyboard.press("Escape");
-  await expect(over).toBeHidden();
-  await bar.getByRole("menuitem", { name: "Game" }).click();
-  await page.getByRole("menu", { name: "Game" }).getByRole("menuitem", { name: "New Game" }).click();
-  await expect(page.getByLabel("Who are you?")).toBeVisible();
+  await expect(page.getByRole("button", { name: `Play as ${name}` })).toBeVisible();
 });
 
 test("the Help menu opens the game's help and the NetHack Wiki", async ({ page, context }) => {
@@ -1079,9 +1113,7 @@ test("Choose Font sets the ASCII map's font and size, switches to ASCII, and is 
   const chosen = await height();
   await page.screenshot({ path: "test-results/ascii-font.png" });
 
-  await page.reload();
-  await page.getByLabel("Who are you?").fill(`${name}b`);
-  await page.getByRole("button", { name: "Play" }).click();
+  await enterGame(page, `${name}b`);
   await untilPlaying(page);
   await expect.poll(height).toBe(chosen);
 

@@ -3,7 +3,8 @@ import { GameClient } from "../client";
 import { WIKI_URL } from "../port/describe";
 import { commandToRun, listCommands } from "../port/extcmd";
 import { ArrowChords, keyCode, takeLine, type KeyLike } from "../port/keys";
-import { configFile, OPTIONS_TEMPLATE, savedOptionsFile } from "../port/options";
+import { playerName, savedName } from "../port/name";
+import { configFile, OPTIONS_KEY, savedOptions, savedOptionsFile, saveOptions as keepOptions } from "../port/options";
 import { applyEvents, initialState, nextBatch } from "../port/state";
 import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, textSizeFromOptions } from "../port/textsize";
 import type { Answer, GameRequest } from "../protocol";
@@ -29,7 +30,6 @@ import { MapView } from "./MapView";
 import { type BarMenu, MenuBar, type MenuEntry } from "./MenuBar";
 import { COMMAND_MENUS, type CommandItem, GAME_MENU, HELP_MENU, WIZARD_MENU } from "./commands";
 import { MessageView } from "./MessageView";
-import { StartScreen } from "./StartScreen";
 import { StatsView } from "./StatsView";
 
 const TILE_SET_KEY = "nethack.tileSet";
@@ -51,15 +51,9 @@ const ASCII_FONT_KEY = "nethack.asciiFont";
 const INVENTORY_KEY = "nethack.showInventory";
 const INVENTORY_WIDTH_KEY = "nethack.inventoryWidth";
 const TEXT_SIZE_KEY = "nethack.textSize";
-const OPTIONS_KEY = "nethack.options";
-
-function savedOptions(): string {
-  try {
-    return localStorage.getItem(OPTIONS_KEY) ?? OPTIONS_TEMPLATE;
-  } catch {
-    return OPTIONS_TEMPLATE;
-  }
-}
+// the core's farewell after Save & Quit, the one ending with nothing left to read
+const SAVED_FAREWELL = "Be seeing you...";
+const LANDING_PATH = import.meta.env.BASE_URL;
 // with Cmd or Ctrl and Option, as Cocoa's View menu has them; 0 is back to the default
 const TEXT_SIZE_KEYS: Record<string, (size: number) => number> = {
   Equal: biggerTextSize,
@@ -174,15 +168,9 @@ export function App() {
   const [asciiFont, setAsciiFont] = useState(savedAsciiFont);
   // the browser's own dialogs, during which the game hears no keys
   const ownDialog = editingOptions || about || choosingFont;
-  const [quit, setQuit] = useState(false);
   /** False if the browser wouldn't keep it, which the editor says. */
   const saveOptions = (text: string | null): boolean => {
-    if (text !== null)
-      try {
-        localStorage.setItem(OPTIONS_KEY, text);
-      } catch {
-        return false;
-      }
+    if (text !== null && !keepOptions(text)) return false;
     setEditingOptions(false);
     return true;
   };
@@ -372,7 +360,7 @@ export function App() {
   useEffect(() => {
     // a choice made while this one loads wins, whichever arrives first
     let live = true;
-    loadTileSheet(new URL(`tiles/${tileSet.file}`, document.baseURI).href, tileSet.size)
+    loadTileSheet(new URL(`${import.meta.env.BASE_URL}tiles/${tileSet.file}`, location.href).href, tileSet.size)
       .then((loaded) => live && setSheet(loaded))
       .catch((e) => {
         if (!live) return;
@@ -480,11 +468,22 @@ export function App() {
     wakeBeep();
     setPlaying(true);
     client.start({
-      assetBase: new URL("./", document.baseURI).href,
+      assetBase: new URL(import.meta.env.BASE_URL, location.href).href,
       options: `name:${name}`,
       config: configFile(`${BASE_OPTIONS}${ascii ? ",ascii_map" : ""}`, savedOptions()),
     });
   };
+
+  useEffect(() => {
+    const name = playerName(new URLSearchParams(location.search).get("name") ?? savedName());
+    if (!name) location.replace(LANDING_PATH);
+    else if (sheet && !playing) start(name);
+  }, [sheet]);
+
+  // replace: Back from the landing page shouldn't start another game
+  useEffect(() => {
+    if (state.gameOver === SAVED_FAREWELL) location.replace(LANDING_PATH);
+  }, [state.gameOver]);
 
   // absent until the core has read its options, which would overrule a switch made before
   const toggleAscii = state.status.BL_TITLE
@@ -575,13 +574,7 @@ export function App() {
   if (state.error) return <div class="fatal">{state.error}</div>;
   if (!sheet) return <div class="loading">Loading tiles…</div>;
   const optionsDialog = editingOptions ? <OptionsDialog text={savedOptions()} onDone={saveOptions} /> : null;
-  if (!playing)
-    return (
-      <>
-        <StartScreen onStart={start} onOptions={() => setEditingOptions(true)} />
-        {optionsDialog}
-      </>
-    );
+  if (!playing) return <div class="loading">Loading…</div>;
 
   return (
     <div class="app">
@@ -624,15 +617,11 @@ export function App() {
           />
         ) : null}
         {!state.started ? <div class="overlay-note">Starting…</div> : null}
-        {state.gameOver !== null && !quit && !ownDialog ? (
+        {state.gameOver !== null && state.gameOver !== SAVED_FAREWELL && !ownDialog ? (
           <GameOverDialog
             text={state.gameOver}
             onNewGame={() => location.reload()}
-            onQuit={() => {
-              // a page can only close itself if it was opened by a script; otherwise the last screen stays to look at
-              window.close();
-              setQuit(true);
-            }}
+            onQuit={() => location.replace(LANDING_PATH)}
           />
         ) : null}
         {optionsDialog}

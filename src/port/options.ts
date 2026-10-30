@@ -79,3 +79,23 @@ export function configFile(base: string, player: string): string {
   });
   return left.length ? `${player.replace(/\n?$/, "\n")}OPTIONS=${left.join(",")}\n` : player;
 }
+
+export const OPTIONS_KEY = "nethack.options";
+
+export function savedOptions(): string {
+  try {
+    return localStorage.getItem(OPTIONS_KEY) ?? OPTIONS_TEMPLATE;
+  } catch {
+    return OPTIONS_TEMPLATE;
+  }
+}
+
+/** False if the browser wouldn't keep it. */
+export function saveOptions(text: string): boolean {
+  try {
+    localStorage.setItem(OPTIONS_KEY, text);
+    return true;
+  } catch {
+    return false;
+  }
+}
