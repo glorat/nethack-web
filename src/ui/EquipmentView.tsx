@@ -1,4 +1,5 @@
 import type { EquipmentSlot, MenuItem } from "../protocol";
+import { equipmentTip } from "../port/equipment";
 import { tileStyle, type TileSheet } from "../tiles";
 
 // slot order matches nhweb_equip_obj() in sys/libnh/libnhmain.c
@@ -28,7 +29,7 @@ export function EquipmentView({ equipment, inventory, sheet, onChoose }: Props) 
         return (
           <button
             class="equip-slot"
-            title={text ?? name}
+            title={equipmentTip(name, letter, text)}
             disabled={!letter}
             style={item ? tileStyle(sheet, item.tile, CELL) : undefined}
             onClick={() => letter && onChoose(letter)}

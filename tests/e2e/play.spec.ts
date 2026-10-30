@@ -55,6 +55,8 @@ test("start a game, move, and see status and inventory", async ({ page }) => {
   await expect(page.locator(".meter.hp .meter-text")).toHaveText(/\d+\(\d+\)/);
   await expect(page.locator(".inv-item").first()).toBeVisible();
   await expect(page.locator(".equip-slot:not([disabled])").first()).toBeVisible();
+  await expect(page.locator(".equip-slot:not([disabled])").first()).toHaveAttribute("title", /^\([a-zA-Z]\) /);
+  await expect(page.locator('.equip-slot[title*="being worn"]')).toHaveCount(0);
 
   for (const key of ["l", "l", "j", "h", "k"]) {
     await page.keyboard.press(key);

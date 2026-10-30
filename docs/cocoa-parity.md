@@ -62,7 +62,7 @@ Decided for the web:
 ## Second pass
 
 - [x] Save & Quit doesn't ask "Really save?" or "Overwrite the old file?" (`wincocoa.m` `AlwaysYes`).
-- [ ] Equipment tooltips as Cocoa words them: "(a) +1 long sword", without "(being worn)" (`EquipmentView.m`).
+- [x] Equipment tooltips as Cocoa words them: "(a) +1 long sword", without "(being worn)" (`EquipmentView.m`).
 - [ ] Extended commands: a sole match is completed and selected as you type; Esc clears what's typed before it cancels (`ExtCommandWindowController.m`).
 - [ ] The bell, and a refused click or inventory pick, are heard or seen (`nhbell`, `NSBeep`).
 - [ ] Choose the ASCII map's font and size, remembered; choosing one switches to ASCII (`changeFont`).
