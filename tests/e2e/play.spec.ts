@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { sortKey } from "../../src/port/sort";
 import { clipAround } from "../../src/ui/scroll";
 
 /** Answers the character-creation prompts until the map is showing. */
@@ -510,4 +511,35 @@ test("in a menu of several picks, . or , picks everything, - or \\ nothing, and 
   await expect(picked).toHaveCount(all);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
+});
+
+test("Sort A–Z sorts a menu's items under each heading by name, and unticking restores the order", async ({ page }) => {
+  // her spear comes before her dagger
+  await startAs(page, `Sort${Date.now() % 100000}`, /Valkyrie/);
+  await page.keyboard.press("Shift+D");
+  const dialog = page.getByRole("dialog");
+  await dialog.locator(".menu-item", { hasText: /all types/i }).click();
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(dialog).toContainText("dagger");
+  // a heading as "# name", an item as its text
+  const rows = () =>
+    dialog.locator(".menu-items > *").evaluateAll((els) =>
+      els.map((el) => (el.classList.contains("menu-heading") ? `# ${el.textContent}` : el.querySelector(".menu-text")!.textContent!)),
+    );
+  const before = await rows();
+
+  await dialog.getByLabel("Sort A–Z").check();
+  const after = await rows();
+  // the same rows, headings where they were, and the items between them in order of name
+  expect([...after].sort()).toEqual([...before].sort());
+  expect(after.findIndex((r) => r.includes("dagger"))).toBeLessThan(after.findIndex((r) => r.includes("spear")));
+  after.forEach((row, i) => row.startsWith("# ") && expect(before[i]).toBe(row));
+  for (let i = 1; i < after.length; i++) {
+    if (after[i].startsWith("# ") || after[i - 1].startsWith("# ")) continue;
+    expect(sortKey(after[i - 1]).localeCompare(sortKey(after[i]), undefined, { sensitivity: "base" })).toBeLessThanOrEqual(0);
+  }
+
+  await dialog.getByLabel("Sort A–Z").uncheck();
+  expect(await rows()).toEqual(before);
+  await page.keyboard.press("Escape");
 });

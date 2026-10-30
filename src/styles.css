@@ -160,9 +160,10 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 }
 .input-dialog form { display: contents; }
 .dialog-title { font-weight: 600; }
-.dialog-buttons { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
+.dialog-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; align-items: center; }
 .hint { color: var(--muted); }
-.dialog-buttons .select-all { margin-right: auto; }
+.dialog-left { display: flex; align-items: center; gap: 8px; margin-right: auto; }
+.sort-toggle { display: flex; align-items: center; gap: 4px; color: var(--muted); }
 .menu-items, .ext-list { overflow-y: auto; margin: 0 -14px; }
 .menu-heading { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 8px 14px 2px; }
 .menu-heading.strong { color: var(--text); }

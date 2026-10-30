@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { MenuHow, MenuItem, MenuSelection } from "../../protocol";
+import { sortedOrder } from "../../port/sort";
 import { tileStyle, type TileSheet } from "../../tiles";
 import { textStyle } from "../colors";
 
@@ -34,6 +35,10 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
   // digits typed before an item's letter: take only that many of it
   const count = useRef(0);
   const [, rerender] = useState(0);
+  const [sorted, setSorted] = useState(false);
+  const order = sorted ? sortedOrder(items) : items.map((_, i) => i);
+  // only lists of things are worth sorting
+  const sortable = how !== "none" && items.some((item) => item.tile >= 0);
   const update = () => rerender((n) => n + 1);
 
   const finish = (picked: Map<number, number>) =>
@@ -127,7 +132,7 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
       <div class="dialog menu-dialog" role="dialog">
         {prompt ? <div class="dialog-title">{prompt}</div> : null}
         <div class={columns > 1 ? "menu-items tabbed" : "menu-items"} style={{ "--menu-columns": columns }}>
-          {items.map((item, i) =>
+          {order.map((i) => [items[i], i] as const).map(([item, i]) =>
             item.identifier === 0 ? (
               <div
                 class={`menu-heading${item.attr === ATR_INVERSE || item.attr === ATR_BOLD ? " strong" : ""}${item.text.includes("\t") ? " columns" : ""}`}
@@ -155,11 +160,15 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
           )}
         </div>
         <div class="dialog-buttons">
-          {how === "any" ? (
-            <button class="select-all" onClick={() => setAll(true)}>
-              Select All
-            </button>
-          ) : null}
+          <div class="dialog-left">
+            {how === "any" ? <button onClick={() => setAll(true)}>Select All</button> : null}
+            {sortable ? (
+              <label class="sort-toggle">
+                <input type="checkbox" checked={sorted} onChange={(e) => setSorted((e.target as HTMLInputElement).checked)} />
+                Sort A–Z
+              </label>
+            ) : null}
+          </div>
           {count.current > 0 ? <span class="hint">Count: {count.current}</span> : null}
           <button onClick={() => onDone(null)}>{how === "none" ? "Close" : "Cancel"}</button>
           {how === "any" ? (

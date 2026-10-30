@@ -30,7 +30,7 @@ Decided for the web:
 - [x] Counts: digits typed before a letter take that many.
 - [x] Any inventory letter is accepted in a suitable-items menu, not only those listed (`UnlistedInventory`).
 - [x] Pick-any keys `.` `,` select all and `-` `\` clear; a Select All button.
-- [ ] Sort A–Z checkbox, sorting items under each heading (`sortItems`).
+- [x] Sort A–Z checkbox, sorting items under each heading (`sortItems`).
 - [ ] Pick-one menus of 2–4 short items without tiles shown as answer buttons (`isQuestion`, `buildQuestionContents`).
 - [ ] Read-only menus as selectable, copyable text.
 - [ ] Keyboard and hover highlight; Return or space picks the highlighted row.
