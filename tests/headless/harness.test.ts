@@ -25,6 +25,15 @@ test("the page's clock is the game's", async () => {
   expect(await moon()).toBe(false);
 });
 
+test("the page's time zone decides the game's date", async () => {
+  const moon = async (utcOffset: number) =>
+    (await (await Session.start({ date: "2024-01-24T20:00:00Z", utcOffset })).skipText()).messages.some((t) =>
+      /full moon tonight/i.test(t),
+    );
+  expect(await moon(0)).toBe(false);
+  expect(await moon(10 * 3600)).toBe(true);
+});
+
 test("the page names the game", async () => {
   const g = await (await Session.start({ wizard: true })).skipText();
   await g.send("#");
