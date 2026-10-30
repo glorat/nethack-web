@@ -10,6 +10,7 @@ const ICON = 24;
 const ATR_BOLD = 1;
 const ATR_INVERSE = 7;
 const MAX_COUNT = 0x7fffffff;
+const SCROLL_KEYS = { ArrowUp: 1, ArrowDown: 1, PageUp: 1, PageDown: 1, Home: 1, End: 1 };
 
 /** A heading's inverse (menu_headings' default) is drawn as a strong heading instead. */
 export function headingStyle(item: MenuItem): Record<string, string> {
@@ -77,11 +78,44 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     if (how === "any") toggle([i]);
   };
 
+  // a read-only list is read like a text view: selected, copied and scrolled by key
+  const list = useRef<HTMLDivElement>(null);
+  const selectList = () => {
+    if (!list.current) return;
+    const range = document.createRange();
+    range.selectNodeContents(list.current);
+    getSelection()?.removeAllRanges();
+    getSelection()?.addRange(range);
+  };
+  const scrollList = (key: string) => {
+    const el = list.current;
+    if (!el) return;
+    const page = el.clientHeight * 0.9;
+    const by: Record<string, number> = { ArrowUp: -20, ArrowDown: 20, PageUp: -page, PageDown: page, Home: -el.scrollHeight, End: el.scrollHeight };
+    el.scrollTop += by[key];
+  };
+  // copied as Cocoa's text view holds it: a letter, a tab and the item, columns tab-separated
+  const copyList = (e: ClipboardEvent) => {
+    const selection = getSelection();
+    if (!selection || !list.current || !e.clipboardData) return;
+    const lines = [...list.current.children].flatMap((row, n) => {
+      if (!selection.containsNode(row, true)) return [];
+      const item = items[order[n]];
+      return [item.identifier === 0 ? item.text : `${item.accelerator}\t${item.text}`];
+    });
+    if (!lines.length) return;
+    e.preventDefault();
+    e.clipboardData.setData("text/plain", lines.join("\n"));
+  };
+
   // layout effect: listen before the dialog is painted, or a fast key press is lost
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      e.preventDefault();
       e.stopPropagation();
+      if (how === "none" && (e.metaKey || e.ctrlKey) && e.key === "c") return;
+      e.preventDefault();
+      if (how === "none" && (e.metaKey || e.ctrlKey) && e.key === "a") return selectList();
+      if (how === "none" && e.key in SCROLL_KEYS) return scrollList(e.key);
       if (e.key === "Escape") return onDone(null);
       if (e.key === "Enter" || (e.key === " " && how !== "one")) {
         if (how === "one" && selected.current.size === 0) return onDone(null);
@@ -128,6 +162,9 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     return n > 0 ? <span class="menu-count">{n} of </span> : null;
   };
 
+  // a list to read is text to select and copy, not buttons
+  const Row = how === "none" ? "div" : "button";
+
   if (isQuestion(how, items))
     return (
       <div class="dialog-backdrop">
@@ -157,7 +194,12 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     <div class="dialog-backdrop">
       <div class="dialog menu-dialog" role="dialog">
         {prompt ? <div class="dialog-title">{prompt}</div> : null}
-        <div class={columns > 1 ? "menu-items tabbed" : "menu-items"} style={{ "--menu-columns": columns }}>
+        <div
+          ref={list}
+          onCopy={how === "none" ? copyList : undefined}
+          class={`menu-items${columns > 1 ? " tabbed" : ""}${how === "none" ? " readonly" : ""}`}
+          style={{ "--menu-columns": columns }}
+        >
           {order.map((i) => [items[i], i] as const).map(([item, i]) =>
             item.identifier === 0 ? (
               <div
@@ -167,9 +209,9 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
                 {item.text.includes("\t") ? fields(item.text, headingStyle(item)) : item.text || " "}
               </div>
             ) : (
-              <button
+              <Row
                 class={`menu-item${selected.current.has(i) ? " selected" : ""}`}
-                onClick={() => choose(i)}
+                onClick={how === "none" ? undefined : () => choose(i)}
               >
                 <span class="inv-icon" style={tileStyle(sheet, item.tile, ICON)} />
                 <span class="inv-letter">{item.accelerator}</span>
@@ -181,7 +223,7 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
                     {item.text}
                   </span>
                 )}
-              </button>
+              </Row>
             ),
           )}
         </div>

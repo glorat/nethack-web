@@ -560,3 +560,34 @@ test("a short question from the game shows a button for each answer", async ({ p
   await untilPlaying(page);
   await expect(page.locator(".stats-title")).toBeVisible();
 });
+
+test("a read-only list is text that can be selected and copied", async ({ page }) => {
+  await startGame(page, `Copy${Date.now() % 100000}`);
+  // ^X lists attributes in a read-only menu
+  await page.keyboard.press("Control+x");
+  const dialog = page.getByRole("dialog");
+  const list = dialog.locator(".menu-items");
+  await expect(list).toContainText(/You are/);
+
+  const key = (key: string) =>
+    page.evaluate((key) => window.dispatchEvent(new KeyboardEvent("keydown", { key, ctrlKey: true, cancelable: true })), key);
+  // Ctrl-A selects the list; Ctrl-C copies it, and nothing else reaches the browser
+  expect(await key("a")).toBe(false);
+  expect(await page.evaluate(() => getSelection()!.toString())).toMatch(/You are/i);
+  expect(await key("c")).toBe(true);
+  expect(await key("r")).toBe(false);
+
+  const copied = await list.evaluate((el) => {
+    const data = new DataTransfer();
+    el.dispatchEvent(new ClipboardEvent("copy", { clipboardData: data, bubbles: true, cancelable: true }));
+    return data.getData("text/plain");
+  });
+  // the core's text as it is, not as styled, one line to a row
+  expect(copied).toMatch(/^ *You are/m);
+  expect(copied).toMatch(/^[^\n]*[a-z][^\n]*:$/m);
+
+  await page.keyboard.press("PageDown");
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+});

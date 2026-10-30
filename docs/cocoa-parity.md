@@ -33,7 +33,7 @@ Decided for the web:
 - [x] Sort A–Z checkbox, sorting items under each heading (`sortItems`).
 - [x] Pick-one menus of 2–4 short items without tiles shown as answer buttons (`isQuestion`, `buildQuestionContents`).
 - [x] Items the core gave no letter get the next free one, as tty and Cocoa hand out (`buildRows`).
-- [ ] Read-only menus as selectable, copyable text.
+- [x] Read-only menus as selectable, copyable text.
 - [ ] Keyboard and hover highlight; Return or space picks the highlighted row.
 
 ## Prompts

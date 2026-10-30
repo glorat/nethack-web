@@ -148,8 +148,9 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .inv-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* dialogs */
+/* a drag from outside a read-only list mustn't select the page under it */
 .dialog-backdrop {
-  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45);
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); user-select: none;
   display: flex; align-items: center; justify-content: center; z-index: 10;
 }
 .dialog {
@@ -169,6 +170,9 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .menu-heading.strong { color: var(--text); }
 .menu-item { padding: 3px 14px; }
 .menu-item.selected { background: #23395d; }
+.menu-items.readonly { user-select: text; }
+.menu-items.readonly .menu-item { cursor: text; }
+.menu-items.readonly .menu-item:hover { background: none; }
 .menu-text { white-space: pre; }
 .menu-dialog.question { width: 380px; }
 .answers { display: flex; flex-direction: column; gap: 8px; }
@@ -181,7 +185,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .menu-heading.columns { text-transform: none; letter-spacing: normal; }
 .menu-heading.columns > :first-child { grid-column: 3; }
 .menu-field { white-space: pre; padding-right: 10px; }
-.text-body { font: 12px/1.35 var(--mono); overflow: auto; margin: 0; }
+.text-body { font: 12px/1.35 var(--mono); overflow: auto; margin: 0; user-select: text; }
 .text-body .strong { font-weight: 700; }
 .ext-item { display: flex; gap: 12px; width: 100%; border: 0; border-radius: 0; background: none; padding: 3px 14px; text-align: left; }
 .ext-item.active, .ext-item:hover { background: #23395d; }
