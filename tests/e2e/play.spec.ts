@@ -69,9 +69,8 @@ test("a saved game survives a reload", async ({ page }) => {
   await startGame(page, name);
   const title = await page.locator(".stats-title").innerText();
 
+  // Save & Quit doesn't ask again, as in Cocoa
   await page.keyboard.press("S");
-  await expect(page.getByRole("dialog")).toContainText(/Really save\?/);
-  await page.keyboard.press("y");
   await expect(page.getByRole("button", { name: "New game" })).toBeVisible();
 
   await page.reload();
@@ -776,9 +775,9 @@ test("Cmd-Option = and - change the text size, which is kept, and the sidebar gr
   expect(await sidebar()).toBeCloseTo((narrow * 16) / 13, 0);
   // the map doesn't scale with the text, nor do questions, as in Cocoa
   expect(await map()).toBe(mapWidth);
-  await page.keyboard.press("Shift+S");
+  await page.keyboard.press("Alt+p");
   const question = page.getByRole("dialog");
-  await expect(question).toContainText(/Really save/);
+  await expect(question).toContainText(/want to pray/);
   expect(await question.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBe(13);
   await page.keyboard.press("n");
   await expect(question).toBeHidden();
@@ -919,8 +918,6 @@ test("tile_file in the options file chooses the tile set, and an unknown one fal
 test("when the game ends, a dialog offers a new game or to quit, which leaves the last screen", async ({ page }) => {
   await startGame(page, `End${Date.now() % 100000}`);
   await page.keyboard.press("Shift+S");
-  await expect(page.getByRole("dialog")).toContainText(/Really save\?/);
-  await page.keyboard.press("y");
   const over = page.getByRole("dialog", { name: "The game is over" });
   // the core's farewell, then Cocoa's question
   await expect(over).toContainText(/Be seeing you.*Start a new game, or quit NetHack\./);

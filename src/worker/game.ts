@@ -37,6 +37,8 @@ const MENU_BEHAVE_PERMINV = 1;
 const MENU_ITEMFLAGS_SELECTED = 1;
 const ESC = 27;
 const HASH = "#".charCodeAt(0);
+// Save & Quit is a deliberate choice, as Cocoa takes it
+const ALWAYS_YES = ["Really save?", "Overwrite the old file?"];
 
 interface Window {
   kind: number;
@@ -493,6 +495,10 @@ export class Game {
   }
 
   private async yn(query: string, choices: string, def: number): Promise<number> {
+    if (ALWAYS_YES.includes(query)) {
+      this.m._nhweb_set_yn_number(0);
+      return "y".charCodeAt(0);
+    }
     const answer = await this.ask({
       kind: "yn",
       query,

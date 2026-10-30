@@ -31,7 +31,6 @@ test("a game left unfinished is offered for recovery and comes back", async () =
 test("restoring a save removes it, leaving the game to recovery", async () => {
   const saved = await (await Session.start()).skipText();
   await saved.send("S");
-  await saved.yn("y");
 
   const restored = await (await Session.start({ saves: saved.saves() })).skipText();
   expect(restored.messages.some((t) => /welcome back/i.test(t))).toBe(true);
@@ -62,7 +61,6 @@ test("a restored game, and one recovered after that, show the saved state", asyn
   const shieldOff = g.state.status.BL_AC?.text;
   expect(Number(shieldOff)).toBeGreaterThan(Number(shieldOn));
   await g.send("S");
-  await g.yn("y");
 
   const restored = await (await Session.start({ saves: g.saves() })).skipText();
   expect(restored.state.status.BL_AC?.text).toBe(shieldOff);

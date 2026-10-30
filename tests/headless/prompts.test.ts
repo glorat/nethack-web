@@ -25,10 +25,10 @@ test("an answer ending in you is logged like any other", async () => {
 
 test("Escape answers a yes/no question with no, and the log shows it", async () => {
   const g = await (await Session.start()).skipText();
-  await g.send("S");
+  await extended(g, "quit");
   await g.answer(null);
   expect(g.ended).toBe(false);
-  expect(g.messages).toContain("Really save? [yn] (n) n");
+  expect(g.messages).toContain("Really quit without saving? [yn] (n) n");
 });
 
 test("a list shown in the middle of a move holds the move until it is closed", async () => {

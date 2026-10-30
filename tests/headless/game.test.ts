@@ -26,7 +26,6 @@ test("picking an inventory item offers its actions", async () => {
 test("a saved game restores", async () => {
   const g = await (await Session.start()).skipText();
   await g.send("S");
-  await g.yn("y");
   expect(g.ended).toBe(true);
   expect([...g.saves().keys()]).toContain("0Tester");
 
