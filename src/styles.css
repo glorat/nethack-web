@@ -168,6 +168,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .menu-item { padding: 3px 14px; }
 .menu-item.selected { background: #23395d; }
 .menu-text { white-space: pre; }
+.menu-count { color: var(--accent); font-weight: 600; }
 .menu-items.tabbed { display: grid; grid-template-columns: 24px auto repeat(var(--menu-columns), auto) 1fr; column-gap: 6px; }
 .menu-items.tabbed > * { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; }
 .menu-heading.columns { text-transform: none; letter-spacing: normal; }

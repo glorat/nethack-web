@@ -1,4 +1,5 @@
-import { useLayoutEffect, useState } from "preact/hooks";
+import type { ComponentChildren } from "preact";
+import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { MenuHow, MenuItem, MenuSelection } from "../../protocol";
 import { tileStyle, type TileSheet } from "../../tiles";
 import { textStyle } from "../colors";
@@ -6,6 +7,7 @@ import { textStyle } from "../colors";
 const ICON = 24;
 const ATR_BOLD = 1;
 const ATR_INVERSE = 7;
+const MAX_COUNT = 0x7fffffff;
 
 /** A heading's inverse (menu_headings' default) is drawn as a strong heading instead. */
 export function headingStyle(item: MenuItem): Record<string, string> {
@@ -21,21 +23,39 @@ interface Props {
 }
 
 export function MenuDialog({ how, prompt, items, sheet, onDone }: Props) {
-  const [selected, setSelected] = useState<Set<number>>(
-    () => new Set(items.flatMap((item, i) => (item.preselected && item.identifier !== 0 ? [i] : []))),
+  // what is picked, each with how many of it: -1 for all. Refs, as keys typed ahead are replayed
+  // one after another before a render would bring new state.
+  const [preselected] = useState(
+    () => new Map(items.flatMap((item, i) => (item.preselected && item.identifier !== 0 ? [[i, -1]] : []))),
   );
+  const selected = useRef<Map<number, number>>(preselected);
+  // digits typed before an item's letter: take only that many of it
+  const count = useRef(0);
+  const [, rerender] = useState(0);
+  const update = () => rerender((n) => n + 1);
 
-  const finish = (indices: Iterable<number>) =>
-    onDone([...indices].map((i) => ({ identifier: items[i].identifier, count: -1 })));
+  const finish = (picked: Map<number, number>) =>
+    onDone([...picked].map(([i, n]) => ({ identifier: items[i].identifier, count: n })));
 
-  const toggle = (i: number) => {
+  const taking = () => {
+    const n = count.current;
+    count.current = 0;
+    return n > 0 ? n : -1;
+  };
+
+  const toggle = (indices: number[]) => {
+    const n = taking();
+    for (const i of indices) {
+      if (selected.current.has(i)) selected.current.delete(i);
+      else selected.current.set(i, n);
+    }
+    update();
+  };
+
+  const choose = (i: number) => {
     if (items[i].identifier === 0) return;
-    if (how === "one") return finish([i]);
-    if (how === "none") return;
-    const next = new Set(selected);
-    if (next.has(i)) next.delete(i);
-    else next.add(i);
-    setSelected(next);
+    if (how === "one") return finish(new Map([[i, taking()]]));
+    if (how === "any") toggle([i]);
   };
 
   // layout effect: listen before the dialog is painted, or a fast key press is lost
@@ -45,22 +65,24 @@ export function MenuDialog({ how, prompt, items, sheet, onDone }: Props) {
       e.stopPropagation();
       if (e.key === "Escape") return onDone(null);
       if (e.key === "Enter" || (e.key === " " && how !== "one")) {
-        if (how === "one" && selected.size === 0) return onDone(null);
-        return finish(selected);
+        if (how === "one" && selected.current.size === 0) return onDone(null);
+        return finish(selected.current);
       }
-      const hits = items.flatMap((item, i) =>
-        item.identifier !== 0 && (item.accelerator === e.key || item.groupAccelerator === e.key) ? [i] : [],
-      );
+      if (how === "none") return;
+      const letters = items.flatMap((item, i) => (item.identifier !== 0 && item.accelerator === e.key ? [i] : []));
+      const group = items.flatMap((item, i) => (item.identifier !== 0 && item.groupAccelerator === e.key ? [i] : []));
+      // a digit is a group's symbol, such as 0 for iron balls, only before a count is started, as in tty
+      const digit = e.key >= "0" && e.key <= "9" && !(count.current === 0 && group.length);
+      if (!letters.length && digit) {
+        const next = count.current * 10 + Number(e.key);
+        // the core takes a count as a 32-bit int, and splitting a stack by a wrapped one panics
+        if (next <= MAX_COUNT) count.current = next;
+        return update();
+      }
+      const hits = letters.length ? letters : group;
       if (!hits.length) return;
-      if (how === "one") return finish([hits[0]]);
-      if (how === "any") {
-        const next = new Set(selected);
-        for (const i of hits) {
-          if (next.has(i)) next.delete(i);
-          else next.add(i);
-        }
-        setSelected(next);
-      }
+      if (how === "one") return choose(hits[0]);
+      toggle(hits);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -69,12 +91,18 @@ export function MenuDialog({ how, prompt, items, sheet, onDone }: Props) {
   // with menu_tab_sep the core separates columns with tabs; a grid lines them up,
   // and a heading row of columns starts where the items' text does
   const columns = Math.max(...items.map((item) => item.text.split("\t").length));
-  const fields = (text: string, style?: Record<string, string>) =>
-    text.split("\t").map((f) => (
+  const fields = (text: string, style?: Record<string, string>, before?: ComponentChildren) =>
+    text.split("\t").map((f, n) => (
       <span class="menu-field" style={style}>
+        {n === 0 ? before : null}
         {f}
       </span>
     ));
+  // inside the text, so a column menu's grid keeps its columns
+  const taken = (i: number) => {
+    const n = selected.current.get(i) ?? -1;
+    return n > 0 ? <span class="menu-count">{n} of </span> : null;
+  };
 
   return (
     <div class="dialog-backdrop">
@@ -91,15 +119,16 @@ export function MenuDialog({ how, prompt, items, sheet, onDone }: Props) {
               </div>
             ) : (
               <button
-                class={`menu-item${selected.has(i) ? " selected" : ""}`}
-                onClick={() => toggle(i)}
+                class={`menu-item${selected.current.has(i) ? " selected" : ""}`}
+                onClick={() => choose(i)}
               >
                 <span class="inv-icon" style={tileStyle(sheet, item.tile, ICON)} />
                 <span class="inv-letter">{item.accelerator}</span>
                 {columns > 1 ? (
-                  fields(item.text, textStyle(item.color, item.attr))
+                  fields(item.text, textStyle(item.color, item.attr), taken(i))
                 ) : (
                   <span class="menu-text" style={textStyle(item.color, item.attr)}>
+                    {taken(i)}
                     {item.text}
                   </span>
                 )}
@@ -108,9 +137,10 @@ export function MenuDialog({ how, prompt, items, sheet, onDone }: Props) {
           )}
         </div>
         <div class="dialog-buttons">
+          {count.current > 0 ? <span class="hint">Count: {count.current}</span> : null}
           <button onClick={() => onDone(null)}>{how === "none" ? "Close" : "Cancel"}</button>
           {how === "any" ? (
-            <button class="primary" onClick={() => finish(selected)}>
+            <button class="primary" onClick={() => finish(selected.current)}>
               OK
             </button>
           ) : null}

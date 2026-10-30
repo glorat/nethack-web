@@ -32,6 +32,17 @@ async function untilPlaying(page: Page) {
   }
 }
 
+/** Starts a game as the role picked in the character picker. */
+async function startAs(page: Page, name: string, role: RegExp) {
+  await page.goto("/");
+  await page.getByLabel("Who are you?").fill(name);
+  await page.getByRole("button", { name: "Play" }).click();
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  await picker.getByRole("option", { name: role }).click();
+  await picker.getByRole("button", { name: "Play" }).click();
+  await untilPlaying(page);
+}
+
 test("start a game, move, and see status and inventory", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -201,13 +212,7 @@ test("keys typed into an open window stay there", async ({ page }) => {
 });
 
 test("a menu's column headings line up with the columns", async ({ page }) => {
-  await page.goto("/");
-  await page.getByLabel("Who are you?").fill(`Cols${Date.now() % 100000}`);
-  await page.getByRole("button", { name: "Play" }).click();
-  const picker = page.getByRole("dialog", { name: "Choose your character" });
-  await picker.getByRole("option", { name: /Priest/ }).click();
-  await picker.getByRole("button", { name: "Play" }).click();
-  await untilPlaying(page);
+  await startAs(page, `Cols${Date.now() % 100000}`, /Priest/);
   await page.keyboard.press("Shift+Z");
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText(/Retention/);
@@ -405,13 +410,7 @@ test("zooming out from the far corner keeps the middle from before the browser c
 });
 
 test("a stat that changes shows an arrow beside it", async ({ page }) => {
-  await page.goto("/");
-  await page.getByLabel("Who are you?").fill(`Arrow${Date.now() % 100000}`);
-  await page.getByRole("button", { name: "Play" }).click();
-  const picker = page.getByRole("dialog", { name: "Choose your character" });
-  await picker.getByRole("option", { name: /Valkyrie/ }).click();
-  await picker.getByRole("button", { name: "Play" }).click();
-  await untilPlaying(page);
+  await startAs(page, `Arrow${Date.now() % 100000}`, /Valkyrie/);
 
   // her shield is all she can take off, and without it her AC goes up, which is worse
   await page.keyboard.press("Shift+T");
@@ -421,13 +420,53 @@ test("a stat that changes shows an arrow beside it", async ({ page }) => {
 });
 
 test("the inventory shows blessed items green", async ({ page }) => {
-  await page.goto("/");
-  await page.getByLabel("Who are you?").fill(`Holy${Date.now() % 100000}`);
-  await page.getByRole("button", { name: "Play" }).click();
-  const picker = page.getByRole("dialog", { name: "Choose your character" });
-  await picker.getByRole("option", { name: /Priest/ }).click();
-  await picker.getByRole("button", { name: "Play" }).click();
-  await untilPlaying(page);
+  await startAs(page, `Holy${Date.now() % 100000}`, /Priest/);
   // a priest starts with holy water and sees that it's blessed
   await expect(page.locator(".inv-text", { hasText: "holy water" })).toHaveCSS("color", "rgb(60, 176, 67)");
+});
+
+test("a count typed before an item's letter in a menu takes only that many", async ({ page }) => {
+  await startAs(page, `Count${Date.now() % 100000}`, /Priest/);
+  const water = page.locator(".inv-item", { hasText: "holy water" });
+  await expect(water).toContainText("4 potions");
+  const letter = (await water.locator(".inv-letter").innerText()).trim();
+
+  await page.keyboard.press("Shift+D");
+  const dialog = page.getByRole("dialog");
+  await dialog.locator(".menu-item", { hasText: /all types/i }).click();
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(dialog).toContainText("holy water");
+  await page.keyboard.type(`2${letter}`);
+  await expect(dialog.locator(".menu-item.selected")).toContainText("2 of");
+  await page.keyboard.press("Enter");
+  await expect(water).toContainText("2 potions");
+});
+
+test("a count typed ahead of the menu it is for still takes only that many", async ({ page }) => {
+  await startAs(page, `Ahead${Date.now() % 100000}`, /Priest/);
+  const water = page.locator(".inv-item", { hasText: "holy water" });
+  const letter = (await water.locator(".inv-letter").innerText()).trim();
+  await page.keyboard.press("Shift+D");
+  const dialog = page.getByRole("dialog");
+  const all = (await dialog.locator(".menu-item", { hasText: /all types/i }).locator(".inv-letter").innerText()).trim();
+  // the second menu opens only after these are typed, and replays them
+  await page.keyboard.type(`${all}\n2${letter}\n`);
+  await expect(water).toContainText("2 potions");
+});
+
+test("a count too big for the core stops growing, and the game carries on", async ({ page }) => {
+  await startAs(page, `Huge${Date.now() % 100000}`, /Priest/);
+  const water = page.locator(".inv-item", { hasText: "holy water" });
+  const letter = (await water.locator(".inv-letter").innerText()).trim();
+  await page.keyboard.press("Shift+D");
+  const dialog = page.getByRole("dialog");
+  await dialog.locator(".menu-item", { hasText: /all types/i }).click();
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(dialog).toContainText("holy water");
+  await page.keyboard.type("3000000000");
+  await expect(dialog.locator(".hint")).toHaveText("Count: 300000000");
+  await page.keyboard.type(`${letter}\n`);
+  // more than there are is all of them
+  await expect(water).toBeHidden();
+  await expect(page.locator(".messages")).toContainText(/You drop 4 potions/);
 });

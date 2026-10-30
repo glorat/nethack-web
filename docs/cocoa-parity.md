@@ -27,7 +27,7 @@ Decided for the web:
 ## Menus
 
 - [x] Default menu colours: blessed and holy water green, cursed and unholy water red, after the player's `MENUCOLOR` rules so those win (`wincocoa.m` `AddDefaultMenuColors`); `MENUCOLOR` attributes shown in the inventory sidebar too.
-- [ ] Counts: digits typed before a letter take that many.
+- [x] Counts: digits typed before a letter take that many.
 - [ ] Any inventory letter is accepted in a suitable-items menu, not only those listed (`UnlistedInventory`).
 - [ ] Pick-any keys `.` `,` select all and `-` `\` clear; a Select All button.
 - [ ] Sort A–Z checkbox, sorting items under each heading (`sortItems`).
