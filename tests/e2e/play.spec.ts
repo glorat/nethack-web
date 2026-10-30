@@ -721,3 +721,38 @@ test("the inventory sidebar can be hidden and shown, and stays as it was left", 
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 });
+
+test("dragging the inventory's edge resizes it, within limits, and the width is kept", async ({ page }) => {
+  const name = `Wide${Date.now() % 100000}`;
+  await startGame(page, name);
+  const sidebar = page.locator(".inventory");
+  const handle = page.locator(".inv-resize");
+  const start = (await sidebar.boundingBox())!.width;
+  const drag = async (by: number) => {
+    const from = (await handle.boundingBox())!;
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + from.width / 2 + by, from.y + from.height / 2, { steps: 4 });
+    await page.mouse.up();
+  };
+  await drag(-100);
+  await expect.poll(async () => Math.round((await sidebar.boundingBox())!.width)).toBe(Math.round(start + 100));
+  // no narrower than 180
+  await drag(1000);
+  await expect.poll(async () => Math.round((await sidebar.boundingBox())!.width)).toBe(180);
+  // nor so wide the map, stats and messages lose their room
+  await drag(-2000);
+  await expect.poll(async () => Math.round((await sidebar.boundingBox())!.width)).toBe(page.viewportSize()!.width - 637);
+  // and kept within the limit when the window narrows
+  await page.setViewportSize({ width: 1200, height: page.viewportSize()!.height });
+  await expect.poll(async () => Math.round((await sidebar.boundingBox())!.width)).toBe(1200 - 637);
+  await page.setViewportSize({ width: 1400, height: page.viewportSize()!.height });
+  await drag(500);
+  const kept = Math.round((await sidebar.boundingBox())!.width);
+
+  await page.reload();
+  await page.getByLabel("Who are you?").fill(`${name}b`);
+  await page.getByRole("button", { name: "Play" }).click();
+  await untilPlaying(page);
+  expect(Math.round((await sidebar.boundingBox())!.width)).toBe(kept);
+});

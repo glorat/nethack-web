@@ -27,6 +27,22 @@ const DEFAULT_CELL = 32;
 const ZOOM_KEYS: Record<string, -1 | 0 | 1> = { "=": 1, "+": 1, "-": -1, "0": 0 };
 const ASCII_KEY = "nethack.asciiMap";
 const INVENTORY_KEY = "nethack.showInventory";
+const INVENTORY_WIDTH_KEY = "nethack.inventoryWidth";
+// Cocoa's narrowest sidebar, and the narrowest the map, stats and messages can be beside it
+const MIN_INVENTORY_WIDTH = 180;
+const MIN_MAIN_WIDTH = 637;
+
+function inventoryWidth(width: number): number {
+  return Math.round(Math.max(MIN_INVENTORY_WIDTH, Math.min(width, window.innerWidth - MIN_MAIN_WIDTH)));
+}
+
+function savedInventoryWidth(): number {
+  try {
+    const saved = Number(localStorage.getItem(INVENTORY_WIDTH_KEY));
+    if (saved > 0) return saved;
+  } catch {}
+  return 300;
+}
 
 function savedShowInventory(): boolean {
   try {
@@ -90,6 +106,22 @@ export function App() {
   };
   const [showInventory, setShowInventoryState] = useState(savedShowInventory);
   const shownInventory = useRef(showInventory);
+  const [sidebarWidth, setSidebarWidth] = useState(savedInventoryWidth);
+  // the sidebar's limit follows the window
+  const [, setWindowWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const resized = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", resized);
+    return () => window.removeEventListener("resize", resized);
+  }, []);
+  const resizeInventory = (width: number, done: boolean) => {
+    const next = inventoryWidth(width);
+    setSidebarWidth(next);
+    if (done)
+      try {
+        localStorage.setItem(INVENTORY_WIDTH_KEY, String(next));
+      } catch {}
+  };
   const setShowInventory = (show: boolean) => {
     shownInventory.current = show;
     setShowInventoryState(show);
@@ -293,7 +325,14 @@ export function App() {
         />
       </div>
       {showInventory ? (
-        <InventoryView items={state.inventory} sheet={sheet} onChoose={chooseItem} onHide={() => setShowInventory(false)} />
+        <InventoryView
+          items={state.inventory}
+          sheet={sheet}
+          width={inventoryWidth(sidebarWidth)}
+          onChoose={chooseItem}
+          onHide={() => setShowInventory(false)}
+          onResize={resizeInventory}
+        />
       ) : null}
       {!state.started ? <div class="overlay-note">Starting…</div> : null}
       {state.gameOver ? (
