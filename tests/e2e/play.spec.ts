@@ -998,3 +998,32 @@ test("an extended command only one name starts with completes as it's typed, and
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 });
+
+test("the game beeps at a click on unexplored ground far away, and at an inventory pick it can't take", async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as { beeps: number; AudioContext: typeof AudioContext };
+    w.beeps = 0;
+    w.AudioContext = class extends AudioContext {
+      createOscillator() {
+        w.beeps++;
+        return super.createOscillator();
+      }
+    };
+  });
+  const beeps = () => page.evaluate(() => (window as unknown as { beeps: number }).beeps);
+  await startGame(page, `Beep${Date.now() % 100000}`);
+  const canvas = page.locator(".map canvas");
+  const box = (await canvas.boundingBox())!;
+  // the map's top row is never part of a level
+  await canvas.click({ position: { x: (box.width / 80) * 1.5, y: (box.height / 21) * 0.5 } });
+  await expect.poll(beeps).toBe(1);
+
+  // choosing where to travel isn't the command prompt, so the inventory can't open
+  await page.keyboard.press("_");
+  await expect(page.getByRole("dialog")).toContainText(/tip/i);
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".messages")).toContainText(/where do you want to travel/i);
+  await page.locator(".inv-item").first().click();
+  await expect.poll(beeps).toBe(2);
+  await page.keyboard.press("Escape");
+});

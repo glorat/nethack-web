@@ -9,6 +9,7 @@ import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, te
 import type { Answer, GameRequest } from "../protocol";
 import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port/tilesets";
 import { loadTileSheet, type TileSheet } from "../tiles";
+import { beep, wakeBeep } from "./beep";
 import { DirectionDialog } from "./dialogs/DirectionDialog";
 import { ExtCommandDialog } from "./dialogs/ExtCommandDialog";
 import { GameOverDialog } from "./dialogs/GameOverDialog";
@@ -272,6 +273,7 @@ export function App() {
         events: (events) => {
           setState((s) => applyEvents(s, events));
           for (const e of events) {
+            if (e.type === "bell") beep();
             if (e.type === "text_size") optionsTextSize.current(e.size, e.atStart);
             if (e.type === "options_file")
               try {
@@ -439,7 +441,7 @@ export function App() {
 
   const chooseItem = (letter: string) => {
     const key = inventoryKey.current;
-    if (!key || pendingRef.current) return;
+    if (!key || pendingRef.current) return beep();
     setInventoryKey(0);
     setCommandKey(0);
     waitingForKey.current = false;
@@ -449,6 +451,7 @@ export function App() {
   };
 
   const start = (name: string) => {
+    wakeBeep();
     setPlaying(true);
     client.start({
       assetBase: new URL("./", document.baseURI).href,
