@@ -27,6 +27,8 @@ export interface SessionOptions {
   config?: string;
   /** Files to put in /save first, e.g. from an earlier session. */
   saves?: Map<string, Uint8Array>;
+  /** Another tab is playing too. */
+  otherTab?: boolean;
 }
 
 type Module = NetHackModule & {
@@ -118,7 +120,7 @@ export class Session {
     const shared = (globalThis as { nethackGlobal?: { shimFunctionRunning?: unknown } }).nethackGlobal;
     if (shared) shared.shimFunctionRunning = null;
     session = new Session(m);
-    const game = new Game(m, session.host());
+    const game = new Game(m, session.host(!options.otherTab));
     session.game = game;
     // one callback name per session, so sessions don't share one global
     const callback = `nethackCallback${++sessions}`;
@@ -233,7 +235,7 @@ export class Session {
     return this.prompt as Extract<GameRequest, { kind: K }>;
   }
 
-  private host() {
+  private host(alone: boolean) {
     return {
       post: (events: GameEvent[]) => {
         if (this.failPost?.(events)) {
@@ -259,6 +261,7 @@ export class Session {
           else this.settle();
         }),
       persist: async () => {},
+      alone,
     };
   }
 

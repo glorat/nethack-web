@@ -24,14 +24,35 @@ async function quit(g: Session): Promise<string[]> {
   return shown;
 }
 
-test("a game left unfinished is offered for recovery and comes back", async () => {
+test("a game left unfinished comes back without asking", async () => {
   const left = await (await Session.start()).skipText();
   await left.send("llll");
 
-  const next = await Session.start({ saves: left.saves() });
-  expect(next.prompt).toMatchObject({ kind: "yn", query: expect.stringMatching(/old game in progress/i) });
-  await (await next.yn("r")).skipText();
+  const next = await (await Session.start({ saves: left.saves() })).skipText();
   expect(next.messages.some((t) => /welcome back/i.test(t))).toBe(true);
+  expect(next.messages.some((t) => /old game in progress/i.test(t))).toBe(false);
+  expect([...next.saves().keys()]).not.toContain("recovering");
+});
+
+test("a game that can't be recovered is asked about the next time", async () => {
+  const left = await (await Session.start()).skipText();
+  const saves = left.saves();
+  // a checkpoint cut short
+  saves.set("0Tester.0", new Uint8Array());
+
+  const failed = await Session.start({ saves });
+  expect(failed.ended).toBe(true);
+  const next = await Session.start({ saves: failed.saves() });
+  expect(next.prompt).toMatchObject({ kind: "yn", query: expect.stringMatching(/old game in progress/i) });
+  await (await next.yn("y")).skipText();
+  expect(next.messages.some((t) => /welcome to NetHack/i.test(t))).toBe(true);
+});
+
+test("a game left unfinished is asked about while another tab is playing", async () => {
+  const left = await (await Session.start()).skipText();
+
+  const next = await Session.start({ saves: left.saves(), otherTab: true });
+  expect(next.prompt).toMatchObject({ kind: "yn", query: expect.stringMatching(/old game in progress/i) });
 });
 
 test("a recovered game comes back as of the last command, not the last level change", async () => {
@@ -40,8 +61,7 @@ test("a recovered game comes back as of the last command, not the last level cha
   const turn = left.state.status.BL_TIME?.text;
   expect(Number(turn)).toBeGreaterThan(10);
 
-  const next = await Session.start({ saves: left.saves(), options: "time" });
-  await (await next.yn("r")).skipText();
+  const next = await (await Session.start({ saves: left.saves(), options: "time" })).skipText();
   expect(next.state.status.BL_TIME?.text).toBe(turn);
 });
 
@@ -59,7 +79,6 @@ test("a game recovered while engulfed is still engulfed", async () => {
   expect(g.messages.some((t) => /engulfs you/.test(t))).toBe(true);
 
   const next = await Session.start({ saves: g.saves(), wizard: true });
-  await next.yn("r");
   // debug mode asks whether to keep the save file it restores
   await (await next.yn("n")).skipText();
   await next.send("\x18");
@@ -104,8 +123,8 @@ test("restoring a save removes it, leaving the game to recovery", async () => {
   expect(restored.messages.some((t) => /welcome back/i.test(t))).toBe(true);
   expect([...restored.saves().keys()]).not.toContain("0Tester");
 
-  const next = await Session.start({ saves: restored.saves() });
-  expect(next.prompt).toMatchObject({ kind: "yn", query: expect.stringMatching(/old game in progress/i) });
+  const next = await (await Session.start({ saves: restored.saves() })).skipText();
+  expect(next.messages.some((t) => /Restoring save file/.test(t))).toBe(true);
 });
 
 test("the high score list is kept between games", async () => {
@@ -137,7 +156,7 @@ test("a restored game, and one recovered after that, show the saved state", asyn
 
   // the restore wrote a checkpoint, which is what recovery starts from
   const recovered = await Session.start({ saves: restored.saves() });
-  await (await recovered.yn("r")).skipText();
+  await recovered.skipText();
   expect(recovered.state.status.BL_AC?.text).toBe(shieldOff);
   expect(recovered.state.equipment[5]).toEqual({ letter: "", tile: -1 });
 });

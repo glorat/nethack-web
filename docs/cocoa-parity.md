@@ -67,7 +67,7 @@ Decided for the web:
 - [x] The bell, and a refused click or inventory pick, are heard or seen (`nhbell`, `NSBeep`).
 - [x] Choose the ASCII map's font and size, remembered; choosing one switches to ASCII (`changeFont`).
 - [x] An About box: NetHack, this port and the painted tiles by Kevin Tam, the Cocoa interface it follows, the classic tiles, the licence.
-- [ ] Closing the tab mid-game keeps the game (Cocoa saves on ⌘Q or closing the window, `terminateApplication`). Discuss the approach first: a page can't wait on a save as it unloads.
+- [x] Closing the tab mid-game keeps the game (Cocoa saves on ⌘Q or closing the window, `terminateApplication`). A page can't wait on a save as it unloads, so the core checkpoints before each command once time has passed, and the next start recovers without asking, unless the last recovery failed.
 
 ## Later
 

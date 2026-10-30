@@ -39,6 +39,9 @@ const ESC = 27;
 const HASH = "#".charCodeAt(0);
 // Save & Quit is a deliberate choice, as Cocoa takes it
 const ALWAYS_YES = ["Really save?", "Overwrite the old file?"];
+const OLD_GAME = "Old game in progress. Destroy [y], Recover [r], or Cancel [n]?";
+// left behind by a recovery that never reached play, so the next start asks instead of failing again
+const RECOVERING = "/save/recovering";
 
 interface Window {
   kind: number;
@@ -54,6 +57,8 @@ export interface GameHost {
   /** Resolves with the next key or click the player makes. */
   nextInput(request: Extract<GameRequest, { kind: "poskey" }>): Promise<Input>;
   persist(): Promise<void>;
+  /** No other tab is playing, so a game left unfinished can't be one still going on there. */
+  readonly alone: boolean;
 }
 
 /** "FOODPOIS" style names of the bits set in a BL_CONDITION mask, in `order`. */
@@ -94,6 +99,7 @@ export class Game {
   /** The cell last drawn on each map square, by y * COLNO + x. */
   private cells = new Map<number, MapCell>();
   private mapCursor = { x: 0, y: 0 };
+  private recovering = false;
 
   constructor(
     private readonly m: NetHackModule,
@@ -127,6 +133,10 @@ export class Game {
   }
 
   private async input(): Promise<Input> {
+    if (this.recovering && this.m._nhweb_in_play()) {
+      this.recovering = false;
+      this.m.FS.unlink(RECOVERING);
+    }
     this.optionsFile();
     this.refreshPeaceful();
     this.expireChanges();
@@ -498,6 +508,17 @@ export class Game {
     if (ALWAYS_YES.includes(query)) {
       this.m._nhweb_set_yn_number(0);
       return "y".charCodeAt(0);
+    }
+    // a game left unfinished comes back, as Cocoa brings back the game it was quit in
+    if (query === OLD_GAME && this.host.alone) {
+      if (!this.m.FS.analyzePath(RECOVERING).exists) {
+        this.m.FS.writeFile(RECOVERING, "");
+        // saved before recovering, in case the recovery crashes the core
+        await this.host.persist();
+        this.recovering = true;
+        return "r".charCodeAt(0);
+      }
+      this.m.FS.unlink(RECOVERING);
     }
     const answer = await this.ask({
       kind: "yn",

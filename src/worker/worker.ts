@@ -56,6 +56,18 @@ function persist(): Promise<void> {
   return persisting;
 }
 
+/** Whether this is the only tab playing; if so, it stays that until this worker ends. */
+function soleTab(): Promise<boolean> {
+  return new Promise((resolve) => {
+    // absent outside https and localhost, where the game in progress is asked about as before
+    if (!navigator.locks) return resolve(false);
+    void navigator.locks.request("nethack-game", { ifAvailable: true }, (lock) => {
+      resolve(lock !== null);
+      return lock ? new Promise<void>(() => {}) : undefined;
+    });
+  });
+}
+
 async function start({ assetBase, options, config }: StartOptions): Promise<void> {
   const url = new URL("nethack.js", assetBase).href;
   const { default: createModule } = (await import(/* @vite-ignore */ url)) as {
@@ -80,6 +92,7 @@ async function start({ assetBase, options, config }: StartOptions): Promise<void
       return new Promise((resolve) => (inputWaiter = resolve));
     },
     persist,
+    alone: await soleTab(),
   };
 
   module = await createModule({

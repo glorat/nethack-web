@@ -81,14 +81,15 @@ test("a saved game survives a reload", async ({ page }) => {
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
   await expect(page.locator(".stats-title")).toHaveText(title);
 
-  // the restore deleted the save, so another reload finds only the game in progress
+  // the restore deleted the save, so another reload recovers the game in progress
   await page.reload();
   await page.getByLabel("Who are you?").fill(name);
   await page.getByRole("button", { name: "Play" }).click();
-  await expect(page.getByRole("dialog")).toContainText(/old game in progress/i, { timeout: 15_000 });
+  await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
+  await expect(page.locator(".stats-title")).toHaveText(title);
 });
 
-test("a game in progress can be recovered after a reload", async ({ page }) => {
+test("a game in progress comes back after a reload without asking", async ({ page }) => {
   const name = `Rec${Date.now() % 100000}`;
   await startGame(page, name);
   const title = await page.locator(".stats-title").innerText();
@@ -98,14 +99,21 @@ test("a game in progress can be recovered after a reload", async ({ page }) => {
   await page.reload();
   await page.getByLabel("Who are you?").fill(name);
   await page.getByRole("button", { name: "Play" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText(/old game in progress/i, { timeout: 15_000 });
-  // each answer shows its key
-  await expect(dialog.getByRole("button", { name: "r Recover" })).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "y Destroy" })).toBeVisible();
-  await dialog.getByRole("button", { name: "Recover" }).click();
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
+  await expect(page.locator(".messages")).not.toContainText(/old game in progress/i);
   await expect(page.locator(".stats-title")).toHaveText(title);
+});
+
+test("a game playing in another tab is asked about, not taken over", async ({ page, context }) => {
+  const name = `Tab${Date.now() % 100000}`;
+  await startGame(page, name);
+  await page.keyboard.press("s");
+
+  const other = await context.newPage();
+  await other.goto("/");
+  await other.getByLabel("Who are you?").fill(name);
+  await other.getByRole("button", { name: "Play" }).click();
+  await expect(other.getByRole("dialog")).toContainText(/old game in progress/i, { timeout: 15_000 });
 });
 
 test("inventory click opens the item's action menu", async ({ page }) => {
