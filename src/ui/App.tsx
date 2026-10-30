@@ -20,6 +20,7 @@ import { TextDialog } from "./dialogs/TextDialog";
 import { YesNoDialog } from "./dialogs/YesNoDialog";
 import { EquipmentView } from "./EquipmentView";
 import { InventoryView } from "./InventoryView";
+import { keyLike } from "./keyevent";
 import { MapView } from "./MapView";
 import { type BarMenu, MenuBar, type MenuEntry } from "./MenuBar";
 import { COMMAND_MENUS, type CommandItem, GAME_MENU, HELP_MENU, WIZARD_MENU } from "./commands";
@@ -371,9 +372,10 @@ export function App() {
     };
     const onKey = (e: KeyboardEvent) => {
       if (!playing || pendingRef.current) return;
-      if (keyCode(e) === null) return;
+      const k = keyLike(e);
+      if (keyCode(k) === null) return;
       e.preventDefault();
-      type(chords.current.down({ key: e.key, code: e.code, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey }));
+      type(chords.current.down(k));
     };
     const onRelease = () => type(chords.current.up());
     window.addEventListener("keydown", onKey);

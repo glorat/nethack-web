@@ -1,5 +1,6 @@
 import { useLayoutEffect } from "preact/hooks";
 import { keyCode, type KeyLike } from "../../port/keys";
+import { keyLike } from "../keyevent";
 
 interface Props {
   lines: { attr: number; text: string }[];
@@ -16,7 +17,8 @@ export function TextDialog({ lines, onDone }: Props) {
   // layout effect: listen before the dialog is painted, or a fast key press is lost
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const code = keyCode(e);
+      const k = keyLike(e);
+      const code = keyCode(k);
       if (code === null) return;
       e.preventDefault();
       e.stopPropagation();
@@ -24,7 +26,7 @@ export function TextDialog({ lines, onDone }: Props) {
       if (DISMISS.includes(code)) return onDone();
       // but not a key typed before the window opened, replayed into it: the window waits to be seen
       if (!e.isTrusted) return;
-      onDone({ key: e.key, code: e.code, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey });
+      onDone(k);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);

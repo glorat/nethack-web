@@ -96,3 +96,29 @@ test("at a direction prompt the keypad and modified arrows point the same way", 
   expect(String.fromCharCode(directionKey(event("8", { code: "Digit8" }), "hykulnjb><")!)).toBe("8");
   expect(directionKey(event("ArrowLeft", { metaKey: true }), "hykulnjb><")).toBeNull();
 });
+
+test("macOS's Option keys give meta commands from the key pressed, not the character Option makes", () => {
+  const option = (key: string, code: string, shiftKey = false) => keyCode({ key, code, shiftKey, ctrlKey: false, altKey: true, metaKey: false });
+  expect(option("¬", "KeyL")).toBe(0x80 | "l".charCodeAt(0));
+  expect(option("π", "KeyP")).toBe(0x80 | "p".charCodeAt(0));
+  // Option-E starts an accent
+  expect(option("Dead", "KeyE")).toBe(0x80 | "e".charCodeAt(0));
+  expect(option("Ç", "KeyC", true)).toBe(0x80 | "C".charCodeAt(0));
+  expect(option("™", "Digit2")).toBe(0x80 | "2".charCodeAt(0));
+  // where Alt makes no character of its own, as on Windows and Linux, the key is read as before
+  expect(option("l", "KeyL")).toBe(0x80 | "l".charCodeAt(0));
+  expect(option("Alt", "AltLeft")).toBeNull();
+});
+
+test("where Option composes, the layout's own character for the key gives the meta command, on any layout", () => {
+  const option = (key: string, code: string, base: string, shiftKey = false) =>
+    keyCode({ key, code, base, shiftKey, ctrlKey: false, altKey: true, metaKey: false });
+  // German: Option-L is @
+  expect(option("@", "KeyL", "l")).toBe(0x80 | "l".charCodeAt(0));
+  // Dvorak: L is where QWERTY has P
+  expect(option("¬", "KeyP", "l")).toBe(0x80 | "l".charCodeAt(0));
+  expect(option("Ç", "KeyC", "c", true)).toBe(0x80 | "C".charCodeAt(0));
+  expect(option("÷", "Slash", "/")).toBe(0x80 | "/".charCodeAt(0));
+  // the shifted character of a key that isn't a letter isn't known
+  expect(option("¿", "Slash", "/", true)).toBeNull();
+});

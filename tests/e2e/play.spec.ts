@@ -962,3 +962,21 @@ test("the Help menu opens the game's help and the NetHack Wiki", async ({ page, 
   expect(wiki.url()).toBe("https://nethackwiki.com/");
   await wiki.close();
 });
+
+test("Option or Alt with a letter gives a meta command, such as loot", async ({ page }) => {
+  await startGame(page, `Meta${Date.now() % 100000}`);
+  // as macOS sends Option-L: the character it makes, ¬, on the L key
+  await page.evaluate(() =>
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "¬", code: "KeyL", altKey: true, cancelable: true })),
+  );
+  await expect(page.getByRole("dialog")).toContainText(/Loot in what direction/);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+
+  // on a Mac, as Option-L is on a German layout, where it makes an @
+  test.skip(!(await page.evaluate(() => /Mac/.test(navigator.platform))), "Option composes characters only on macOS");
+  await page.evaluate(() =>
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "@", code: "KeyL", altKey: true, cancelable: true })),
+  );
+  await expect(page.getByRole("dialog")).toContainText(/Loot in what direction/);
+});

@@ -4,6 +4,9 @@ export interface KeyLike {
   key: string;
   /** The physical key, which tells the numeric keypad's digits from the row above the letters. */
   code?: string;
+  shiftKey?: boolean;
+  /** Where Option composes a character (macOS): the layout's own character for the key, without modifiers. */
+  base?: string;
   ctrlKey: boolean;
   altKey: boolean;
   metaKey: boolean;
@@ -35,6 +38,21 @@ export function keyCode(e: KeyLike): number | null {
     case "Tab":
       return 9;
   }
+  // the core's M() meta bit, as tty sets it for Alt with altmeta. macOS's Option composes a character
+  // instead (Option-L is ¬ on a US layout, @ on a German one), so the key's own character is used, as
+  // Cocoa uses charactersIgnoringModifiers; failing that, a composed character is read from where the key is
+  if (e.altKey && !e.ctrlKey && e.base) {
+    const base = e.shiftKey && /^[a-z]$/.test(e.base) ? e.base.toUpperCase() : e.base;
+    const code = base.length === 1 ? base.charCodeAt(0) : 128;
+    return code < 128 && (!e.shiftKey || /^[A-Z]$/.test(base)) ? code | 0x80 : null;
+  }
+  if (e.altKey && !e.ctrlKey && (e.key.length !== 1 || e.key.charCodeAt(0) > 127)) {
+    const letter = /^Key([A-Z])$/.exec(e.code ?? "")?.[1];
+    if (letter) return (e.shiftKey ? letter : letter.toLowerCase()).charCodeAt(0) | 0x80;
+    const digit = /^Digit([0-9])$/.exec(e.code ?? "")?.[1];
+    if (digit && !e.shiftKey) return digit.charCodeAt(0) | 0x80;
+    return null;
+  }
   if (e.key.length !== 1) return null;
   const code = e.key.charCodeAt(0);
   if (code > 127) return null;
@@ -42,7 +60,6 @@ export function keyCode(e: KeyLike): number | null {
     const upper = e.key.toUpperCase().charCodeAt(0);
     return upper >= 64 && upper <= 95 ? upper & 0x1f : null;
   }
-  // the core's M() meta bit, as tty sets it for Alt with altmeta
   if (e.altKey) return code | 0x80;
   return code;
 }
