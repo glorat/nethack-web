@@ -33,6 +33,12 @@ export interface NetHackModule {
   _nhweb_describe(x: number, y: number): number;
   _nhweb_map_marks(x: number, y: number, glyph: number, glyphFlags: number): number;
   _nhweb_in_play(): number;
+  _nhweb_game_over(): number;
+  _nhweb_resumed(): number;
+  _nhweb_restoring(): number;
+  _nhweb_checkpointed(): number;
+  _nhweb_checkpoint_count(): number;
+  _nhweb_game_name(): number;
   _nhweb_moves(): number;
   _nhweb_condition_mask(i: number): number;
   _nhweb_invent_letters(): number;
@@ -54,6 +60,8 @@ export interface EmscriptenFS {
   syncfs(populate: boolean, callback: (err: unknown) => void): void;
   writeFile(path: string, data: string | Uint8Array): void;
   readFile(path: string, opts: { encoding: "utf8" }): string;
+  readdir(path: string): string[];
+  rmdir(path: string): void;
   unlink(path: string): void;
   analyzePath(path: string): { exists: boolean };
 }

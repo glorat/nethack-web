@@ -33,6 +33,7 @@ import { MessageView } from "./MessageView";
 import { StatsView } from "./StatsView";
 
 const TILE_SET_KEY = "nethack.tileSet";
+const LAST_GAME_KEY = "nethack.lastGame";
 
 function savedTileSet(): TileSet {
   try {
@@ -292,6 +293,11 @@ export function App() {
             if (e.type === "options_file")
               try {
                 localStorage.setItem(OPTIONS_KEY, savedOptionsFile(e.text, BASE_OPTIONS));
+              } catch {}
+            // kept for replaying straight away; one too big for the browser to keep is lost
+            if (e.type === "recording")
+              try {
+                localStorage.setItem(LAST_GAME_KEY, e.text);
               } catch {}
           }
         },

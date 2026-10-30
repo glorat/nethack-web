@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import type { Answer, GameEvent, GameRequest, MapCell } from "../../src/protocol";
 import { applyEvents, cellAt, initialState, type GameState } from "../../src/port/state";
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
+import { Recorder } from "../../src/worker/recorder";
 import type { EmscriptenFS, NetHackModule } from "../../src/worker/memory";
 
 const ROOT = resolve(__dirname, "../..");
@@ -38,8 +39,9 @@ export interface SessionOptions {
 
 type Module = NetHackModule & {
   FS: EmscriptenFS & {
-    readdir(path: string): string[];
     readFile(path: string): Uint8Array;
+    stat(path: string): { mode: number };
+    isDir(mode: number): boolean;
     writeFile(path: string, data: Uint8Array): void;
   };
 };
@@ -72,6 +74,12 @@ export class Session {
   wizard = false;
   /** What the core printed outside its windows, such as errors before the game starts. */
   output: string[] = [];
+  /** The recording's lines, as the recorder streamed them out. */
+  recorded: string[] = [];
+  /** The whole recording, once the game has ended. */
+  recording: string | null = null;
+  /** /save as it was at the last persist, which is all a closed page would have kept. */
+  persisted: Map<string, Uint8Array> = new Map();
 
   private queue: Input[] = [];
   private giveInput: ((input: Input) => void) | null = null;
@@ -107,7 +115,14 @@ export class Session {
           // Emscripten's HOME, which it creates
           if (options.config !== undefined) mod.FS.writeFile(CONFIG_FILE, new TextEncoder().encode(options.config));
           mod.FS.mkdir("/save");
-          for (const [file, data] of options.saves ?? []) mod.FS.writeFile(`/save/${file}`, data);
+          for (const [file, data] of options.saves ?? []) {
+            const parts = file.split("/");
+            for (let i = 1; i < parts.length; i++) {
+              const dir = `/save/${parts.slice(0, i).join("/")}`;
+              if (!mod.FS.analyzePath(dir).exists) mod.FS.mkdir(dir);
+            }
+            mod.FS.writeFile(`/save/${file}`, data);
+          }
         },
       ],
     });
@@ -120,7 +135,13 @@ export class Session {
     const shared = (globalThis as { nethackGlobal?: { shimFunctionRunning?: unknown } }).nethackGlobal;
     if (shared) shared.shimFunctionRunning = null;
     session = new Session(m);
-    const game = new Game(m, session.host(options));
+    const recorder = new Recorder(session.host(options), m, {
+      options: nethackOptions,
+      config: options.config ?? "",
+      stream: (lines) => session.recorded.push(...lines),
+      finished: (text) => (session.recording = text),
+    });
+    const game = new Game(m, recorder);
     session.game = game;
     // one callback name per session, so sessions don't share one global
     const callback = `nethackCallback${++sessions}`;
@@ -223,10 +244,18 @@ export class Session {
     return cell;
   }
 
-  /** The files in /save, to start a later session from. */
+  /** The files in /save, by their paths under it, to start a later session from. */
   saves(): Map<string, Uint8Array> {
     const files = new Map<string, Uint8Array>();
-    for (const f of this.m.FS.readdir("/save")) if (!f.startsWith(".")) files.set(f, this.m.FS.readFile(`/save/${f}`));
+    const walk = (dir: string) => {
+      for (const f of this.m.FS.readdir(`/save${dir}`)) {
+        if (f.startsWith(".")) continue;
+        const path = `${dir}/${f}`;
+        if (this.m.FS.isDir(this.m.FS.stat(`/save${path}`).mode)) walk(path);
+        else files.set(path.slice(1), this.m.FS.readFile(`/save${path}`));
+      }
+    };
+    walk("");
     return files;
   }
 
@@ -255,13 +284,17 @@ export class Session {
         }),
       nextInput: (request: { inventoryKey: number; wizard: boolean }) =>
         new Promise<Input>((give) => {
+          // as the worker persists while waiting for each key
+          this.persisted = this.saves();
           this.inventoryKey = request.inventoryKey;
           this.wizard = request.wizard;
           this.giveInput = give;
           if (this.queue.length) this.feed();
           else this.settle();
         }),
-      persist: async () => {},
+      persist: async () => {
+        this.persisted = this.saves();
+      },
       alone: !options.otherTab,
       now: () => now,
       utcOffset: () => options.utcOffset ?? 0,
