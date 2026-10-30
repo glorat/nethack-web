@@ -19,6 +19,8 @@ interface Props {
   describe(x: number, y: number): Promise<string | null>;
   /** 0 goes back to the starting size. */
   onZoom(step: -1 | 0 | 1): void;
+  /** Present while the inventory sidebar is hidden. */
+  onShowInventory?(): void;
 }
 
 interface Tooltip {
@@ -44,7 +46,7 @@ const PINCH_STEP = 15;
 const CLICK_PRIMARY = 1;
 const CLICK_SECONDARY = 2;
 
-export function MapView({ state, sheet, cell, ascii, onAscii, onClick, describe, onZoom }: Props) {
+export function MapView({ state, sheet, cell, ascii, onAscii, onClick, describe, onZoom, onShowInventory }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const pane = useRef<HTMLDivElement>(null);
@@ -271,6 +273,11 @@ export function MapView({ state, sheet, cell, ascii, onAscii, onClick, describe,
           onMouseLeave={cancelTooltip}
         />
       </div>
+      {onShowInventory ? (
+        <button class="show-inventory" onClick={onShowInventory}>
+          Show Inventory
+        </button>
+      ) : null}
       <div class="map-zoom">
         <button class="ascii-toggle" aria-pressed={ascii} disabled={!onAscii} onClick={() => onAscii?.(!ascii)}>
           ASCII

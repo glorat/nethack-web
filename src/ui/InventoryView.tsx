@@ -9,12 +9,18 @@ interface Props {
   items: MenuItem[];
   sheet: TileSheet;
   onChoose(letter: string): void;
+  onHide(): void;
 }
 
-export function InventoryView({ items, sheet, onChoose }: Props) {
+export function InventoryView({ items, sheet, onChoose, onHide }: Props) {
   return (
     <aside class="inventory">
-      <h2>Inventory</h2>
+      <h2>
+        Inventory
+        <button class="hide-inventory" aria-label="Hide Inventory" onClick={onHide}>
+          Hide
+        </button>
+      </h2>
       {items.map((item) =>
         item.identifier === 0 ? (
           <h3 class="inv-heading" style={headingStyle(item)}>

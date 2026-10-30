@@ -26,6 +26,15 @@ const DEFAULT_CELL = 32;
 // with Cmd or Ctrl, as Cocoa's View menu has them; 0 is back to the starting size
 const ZOOM_KEYS: Record<string, -1 | 0 | 1> = { "=": 1, "+": 1, "-": -1, "0": 0 };
 const ASCII_KEY = "nethack.asciiMap";
+const INVENTORY_KEY = "nethack.showInventory";
+
+function savedShowInventory(): boolean {
+  try {
+    return localStorage.getItem(INVENTORY_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
 
 function savedCell(): number {
   try {
@@ -68,7 +77,26 @@ export function App() {
   const [state, setState] = useState(initialState);
   const [pending, setPending] = useState<Pending | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [cell, setCell] = useState(savedCell);
+  const [cell, setCellState] = useState(savedCell);
+  const cellNow = useRef(cell);
+  // settings are saved as they change: an effect waits for the next frame, which a reload can beat
+  const zoom = (step: -1 | 0 | 1) => {
+    const next = zoomed(cellNow.current, step);
+    cellNow.current = next;
+    setCellState(next);
+    try {
+      localStorage.setItem(ZOOM_KEY, String(next));
+    } catch {}
+  };
+  const [showInventory, setShowInventoryState] = useState(savedShowInventory);
+  const shownInventory = useRef(showInventory);
+  const setShowInventory = (show: boolean) => {
+    shownInventory.current = show;
+    setShowInventoryState(show);
+    try {
+      localStorage.setItem(INVENTORY_KEY, show ? "1" : "0");
+    } catch {}
+  };
   // the core's options menu can switch it too, which comes back as state.asciiMap
   const ascii = state.asciiMap ?? savedAscii();
   // non-zero only while the core waits for a command with no keys queued
@@ -172,22 +200,22 @@ export function App() {
     if (state.asciiMap !== null) saveAscii(state.asciiMap);
   }, [state.asciiMap]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(ZOOM_KEY, String(cell));
-    } catch {}
-  }, [cell]);
-
-  // zoom keys work with a dialog open too, as Cocoa's menu shortcuts do: this listener is added before any
-  // dialog's, and the browser would zoom the page otherwise
+  // zoom keys and Ctrl-Cmd-S work with a dialog open too, as Cocoa's menu shortcuts do: this listener is
+  // added before any dialog's, and the browser would zoom the page otherwise
   useEffect(() => {
     if (!playing) return;
     const onKey = (e: KeyboardEvent) => {
-      const zoom = (e.metaKey || e.ctrlKey) && !e.altKey ? ZOOM_KEYS[e.key] : undefined;
-      if (zoom === undefined) return;
+      // Ctrl-Cmd-S, as Cocoa's View menu has it
+      if (e.ctrlKey && e.metaKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return setShowInventory(!shownInventory.current);
+      }
+      const step = (e.metaKey || e.ctrlKey) && !e.altKey ? ZOOM_KEYS[e.key] : undefined;
+      if (step === undefined) return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      setCell((c) => zoomed(c, zoom));
+      zoom(step);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -248,12 +276,14 @@ export function App() {
             state.status.BL_TITLE
               ? (on) => {
                   setState((s) => ({ ...s, asciiMap: on }));
+                  saveAscii(on);
                   client.asciiMap(on);
                 }
               : undefined
           }
           describe={(x, y) => client.describe(x, y)}
-          onZoom={(step) => setCell((c) => zoomed(c, step))}
+          onZoom={zoom}
+          onShowInventory={showInventory ? undefined : () => setShowInventory(true)}
           onClick={(x, y, button) => {
             if (pending) return;
             inventoryKey.current = 0;
@@ -262,7 +292,9 @@ export function App() {
           }}
         />
       </div>
-      <InventoryView items={state.inventory} sheet={sheet} onChoose={chooseItem} />
+      {showInventory ? (
+        <InventoryView items={state.inventory} sheet={sheet} onChoose={chooseItem} onHide={() => setShowInventory(false)} />
+      ) : null}
       {!state.started ? <div class="overlay-note">Starting…</div> : null}
       {state.gameOver ? (
         <div class="dialog-backdrop">

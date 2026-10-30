@@ -45,7 +45,7 @@ Decided for the web:
 
 ## Sidebar and layout
 
-- [ ] Show/Hide Inventory.
+- [x] Show/Hide Inventory.
 - [ ] Drag the inventory sidebar's edge to resize it, remembered.
 - [ ] Bigger, Smaller and Default text size for messages, stats, inventory and menus, remembered (`TextSize.m`); `font_size_message` option.
 

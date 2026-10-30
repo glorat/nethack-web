@@ -686,3 +686,38 @@ test("a key typed before a text window opened doesn't close it unseen", async ({
   await expect(dialog).toBeHidden();
   expect(await turn()).toBe(before);
 });
+
+test("the inventory sidebar can be hidden and shown, and stays as it was left", async ({ page }) => {
+  const name = `Side${Date.now() % 100000}`;
+  await startGame(page, name);
+  const sidebar = page.locator(".inventory");
+  const map = page.locator(".map");
+  const width = (await map.boundingBox())!.width;
+
+  await sidebar.getByRole("button", { name: "Hide" }).click();
+  await expect(sidebar).toBeHidden();
+  expect((await map.boundingBox())!.width).toBeGreaterThan(width);
+
+  await page.reload();
+  await page.getByLabel("Who are you?").fill(`${name}b`);
+  await page.getByRole("button", { name: "Play" }).click();
+  await untilPlaying(page);
+  await expect(sidebar).toBeHidden();
+
+  await page.keyboard.press("Control+Meta+s");
+  await expect(sidebar).toBeVisible();
+  await page.keyboard.press("Control+Meta+s");
+  await expect(sidebar).toBeHidden();
+  await page.getByRole("button", { name: "Show Inventory" }).click();
+  await expect(sidebar).toBeVisible();
+
+  // with a dialog open too, which doesn't take the s
+  await page.keyboard.press("Control+x");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Control+Meta+s");
+  await expect(sidebar).toBeHidden();
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+});
