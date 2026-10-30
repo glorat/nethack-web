@@ -34,7 +34,7 @@ Decided for the web:
 - [x] Pick-one menus of 2–4 short items without tiles shown as answer buttons (`isQuestion`, `buildQuestionContents`).
 - [x] Items the core gave no letter get the next free one, as tty and Cocoa hand out (`buildRows`).
 - [x] Read-only menus as selectable, copyable text.
-- [ ] Keyboard and hover highlight; Return or space picks the highlighted row.
+- [x] Keyboard and hover highlight; Return or space picks the highlighted row.
 
 ## Prompts
 

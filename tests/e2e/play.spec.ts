@@ -591,3 +591,39 @@ test("a read-only list is text that can be selected and copied", async ({ page }
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 });
+
+test("arrow keys highlight a menu's rows, and Return or space picks the highlighted one", async ({ page }) => {
+  await startAs(page, `Lit${Date.now() % 100000}`, /Priest/);
+  const dialog = page.getByRole("dialog");
+
+  // a menu of several picks: space toggles the highlighted row
+  await page.keyboard.press("Shift+D");
+  await dialog.locator(".menu-item", { hasText: /all types/i }).click();
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(dialog).toContainText("holy water");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  const second = dialog.locator(".menu-item").nth(1);
+  await expect(second).toHaveClass(/highlighted/);
+  await page.keyboard.press(" ");
+  await expect(second).toHaveClass(/selected/);
+  await expect(dialog.locator(".menu-item.selected")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  // a menu of one pick: the mouse highlights a row until it leaves the list
+  await page.keyboard.press("q");
+  await expect(dialog).toContainText(/drink/i);
+  const row = dialog.locator(".menu-item").first();
+  await row.hover();
+  await expect(row).toHaveClass(/highlighted/);
+  await dialog.locator(".dialog-title").hover();
+  await expect(dialog.locator(".menu-item.highlighted")).toHaveCount(0);
+  // and Return picks the row the arrow keys are on
+  await page.keyboard.press("ArrowDown");
+  await expect(dialog.locator(".menu-item").first()).toHaveClass(/highlighted/);
+  await expect(dialog.locator(".menu-item").first()).toContainText("holy water");
+  await page.keyboard.press("Enter");
+  await expect(dialog).toBeHidden();
+  await expect(page.locator(".inv-item", { hasText: "holy water" })).toContainText("3 potions");
+});

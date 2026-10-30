@@ -108,6 +108,30 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     e.clipboardData.setData("text/plain", lines.join("\n"));
   };
 
+  // the row the arrow keys, a click or in a pick-one menu the mouse are on, for Return or space;
+  // a question's answers are buttons, so it has none
+  const highlight = useRef<number | null>(null);
+  const highlights = how !== "none" && !isQuestion(how, items);
+  const setHighlight = (i: number | null) => {
+    if (highlight.current === i) return;
+    highlight.current = i;
+    update();
+  };
+  const moveHighlight = (step: 1 | -1) => {
+    const rows = order.filter((i) => items[i].identifier !== 0);
+    if (!rows.length) return;
+    const at = highlight.current === null ? -1 : rows.indexOf(highlight.current);
+    const next = at < 0 ? (step > 0 ? 0 : rows.length - 1) : Math.min(rows.length - 1, Math.max(0, at + step));
+    highlight.current = rows[next];
+    list.current?.children[order.indexOf(rows[next])]?.scrollIntoView({ block: "nearest" });
+    update();
+  };
+
+  // sorting moves the highlighted row
+  useLayoutEffect(() => {
+    if (highlight.current !== null) list.current?.children[order.indexOf(highlight.current)]?.scrollIntoView({ block: "nearest" });
+  }, [sorted]);
+
   // layout effect: listen before the dialog is painted, or a fast key press is lost
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -117,6 +141,12 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
       if (how === "none" && (e.metaKey || e.ctrlKey) && e.key === "a") return selectList();
       if (how === "none" && e.key in SCROLL_KEYS) return scrollList(e.key);
       if (e.key === "Escape") return onDone(null);
+      // not keys typed before the menu opened, replayed into it: they can't have meant a row they hadn't seen
+      if (highlights && e.isTrusted && (e.key === "ArrowDown" || e.key === "ArrowUp"))
+        return moveHighlight(e.key === "ArrowDown" ? 1 : -1);
+      const lit = highlight.current;
+      if (how === "one" && (e.key === "Enter" || e.key === " ") && lit !== null) return choose(lit);
+      if (how === "any" && e.key === " " && lit !== null) return toggle([lit]);
       if (e.key === "Enter" || (e.key === " " && how !== "one")) {
         if (how === "one" && selected.current.size === 0) return onDone(null);
         return finish(selected.current);
@@ -197,6 +227,7 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
         <div
           ref={list}
           onCopy={how === "none" ? copyList : undefined}
+          onMouseLeave={how === "one" ? () => setHighlight(null) : undefined}
           class={`menu-items${columns > 1 ? " tabbed" : ""}${how === "none" ? " readonly" : ""}`}
           style={{ "--menu-columns": columns }}
         >
@@ -210,8 +241,16 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
               </div>
             ) : (
               <Row
-                class={`menu-item${selected.current.has(i) ? " selected" : ""}`}
-                onClick={how === "none" ? undefined : () => choose(i)}
+                class={`menu-item${selected.current.has(i) ? " selected" : ""}${highlight.current === i ? " highlighted" : ""}`}
+                onClick={
+                  how === "none"
+                    ? undefined
+                    : () => {
+                        setHighlight(i);
+                        choose(i);
+                      }
+                }
+                onMouseMove={how === "one" ? () => setHighlight(i) : undefined}
               >
                 <span class="inv-icon" style={tileStyle(sheet, item.tile, ICON)} />
                 <span class="inv-letter">{item.accelerator}</span>
