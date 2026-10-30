@@ -60,6 +60,9 @@ export interface EmscriptenFS {
   syncfs(populate: boolean, callback: (err: unknown) => void): void;
   writeFile(path: string, data: string | Uint8Array): void;
   readFile(path: string, opts: { encoding: "utf8" }): string;
+  readFile(path: string): Uint8Array;
+  stat(path: string): { mode: number };
+  isDir(mode: number): boolean;
   readdir(path: string): string[];
   rmdir(path: string): void;
   unlink(path: string): void;

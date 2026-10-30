@@ -42,3 +42,9 @@ Each line is `<seq> <tag> [args]`. `seq` counts from 1 within each session. Text
 | `end` | `save` or `over` | The session ended by saving, or the game ended; written before the last persist, as the page may go straight after it |
 
 All times are the player's clock and are recorded as they were, even if that clock jumps.
+
+## Replaying
+
+`src/worker/replayer.ts` plays a recording again. Each session runs on a fresh core whose host answers from the recording, checking each `ckpt`, `T`, `=` and `end` against the core. A restore starts from the files the replay itself saved; a recovery from the files as the replay had them at the checkpoint named. The replay stops with the line where the game went differently.
+
+The checks only see the turn, checkpoint count, hit points and level, so a game that differs in nothing else (attributes, say) replays without complaint.
