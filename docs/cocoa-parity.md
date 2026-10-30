@@ -8,7 +8,7 @@ Decided for the web:
 - Right-click opens a small context menu with the wiki search, and keeps the secondary click to the core as an item.
 - Options are a raw `.nethackrc` editor, as in Cocoa.
 - Ship the 64px and classic 16px tile sheets; no 128px.
-- Not porting Cocoa's speech or notes.
+- Speech, notes, sound and tile-set import are later phases, not dropped.
 
 ## Map
 
@@ -59,6 +59,20 @@ Decided for the web:
 - [x] Game-over dialog offers Quit as well as New Game (`showGameOver`).
 - [x] Help: what a key does, NetHack Wiki search.
 
-## Deferred
+## Second pass
+
+- [ ] Save & Quit doesn't ask "Really save?" or "Overwrite the old file?" (`wincocoa.m` `AlwaysYes`).
+- [ ] Equipment tooltips as Cocoa words them: "(a) +1 long sword", without "(being worn)" (`EquipmentView.m`).
+- [ ] Extended commands: a sole match is completed and selected as you type; Esc clears what's typed before it cancels (`ExtCommandWindowController.m`).
+- [ ] The bell, and a refused click or inventory pick, are heard or seen (`nhbell`, `NSBeep`).
+- [ ] Choose the ASCII map's font and size, remembered; choosing one switches to ASCII (`changeFont`).
+- [ ] An About box: NetHack, this port and the painted tiles by Kevin Tam, the classic tiles, the licence.
+- [ ] Closing the tab mid-game keeps the game (Cocoa saves on ⌘Q or closing the window, `terminateApplication`). Discuss the approach first: a page can't wait on a save as it unloads.
+
+## Later
 
 - [ ] Importing a tile set, kept in the browser (`importTileSet`).
+- [ ] Sound (`sound/macsound`; Cocoa's bundle ships no sound files yet).
+- [ ] Speech of messages (`speakString`).
+- [ ] Notes window (`NotesWindowController.m`).
+- [ ] Reaching wizard mode from the browser (sysconf `WIZARDS`).
