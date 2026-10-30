@@ -18,6 +18,7 @@ export interface NetHackModule {
   _nhweb_equip_letter(slot: number): number;
   _nhweb_equip_tile(slot: number): number;
   _nhweb_inventory_key(): number;
+  _nhweb_command_key(): number;
   _nhweb_role_name(role: number, female: number): number;
   _nhweb_race_name(race: number): number;
   _nhweb_role_tile(role: number, female: number): number;

@@ -16,6 +16,8 @@ import { YesNoDialog } from "./dialogs/YesNoDialog";
 import { EquipmentView } from "./EquipmentView";
 import { InventoryView } from "./InventoryView";
 import { MapView } from "./MapView";
+import { type BarMenu, MenuBar, type MenuEntry } from "./MenuBar";
+import { COMMAND_MENUS, type CommandItem, GAME_MENU } from "./commands";
 import { MessageView } from "./MessageView";
 import { StartScreen } from "./StartScreen";
 import { StatsView } from "./StatsView";
@@ -196,13 +198,35 @@ export function App() {
     setPending(p);
   };
 
-  const sendKey = (k: KeyLike) => {
-    const code = keyCode(k);
-    if (code === null) return;
+  const setInventoryKey = (key: number) => {
+    inventoryKey.current = key;
+  };
+  // the extended command key while the core waits for a command, with no keys typed ahead: the menu
+  // bar's commands are only for then, and run as that key and the command's name
+  const commandKey = useRef(0);
+  const [commanding, setCommanding] = useState(false);
+  const setCommandKey = (key: number) => {
+    commandKey.current = key;
+    setCommanding(key !== 0);
+  };
+  const pendingCommand = useRef<string | null>(null);
+  const runCommand = (name: string) => {
+    if (!commandKey.current || pendingRef.current) return;
+    pendingCommand.current = name;
+    sendCode(commandKey.current);
+  };
+
+  const sendCode = (code: number) => {
     waitingForKey.current = false;
-    inventoryKey.current = 0;
+    setInventoryKey(0);
+    setCommandKey(0);
     setState(nextBatch);
     client.key(code);
+  };
+
+  const sendKey = (k: KeyLike) => {
+    const code = keyCode(k);
+    if (code !== null) sendCode(code);
   };
 
   const client = useMemo(
@@ -216,17 +240,24 @@ export function App() {
           // a pick is for the menu the inventory key opens next, or nothing
           const letter = pendingPick.current;
           pendingPick.current = null;
+          // a command for a prompt that didn't come is for none
+          const command = pendingCommand.current;
+          pendingCommand.current = null;
           if (request.kind === "key" || request.kind === "poskey") {
             const next = typeAhead.current.shift();
             if (next) return sendKey(next);
             waitingForKey.current = true;
-            inventoryKey.current = request.kind === "poskey" ? request.inventoryKey : 0;
+            setInventoryKey(request.kind === "poskey" ? request.inventoryKey : 0);
+            setCommandKey(request.kind === "poskey" ? request.commandKey : 0);
             return;
           }
           waitingForKey.current = false;
-          inventoryKey.current = 0;
+          setInventoryKey(0);
+          setCommandKey(0);
           // an arrow held as a dialog opens is its first key, as it was before chords
           typeAhead.current.push(...chords.current.up());
+          if (command && request.kind === "ext_cmd")
+            return client.answer(id, { kind: "ext_cmd", index: request.commands.find((c) => c.name === command)?.index ?? -1 });
           if (request.kind === "ext_cmd" || request.kind === "getlin") {
             const line = takeLine(typeAhead.current);
             if (line.end === "escape") return client.answer(id, request.kind === "getlin" ? { kind: "getlin", text: null } : { kind: "ext_cmd", index: -1 });
@@ -332,7 +363,8 @@ export function App() {
   const chooseItem = (letter: string) => {
     const key = inventoryKey.current;
     if (!key || pendingRef.current) return;
-    inventoryKey.current = 0;
+    setInventoryKey(0);
+    setCommandKey(0);
     waitingForKey.current = false;
     pendingPick.current = letter;
     setState(nextBatch);
@@ -347,67 +379,104 @@ export function App() {
     });
   };
 
+  // absent until the core has read its options, which would overrule a switch made before
+  const toggleAscii = state.status.BL_TITLE
+    ? (on: boolean) => {
+        setState((s) => ({ ...s, asciiMap: on }));
+        saveAscii(on);
+        client.asciiMap(on);
+      }
+    : undefined;
+  const command = (item: CommandItem | null): MenuEntry | null =>
+    item && { title: item.title, key: item.key, indent: item.indent, disabled: !commanding, run: () => runCommand(item.command) };
+  const menus: BarMenu[] = [
+    { title: "Game", entries: GAME_MENU.map(command) },
+    {
+      title: "View",
+      entries: [
+        { title: "Use ASCII Mode", checked: ascii, disabled: !toggleAscii, run: () => toggleAscii?.(!ascii) },
+        null,
+        { title: "Zoom In", key: "⌘=", run: () => zoom(1) },
+        { title: "Zoom Out", key: "⌘-", run: () => zoom(-1) },
+        { title: "Actual Size", key: "⌘0", run: () => zoom(0) },
+        null,
+        {
+          title: "Bigger Text",
+          key: "⌥⌘=",
+          disabled: biggerTextSize(textSize) === textSize,
+          run: () => setTextSize(biggerTextSize(textSizeNow.current), true),
+        },
+        {
+          title: "Smaller Text",
+          key: "⌥⌘-",
+          disabled: smallerTextSize(textSize) === textSize,
+          run: () => setTextSize(smallerTextSize(textSizeNow.current), true),
+        },
+        { title: "Default Text Size", disabled: textSize === DEFAULT_TEXT_SIZE, run: () => setTextSize(DEFAULT_TEXT_SIZE, true) },
+        null,
+        { title: showInventory ? "Hide Inventory" : "Show Inventory", key: "⌃⌘S", run: () => setShowInventory(!showInventory) },
+      ],
+    },
+    ...COMMAND_MENUS.map((menu) => ({ title: menu.title, entries: menu.items.map(command) })),
+  ];
+
   if (state.error) return <div class="fatal">{state.error}</div>;
   if (!sheet) return <div class="loading">Loading tiles…</div>;
   if (!playing) return <StartScreen onStart={start} />;
 
   return (
-    <div class="game">
-      <div class="main-area">
-        <header class="top">
-          <StatsView fields={state.status} />
-          <EquipmentView equipment={state.equipment} inventory={state.inventory} sheet={sheet} onChoose={chooseItem} />
-          <MessageView messages={state.messages} batch={state.batch} />
-        </header>
-        <MapView
-          state={state}
-          sheet={sheet}
-          cell={cell}
-          ascii={ascii}
-          onAscii={
-            state.status.BL_TITLE
-              ? (on) => {
-                  setState((s) => ({ ...s, asciiMap: on }));
-                  saveAscii(on);
-                  client.asciiMap(on);
-                }
-              : undefined
-          }
-          describe={(x, y) => client.describe(x, y)}
-          onZoom={zoom}
-          onShowInventory={showInventory ? undefined : () => setShowInventory(true)}
-          onClick={(x, y, button) => {
-            if (pending) return;
-            inventoryKey.current = 0;
-            setState(nextBatch);
-            client.click(x, y, button);
-          }}
-        />
-      </div>
-      {showInventory ? (
-        <InventoryView
-          items={state.inventory}
-          sheet={sheet}
-          width={inventoryWidth(sidebarWidth * textScale, textScale)}
-          onChoose={chooseItem}
-          onHide={() => setShowInventory(false)}
-          onResize={resizeInventory}
-        />
-      ) : null}
-      {!state.started ? <div class="overlay-note">Starting…</div> : null}
-      {state.gameOver ? (
-        <div class="dialog-backdrop">
-          <div class="dialog">
-            <div class="dialog-title">{state.gameOver}</div>
-            <div class="dialog-buttons">
-              <button class="primary" onClick={() => location.reload()}>
-                New game
-              </button>
+    <div class="app">
+      <MenuBar menus={menus} />
+      <div class="game">
+        <div class="main-area">
+          <header class="top">
+            <StatsView fields={state.status} />
+            <EquipmentView equipment={state.equipment} inventory={state.inventory} sheet={sheet} onChoose={chooseItem} />
+            <MessageView messages={state.messages} batch={state.batch} />
+          </header>
+          <MapView
+            state={state}
+            sheet={sheet}
+            cell={cell}
+            ascii={ascii}
+            onAscii={toggleAscii}
+            describe={(x, y) => client.describe(x, y)}
+            onZoom={zoom}
+            onShowInventory={showInventory ? undefined : () => setShowInventory(true)}
+            onClick={(x, y, button) => {
+              if (pending) return;
+              setInventoryKey(0);
+              setCommandKey(0);
+              setState(nextBatch);
+              client.click(x, y, button);
+            }}
+          />
+        </div>
+        {showInventory ? (
+          <InventoryView
+            items={state.inventory}
+            sheet={sheet}
+            width={inventoryWidth(sidebarWidth * textScale, textScale)}
+            onChoose={chooseItem}
+            onHide={() => setShowInventory(false)}
+            onResize={resizeInventory}
+          />
+        ) : null}
+        {!state.started ? <div class="overlay-note">Starting…</div> : null}
+        {state.gameOver ? (
+          <div class="dialog-backdrop">
+            <div class="dialog">
+              <div class="dialog-title">{state.gameOver}</div>
+              <div class="dialog-buttons">
+                <button class="primary" onClick={() => location.reload()}>
+                  New game
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      ) : null}
-      {pending ? <PendingDialog pending={pending} sheet={sheet} answer={answer} passOn={(k) => typeAhead.current.unshift(k)} /> : null}
+        ) : null}
+        {pending ? <PendingDialog pending={pending} sheet={sheet} answer={answer} passOn={(k) => typeAhead.current.unshift(k)} /> : null}
+      </div>
     </div>
   );
 }

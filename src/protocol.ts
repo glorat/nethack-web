@@ -95,8 +95,11 @@ export interface PlayerChoices {
 
 export type GameRequest =
   | { kind: "key" }
-  /** inventoryKey is 0 unless the core is waiting for a command. */
-  | { kind: "poskey"; inventoryKey: number }
+  /**
+   * inventoryKey and commandKey (the extended command key) are 0 unless the core is waiting for a command,
+   * or if nothing is bound to them.
+   */
+  | { kind: "poskey"; inventoryKey: number; commandKey: number }
   /** directions: for "In what direction?", the keys for W NW N NE E SE S SW down up. */
   | { kind: "yn"; query: string; choices: string; defaultChoice: string; directions?: string }
   | { kind: "getlin"; query: string }

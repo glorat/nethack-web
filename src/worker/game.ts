@@ -123,7 +123,11 @@ export class Game {
     this.refreshPeaceful();
     this.expireChanges();
     this.flush();
-    return this.host.nextInput({ kind: "poskey", inventoryKey: this.m._nhweb_inventory_key() });
+    return this.host.nextInput({
+      kind: "poskey",
+      inventoryKey: this.m._nhweb_inventory_key(),
+      commandKey: this.m._nhweb_command_key(),
+    });
   }
 
   /**

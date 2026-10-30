@@ -793,3 +793,40 @@ test("Cmd-Option = and - change the text size, which is kept, and the sidebar gr
   // the default forgets the choice, so the options decide again
   expect(await page.evaluate(() => localStorage.getItem("nethack.textSize"))).toBeNull();
 });
+
+test("the menu bar runs commands by name while the game waits for one", async ({ page }) => {
+  await startGame(page, `Bar${Date.now() % 100000}`);
+  const bar = page.getByRole("menubar");
+  await bar.getByRole("menuitem", { name: "Act" }).click();
+  await expect(page.getByRole("menu", { name: "Act" }).getByRole("menuitem", { name: /Kick/ })).toBeEnabled();
+  await page.keyboard.press("Escape");
+  await bar.getByRole("menuitem", { name: "Info" }).click();
+  const info = page.getByRole("menu", { name: "Info" });
+  await expect(info.getByRole("menuitem", { name: /What Does a Key Do/ })).toContainText("&");
+  await info.getByRole("menuitem", { name: /Attributes/ }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText(/You are/);
+  await page.screenshot({ path: "test-results/menubar.png" });
+
+  // with a dialog up, the game isn't waiting for a command
+  await bar.getByRole("menuitem", { name: "Act" }).click();
+  await expect(page.getByRole("menu", { name: "Act" }).getByRole("menuitem", { name: /Kick/ })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu", { name: "Act" })).toBeHidden();
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  // View acts on the page
+  const canvas = page.locator(".map canvas");
+  const width = Number(await canvas.getAttribute("width"));
+  await bar.getByRole("menuitem", { name: "View" }).click();
+  await expect(page.getByRole("menu", { name: "View" }).getByRole("menuitemcheckbox", { name: /Use ASCII Mode/ })).toHaveAttribute("aria-checked", "false");
+  await page.getByRole("menu", { name: "View" }).getByRole("menuitem", { name: /Zoom In/ }).click();
+  await expect.poll(async () => Number(await canvas.getAttribute("width"))).toBeGreaterThan(width);
+  await bar.getByRole("menuitem", { name: "View" }).click();
+  await page.getByRole("menu", { name: "View" }).getByRole("menuitem", { name: /Hide Inventory/ }).click();
+  await expect(page.locator(".inventory")).toBeHidden();
+  await bar.getByRole("menuitem", { name: "View" }).click();
+  await expect(page.getByRole("menu", { name: "View" }).getByRole("menuitem", { name: /Show Inventory/ })).toBeVisible();
+});
