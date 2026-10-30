@@ -83,6 +83,8 @@ async function start({ assetBase, options, config }: StartOptions): Promise<void
     default: (config: object) => Promise<NetHackModule>;
   };
 
+  // taken once, so a game doesn't change zone as daylight saving starts or ends
+  const utcOffset = -new Date().getTimezoneOffset() * 60;
   const host = {
     post(events: GameEvent[]) {
       send({ type: "events", events });
@@ -103,6 +105,7 @@ async function start({ assetBase, options, config }: StartOptions): Promise<void
     persist,
     alone: await soleTab(),
     now: () => Math.floor(Date.now() / 1000),
+    utcOffset: () => utcOffset,
     randomSeed: () => crypto.getRandomValues(new Uint32Array(1))[0],
     uuid,
   };

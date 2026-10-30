@@ -65,6 +65,21 @@ test("a recovered game comes back as of the last command, not the last level cha
   expect(next.state.status.BL_TIME?.text).toBe(turn);
 });
 
+test("a game comes back with the start time it had, in the page's time zone", async () => {
+  const date = "2026-01-26T12:00:00Z";
+  const utcOffset = 10 * 3600;
+  // gold to score with, as a game with no points leaves no log entry
+  const left = await (await Session.start({ seed: 3, date, utcOffset })).skipText();
+  await left.send("h,");
+
+  // the xlogfile is locked before it's written, which needs it to exist
+  const saves = new Map([...left.saves(), ["logfile", new Uint8Array()], ["xlogfile", new Uint8Array()]]);
+  const next = await (await Session.start({ saves, seed: 3, date, utcOffset })).skipText();
+  await quit(next);
+  const xlog = new TextDecoder().decode(next.saves().get("xlogfile"));
+  expect(xlog).toContain(`starttime=${Date.parse(date) / 1000}\t`);
+});
+
 test("a game recovered while engulfed is still engulfed", async () => {
   const g = await (await Session.start({ wizard: true, options: "pettype:none" })).skipText();
   await g.send("\x07");

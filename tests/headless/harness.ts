@@ -22,6 +22,8 @@ export interface SessionOptions {
   pageSeed?: number;
   /** The page's clock, which stands still. */
   date?: string;
+  /** The page's time zone, in seconds east of UTC; UTC if not given. */
+  utcOffset?: number;
   /** Debug mode, for ^W wishes, ^F maps and the like. */
   wizard?: boolean;
   /** Extra NETHACKOPTIONS, appended. */
@@ -262,6 +264,7 @@ export class Session {
       persist: async () => {},
       alone: !options.otherTab,
       now: () => now,
+      utcOffset: () => options.utcOffset ?? 0,
       randomSeed: () => options.pageSeed ?? 0,
       uuid: () => PAGE_UUID,
     };

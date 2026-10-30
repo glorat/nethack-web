@@ -61,6 +61,8 @@ export interface GameHost {
   readonly alone: boolean;
   /** Seconds since 1970, for every time the core reads. */
   now(): number;
+  /** Seconds east of UTC, for the game's local time. */
+  utcOffset(): number;
   /** An unguessable 32-bit seed, asked for at the start and at each level change. */
   randomSeed(): number;
   /** A new game's id, kept in its save and in any bones it leaves. */
@@ -284,6 +286,8 @@ export class Game {
         return "";
       case "shim_now":
         return this.host.now();
+      case "shim_utc_offset":
+        return this.host.utcOffset();
       case "shim_random_seed":
         return this.host.randomSeed();
       case "shim_nhuuid":
