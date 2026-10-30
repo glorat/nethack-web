@@ -96,7 +96,11 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .stat-grid { display: grid; grid-template-columns: repeat(4, auto); gap: 0 10px; margin-top: 6px; font-size: 12px; }
 .stat { display: flex; gap: 4px; white-space: nowrap; }
 .stat-label { color: var(--muted); }
-.stat-value { font-family: var(--mono); }
+.stat-value { font-family: var(--mono); position: relative; }
+/* in the gap after the value, so the grid's columns don't shift */
+.stat-change { position: absolute; left: 100%; margin-left: 1px; font-weight: 700; }
+.stat-change.better { color: var(--hp); }
+.stat-change.worse { color: var(--danger); }
 .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .badge { font-size: 11px; padding: 0 6px; border-radius: 8px; background: #4a3b10; color: #f0d070; }
 .badge.urgent { background: #5a1a1a; color: #ff8a8a; }

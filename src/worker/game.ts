@@ -62,6 +62,15 @@ function conditionNames(table: Record<string | number, string | number> | undefi
   return names;
 }
 
+/** The fields that show an arrow when they change, and whether going up is good. */
+const IMPROVES_UP: Record<string, boolean> = {
+  BL_STR: true, BL_DX: true, BL_CO: true, BL_IN: true, BL_WI: true, BL_CH: true,
+  BL_XP: true, BL_HD: true, BL_AC: false,
+};
+
+// the core's default for how long statushilites show a change
+const CHANGE_TURNS = 3;
+
 /** Implements the shim window port on top of the WASM core. */
 export class Game {
   private windows = new Map<number, Window>();
@@ -69,6 +78,10 @@ export class Game {
   private pending: GameEvent[] = [];
   private mapBatch: MapCell[] = [];
   private status: Record<string, StatusValue> = {};
+  /** The turn each field last went up or down, for the status's arrows. */
+  private changes = new Map<string, { direction: 1 | -1; improved: boolean; turn: number }>();
+  // starting gear changes AC and stats before the first turn
+  private showChanges = false;
   private floorTile: number | undefined;
   /** The cell last drawn on each map square, by y * COLNO + x. */
   private cells = new Map<number, MapCell>();
@@ -107,6 +120,7 @@ export class Game {
 
   private async input(): Promise<Input> {
     this.refreshPeaceful();
+    this.expireChanges();
     this.flush();
     return this.host.nextInput({ kind: "poskey", inventoryKey: this.m._nhweb_inventory_key() });
   }
@@ -150,7 +164,10 @@ export class Game {
     const a = args as number[];
     switch (name) {
       case "shim_init_nhwindows":
+        return 0;
       case "shim_status_init":
+        this.changes.clear();
+        this.showChanges = false;
         return 0;
       case "shim_player_selection_or_tty":
         return this.playerSelection();
@@ -214,7 +231,7 @@ export class Game {
         if (!a[3]) delete this.status[this.statusFieldName(a[0])];
         return 0;
       case "shim_status_update":
-        return this.statusUpdate(a[0], a[1], a[3], a[4]);
+        return this.statusUpdate(a[0], a[1], a[2], a[3], a[4]);
       case "shim_preference_update":
         // tiled_map switches ascii_map too
         if (["ascii_map", "tiled_map"].includes(this.m.UTF8ToString(a[0])))
@@ -456,20 +473,43 @@ export class Game {
     return 0;
   }
 
+  private statusWithChanges(): Record<string, StatusValue> {
+    const fields = { ...this.status };
+    const now = this.m._nhweb_moves();
+    for (const [name, { direction, improved, turn }] of this.changes) {
+      // a field the core has stopped showing shows no change either
+      if (fields[name] && now - turn < CHANGE_TURNS) fields[name] = { ...fields[name], change: { direction, improved } };
+    }
+    return fields;
+  }
+
+  /** Without the time option the core sends no status when only the turn changes, so a change would stay shown. */
+  private expireChanges(): void {
+    const now = this.m._nhweb_moves();
+    let expired = false;
+    for (const [name, { turn }] of this.changes) {
+      if (now - turn < CHANGE_TURNS) continue;
+      this.changes.delete(name);
+      expired = true;
+    }
+    if (expired) this.emit({ type: "status", fields: this.statusWithChanges() });
+  }
+
   private statusFieldName(field: number): string {
     const constants = (globalThis as { nethackGlobal?: { constants?: Record<string, Record<string | number, string | number>> } })
       .nethackGlobal?.constants;
     return String(constants?.STATUS_FIELD?.[field] ?? field);
   }
 
-  private statusUpdate(field: number, ptr: number, percent: number, color: number): number {
+  private statusUpdate(field: number, ptr: number, chg: number, percent: number, color: number): number {
     const constants = (globalThis as { nethackGlobal?: { constants?: Record<string, Record<string | number, string | number>> } })
       .nethackGlobal?.constants;
     const name = this.statusFieldName(field);
     switch (name) {
       case "BL_FLUSH":
       case "BL_RESET":
-        this.emit({ type: "status", fields: { ...this.status } });
+        this.emit({ type: "status", fields: this.statusWithChanges() });
+        if (this.m._nhweb_in_play()) this.showChanges = true;
         return 0;
       case "BL_CHARACTERISTICS":
         return 0;
@@ -478,9 +518,17 @@ export class Game {
         this.status[name] = { text: conditionNames(constants?.CONDITION, mask).join(" "), color, percent, mask };
         return 0;
       }
-      default:
+      default: {
+        const before = this.status[name]?.text;
         this.status[name] = { text: ptr ? this.m.UTF8ToString(ptr) : "", color, percent };
+        if (this.showChanges && chg && name in IMPROVES_UP) {
+          // with a hilite rule on XL, the core's chg follows the percentage to the next level, which drops on a level-up
+          const by = Number(this.status[name].text) - Number(before);
+          const direction = (Number.isNaN(by) || by === 0 ? chg : by) > 0 ? 1 : -1;
+          this.changes.set(name, { direction, improved: (direction > 0) === IMPROVES_UP[name], turn: this.m._nhweb_moves() });
+        }
         return 0;
+      }
     }
   }
 }

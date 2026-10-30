@@ -403,3 +403,19 @@ test("zooming out from the far corner keeps the middle from before the browser c
   await settle(page);
   await expectZoomKeepsView(page, "Control+-", 64, 48);
 });
+
+test("a stat that changes shows an arrow beside it", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Who are you?").fill(`Arrow${Date.now() % 100000}`);
+  await page.getByRole("button", { name: "Play" }).click();
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  await picker.getByRole("option", { name: /Valkyrie/ }).click();
+  await picker.getByRole("button", { name: "Play" }).click();
+  await untilPlaying(page);
+
+  // her shield is all she can take off, and without it her AC goes up, which is worse
+  await page.keyboard.press("Shift+T");
+  const ac = page.locator(".stat", { hasText: "AC" });
+  await expect(ac.locator(".stat-change.worse")).toHaveText("↑");
+  await page.locator(".stats").screenshot({ path: "test-results/stat-change.png" });
+});

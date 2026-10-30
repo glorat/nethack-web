@@ -40,12 +40,26 @@ function Meter({ label, cur, max, kind }: { label: string; cur: string; max: str
 
 export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
   if (!fields.BL_TITLE) return <div class="stats" />;
-  const stat = (label: string, name: string) => (
-    <div class="stat">
-      <span class="stat-label">{label}</span>
-      <span class="stat-value" style={{ color: nhColor(fields[name]?.color ?? 8) }}>{value(fields, name)}</span>
-    </div>
-  );
+  const stat = (label: string, name: string) => {
+    const change = fields[name]?.change;
+    return (
+      <div class="stat">
+        <span class="stat-label">{label}</span>
+        <span class="stat-value" style={{ color: nhColor(fields[name]?.color ?? 8) }}>
+          {value(fields, name)}
+          {change ? (
+            <span
+              class={`stat-change ${change.improved ? "better" : "worse"}`}
+              role="img"
+              aria-label={`${change.direction > 0 ? "up" : "down"}, ${change.improved ? "better" : "worse"}`}
+            >
+              {change.direction > 0 ? "↑" : "↓"}
+            </span>
+          ) : null}
+        </span>
+      </div>
+    );
+  };
   const conditions = (fields.BL_CONDITION?.text ?? "").split(" ").filter(Boolean);
   const badges = [value(fields, "BL_HUNGER"), value(fields, "BL_CAP")].filter(Boolean);
   const exp = value(fields, "BL_EXP");

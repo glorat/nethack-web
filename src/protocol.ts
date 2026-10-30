@@ -43,6 +43,8 @@ export interface StatusValue {
   percent: number;
   /** BL_CONDITION only: bitmask of the hero's conditions. */
   mask?: number;
+  /** For a few turns after the value went up (1) or down (-1); improved says whether that was good. */
+  change?: { direction: 1 | -1; improved: boolean };
 }
 
 export interface ExtCommand {

@@ -35,3 +35,51 @@ test("riding shows as a status condition", async () => {
   expect(g.messages.join(" ")).toMatch(/mount/i);
   expect(g.state.status.BL_CONDITION?.text).toMatch(/RIDE/);
 });
+
+const changed = (g: Session) => Object.entries(g.state.status).filter(([, v]) => v.change).map(([k, v]) => [k, v.change]);
+
+test("a stat that changes shows which way for three turns, but starting gear doesn't", async () => {
+  const g = await (await Session.start({ wizard: true })).skipText();
+  expect(changed(g)).toEqual([]);
+
+  await g.send("\x17");
+  await g.getlin("uncursed +0 elven cloak");
+  await g.send("W");
+  await g.yn(g.state.inventory.find((i) => /pall|cloak/.test(i.text))!.accelerator);
+  // a lower AC is better
+  expect(changed(g)).toEqual([["BL_AC", { direction: -1, improved: true }]]);
+  await g.send("s");
+  await g.send("s");
+  expect(changed(g)).toEqual([["BL_AC", { direction: -1, improved: true }]]);
+  await g.send("s");
+  expect(changed(g)).toEqual([]);
+
+  await g.send("T");
+  if (g.prompt?.kind === "yn") await g.yn(g.state.inventory.find((i) => /pall|cloak/.test(i.text))!.accelerator);
+  expect(changed(g)).toEqual([["BL_AC", { direction: 1, improved: false }]]);
+});
+
+test("a stat going up is better", async () => {
+  const g = await (await Session.start({ wizard: true })).skipText();
+  await g.send("\x17");
+  await g.getlin("blessed potion of gain level");
+  await g.send("q");
+  await g.yn(g.state.inventory.find((i) => /potion/.test(i.text))!.accelerator);
+  await g.skipText();
+  expect(changed(g)).toContainEqual(["BL_XP", { direction: 1, improved: true }]);
+});
+
+test("a level gained shows as up even with a hilite rule on experience level", async () => {
+  // with a rule, the core's change direction follows the percentage to the next level, which drops back to 0
+  const g = await (await Session.start({ wizard: true, options: "showexp,statushilites:3,hilite_status:experience-level/<50%/red" })).skipText();
+  await g.send("\x17");
+  await g.getlin("blessed potion of gain level");
+  await g.send("\x17");
+  await g.getlin("blessed potion of gain level");
+  for (const _ of [0, 1]) {
+    await g.send("q");
+    await g.yn(g.state.inventory.find((i) => /potion/.test(i.text))!.accelerator);
+    await g.skipText();
+    expect(changed(g)).toContainEqual(["BL_XP", { direction: 1, improved: true }]);
+  }
+});
