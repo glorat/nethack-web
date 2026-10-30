@@ -6,6 +6,7 @@ import type { Answer, GameEvent, GameRequest, MapCell } from "../../src/protocol
 import { applyEvents, cellAt, initialState, type GameState } from "../../src/port/state";
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
 import { Recorder } from "../../src/worker/recorder";
+import { type BootCore, replay, ReplayError, writeSaveFiles } from "../../src/worker/replayer";
 import type { EmscriptenFS, NetHackModule } from "../../src/worker/memory";
 
 const ROOT = resolve(__dirname, "../..");
@@ -327,5 +328,63 @@ export class Session {
     const settled = this.settled;
     this.settled = null;
     settled?.resolve();
+  }
+}
+
+/** What a headless replay showed: the game's state as a player would have seen it. */
+export interface Replayed {
+  state: GameState;
+  /** Whether it ended where the recording did, or where it went differently. */
+  error: ReplayError | null;
+}
+
+/** Plays a recording again on the real core, as fast as it goes. */
+export async function replayRecording(text: string): Promise<Replayed> {
+  const { default: createModule } = await import(pathToFileURL(resolve(ROOT, "public/nethack.js")).href);
+  let state = initialState();
+  const boot: BootCore = async (session, files, makeHost) => {
+    let host: ReturnType<typeof makeHost> | null = null;
+    const printed: string[] = [];
+    const m: Module = await createModule({
+      noInitialRun: true,
+      wasmBinary: readFileSync(resolve(ROOT, "public/nethack.wasm")),
+      print: (line: string) => printed.push(line),
+      printErr: (line: string) => printed.push(line),
+      onExit: () => host?.stopped(`the core exited before the session's end: ${printed.join(" / ")}`),
+      onAbort: (what: unknown) => host?.stopped(`the core aborted: ${String(what)}`),
+      preRun: [
+        (mod: Module) => {
+          mod.ENV.USER = "player";
+          mod.ENV.NETHACKOPTIONS = session.options;
+          mod.FS.writeFile(CONFIG_FILE, new TextEncoder().encode(session.config));
+          mod.FS.mkdir("/save");
+          writeSaveFiles(mod, files);
+        },
+      ],
+    });
+    const shared = (globalThis as { nethackGlobal?: { shimFunctionRunning?: unknown } }).nethackGlobal;
+    if (shared) shared.shimFunctionRunning = null;
+    host = makeHost(m);
+    const game = new Game(m, host);
+    host.game = game;
+    const callback = `nethackCallback${++sessions}`;
+    (globalThis as Record<string, unknown>)[callback] = (name: string, ...args: unknown[]) => game.callback(name, args);
+    m.ccall("shim_graphics_set_callback", null, ["string"], [callback]);
+    try {
+      m._main(0, 0);
+    } catch (e) {
+      if ((e as { name?: string }).name !== "ExitStatus") throw e;
+    }
+  };
+  try {
+    await replay(text, boot, {
+      post: (events) => (state = applyEvents(state, events)),
+      pace: () => Promise.resolve(),
+      checkpoint: () => {},
+    });
+    return { state, error: null };
+  } catch (e) {
+    if (e instanceof ReplayError) return { state, error: e };
+    throw e;
   }
 }
