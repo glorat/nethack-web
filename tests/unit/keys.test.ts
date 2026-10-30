@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { keyCode, takeLine } from "../../src/port/keys";
+import { ArrowChords, keyCode, takeLine, type KeyLike } from "../../src/port/keys";
 
 const k = (key: string, mods: Partial<{ ctrlKey: boolean; altKey: boolean; metaKey: boolean }> = {}) =>
   keyCode({ key, ctrlKey: false, altKey: false, metaKey: false, ...mods });
@@ -37,4 +37,42 @@ test("keys typed ahead into a line prompt make its text", () => {
   const rest = press("y", "Enter", "j");
   takeLine(rest);
   expect(rest).toEqual(press("j"));
+});
+
+const event = (key: string, mods: Partial<KeyLike> = {}): KeyLike => ({ key, ctrlKey: false, altKey: false, metaKey: false, ...mods });
+const typed = (keys: KeyLike[]) => keys.map((e) => String.fromCharCode(keyCode(e)!)).join("");
+
+test("two arrows pressed together move diagonally", () => {
+  const chords = new ArrowChords();
+  expect(chords.down(event("ArrowLeft"))).toEqual([]);
+  expect(typed(chords.down(event("ArrowUp")))).toBe("y");
+  expect(chords.up()).toEqual([]);
+  expect(chords.up()).toEqual([]);
+  chords.down(event("ArrowDown"));
+  expect(typed(chords.down(event("ArrowRight")))).toBe("n");
+});
+
+test("an arrow alone moves when released", () => {
+  const chords = new ArrowChords();
+  expect(chords.down(event("ArrowRight"))).toEqual([]);
+  expect(typed(chords.up())).toBe("l");
+});
+
+test("a held arrow repeats, and other keys are typed at once, after any held arrow", () => {
+  const chords = new ArrowChords();
+  chords.down(event("ArrowUp"));
+  expect(typed(chords.down(event("ArrowUp")))).toBe("kk");
+  expect(chords.up()).toEqual([]);
+  expect(typed(chords.down(event("s")))).toBe("s");
+  chords.down(event("ArrowLeft"));
+  expect(typed(chords.down(event("ArrowRight")))).toBe("hl");
+  chords.down(event("ArrowLeft"));
+  expect(typed(chords.down(event("s")))).toBe("hs");
+});
+
+test("an arrow with a modifier is neither held nor part of a diagonal", () => {
+  const chords = new ArrowChords();
+  expect(chords.down(event("ArrowLeft", { ctrlKey: true }))).toHaveLength(1);
+  chords.down(event("ArrowLeft"));
+  expect(chords.down(event("ArrowUp", { altKey: true })).map((e) => e.key)).toEqual(["ArrowLeft", "ArrowUp"]);
 });

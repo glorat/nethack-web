@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { GameClient } from "../client";
 import { commandToRun, listCommands } from "../port/extcmd";
-import { keyCode, takeLine, type KeyLike } from "../port/keys";
+import { ArrowChords, keyCode, takeLine, type KeyLike } from "../port/keys";
 import { applyEvents, initialState, nextBatch } from "../port/state";
 import type { Answer, GameRequest } from "../protocol";
 import { loadTileSheet, type TileSheet } from "../tiles";
@@ -49,6 +49,7 @@ export function App() {
   const pendingPick = useRef<string | null>(null);
   // keys typed while the core is busy: each goes to the next thing that asks, as in tty
   const typeAhead = useRef<KeyLike[]>([]);
+  const chords = useRef(new ArrowChords());
   const waitingForKey = useRef(false);
   // read by the key handler, which can run before a new dialog has rendered
   const pendingRef = useRef<Pending | null>(null);
@@ -85,6 +86,8 @@ export function App() {
           }
           waitingForKey.current = false;
           inventoryKey.current = 0;
+          // an arrow held as a dialog opens is its first key, as it was before chords
+          typeAhead.current.push(...chords.current.up());
           if (request.kind === "ext_cmd" || request.kind === "getlin") {
             const line = takeLine(typeAhead.current);
             if (line.end === "escape") return client.answer(id, request.kind === "getlin" ? { kind: "getlin", text: null } : { kind: "ext_cmd", index: -1 });
@@ -115,16 +118,27 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    const type = (keys: KeyLike[]) => {
+      for (const k of keys) {
+        if (waitingForKey.current) sendKey(k);
+        else typeAhead.current.push(k);
+      }
+    };
     const onKey = (e: KeyboardEvent) => {
       if (!playing || pendingRef.current) return;
       if (keyCode(e) === null) return;
       e.preventDefault();
-      const k = { key: e.key, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey };
-      if (waitingForKey.current) sendKey(k);
-      else typeAhead.current.push(k);
+      type(chords.current.down({ key: e.key, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey }));
     };
+    const onRelease = () => type(chords.current.up());
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keyup", onRelease);
+    window.addEventListener("blur", onRelease);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onRelease);
+      window.removeEventListener("blur", onRelease);
+    };
   }, [playing, client]);
 
   // keys typed before a dialog opened are its first keys; its listeners are attached by now

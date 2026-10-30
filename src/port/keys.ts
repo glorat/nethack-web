@@ -61,3 +61,47 @@ export function takeLine(keys: KeyLike[]): { text: string; end: "return" | "esca
   }
   return { text, end: null };
 }
+
+const DIAGONALS: Record<string, string> = {
+  "ArrowLeft ArrowUp": "Home",
+  "ArrowRight ArrowUp": "PageUp",
+  "ArrowLeft ArrowDown": "End",
+  "ArrowRight ArrowDown": "PageDown",
+};
+
+function diagonal(a: string, b: string): string | undefined {
+  return DIAGONALS[`${a} ${b}`] ?? DIAGONALS[`${b} ${a}`];
+}
+
+const bareArrow = (k: KeyLike) => k.key.startsWith("Arrow") && !k.ctrlKey && !k.altKey && !k.metaKey;
+
+/**
+ * Two arrow keys pressed together move diagonally, as in Cocoa: an arrow waits
+ * for its release, or for a second arrow, before it is typed.
+ */
+export class ArrowChords {
+  private held: KeyLike | null = null;
+
+  /** The keys a key press types, in order. */
+  down(k: KeyLike): KeyLike[] {
+    const held = this.held;
+    this.held = null;
+    if (held) {
+      const both = diagonal(held.key, k.key);
+      if (both && bareArrow(k)) return [{ ...k, key: both }];
+      return [held, k];
+    }
+    if (bareArrow(k)) {
+      this.held = k;
+      return [];
+    }
+    return [k];
+  }
+
+  /** The keys a key release types: a waiting arrow, if any. */
+  up(): KeyLike[] {
+    const held = this.held;
+    this.held = null;
+    return held ? [held] : [];
+  }
+}
