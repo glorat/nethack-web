@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import type { Answer, GameEvent, GameRequest, StartOptions, UiMessage, WorkerMessage } from "../protocol";
-import { Game, type Input } from "./game";
+import { CONFIG_FILE, Game, type Input } from "./game";
 import { describeSquare, type NetHackModule } from "./memory";
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -91,8 +91,7 @@ async function start({ assetBase, options, config }: StartOptions): Promise<void
       (m: NetHackModule) => {
         m.ENV.USER = "player";
         m.ENV.NETHACKOPTIONS = options;
-        // Emscripten's HOME, which it creates
-        m.FS.writeFile("/home/web_user/.nethackrc", config);
+        m.FS.writeFile(CONFIG_FILE, config);
         m.FS.mkdir(SAVE_DIR);
         m.FS.mount(m.IDBFS, {}, SAVE_DIR);
       },

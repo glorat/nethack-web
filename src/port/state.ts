@@ -29,6 +29,8 @@ export interface GameState {
   textSize: number | null;
   /** The tile_file option; null if it isn't set. */
   tileFile: string | null;
+  /** The options file as #saveoptions last rewrote it; null if it hasn't. */
+  optionsFile: string | null;
   error: string | null;
   batch: number;
   nextMessageId: number;
@@ -47,6 +49,7 @@ export function initialState(): GameState {
     asciiMap: null,
     textSize: null,
     tileFile: null,
+    optionsFile: null,
     error: null,
     batch: 0,
     nextMessageId: 1,
@@ -94,6 +97,9 @@ export function applyEvents(state: GameState, events: GameEvent[]): GameState {
         break;
       case "error":
         next = { ...next, error: event.text };
+        break;
+      case "options_file":
+        next = { ...next, optionsFile: event.text };
         break;
       case "tile_file":
         next = { ...next, tileFile: event.name };

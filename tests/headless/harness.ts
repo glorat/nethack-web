@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { afterEach, vi } from "vitest";
 import type { Answer, GameEvent, GameRequest, MapCell } from "../../src/protocol";
 import { applyEvents, cellAt, initialState, type GameState } from "../../src/port/state";
-import { Game, type Input } from "../../src/worker/game";
+import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
 import type { EmscriptenFS, NetHackModule } from "../../src/worker/memory";
 
 const ROOT = resolve(__dirname, "../..");
@@ -103,7 +103,7 @@ export class Session {
           mod.ENV.NETHACKOPTIONS = nethackOptions;
           mod.ENV.NETHACK_SEED = String(options.seed ?? 1);
           // Emscripten's HOME, which it creates
-          if (options.config !== undefined) mod.FS.writeFile("/home/web_user/.nethackrc", new TextEncoder().encode(options.config));
+          if (options.config !== undefined) mod.FS.writeFile(CONFIG_FILE, new TextEncoder().encode(options.config));
           mod.FS.mkdir("/save");
           for (const [file, data] of options.saves ?? []) mod.FS.writeFile(`/save/${file}`, data);
         },

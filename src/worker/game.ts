@@ -72,6 +72,9 @@ const IMPROVES_UP: Record<string, boolean> = {
 // the core's default for how long statushilites show a change
 const CHANGE_TURNS = 3;
 
+// Emscripten's HOME, where the worker puts the options file and #saveoptions writes it
+export const CONFIG_FILE = "/home/web_user/.nethackrc";
+
 /** Implements the shim window port on top of the WASM core. */
 export class Game {
   private windows = new Map<number, Window>();
@@ -83,6 +86,8 @@ export class Game {
   private changes = new Map<string, { direction: 1 | -1; improved: boolean; turn: number }>();
   // starting gear changes AC and stats before the first turn
   private showChanges = false;
+  /** The options file as last seen; #saveoptions rewrites it in place, which is kept only if passed on. */
+  private configText: string | null = null;
   private floorTile: number | undefined;
   /** The cell last drawn on each map square, by y * COLNO + x. */
   private cells = new Map<number, MapCell>();
@@ -120,6 +125,7 @@ export class Game {
   }
 
   private async input(): Promise<Input> {
+    this.optionsFile();
     this.refreshPeaceful();
     this.expireChanges();
     this.flush();
@@ -356,6 +362,17 @@ export class Game {
     this.cells.set(y * COLNO + x, cell);
     this.mapBatch.push(cell);
     return 0;
+  }
+
+  private optionsFile(): void {
+    let text = "";
+    try {
+      text = this.m.FS.readFile(CONFIG_FILE, { encoding: "utf8" });
+    } catch {
+      // none yet
+    }
+    if (this.configText !== null && text !== this.configText) this.emit({ type: "options_file", text });
+    this.configText = text;
   }
 
   private tileFile(): void {

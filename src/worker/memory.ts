@@ -53,6 +53,7 @@ export interface EmscriptenFS {
   mount(type: unknown, opts: object, mountpoint: string): void;
   syncfs(populate: boolean, callback: (err: unknown) => void): void;
   writeFile(path: string, data: string | Uint8Array): void;
+  readFile(path: string, opts: { encoding: "utf8" }): string;
 }
 
 /* glyph_info: int glyph; int ttychar; uint32 framecolor; glyph_map gm;

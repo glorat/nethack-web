@@ -3,7 +3,7 @@ import { GameClient } from "../client";
 import { WIKI_URL } from "../port/describe";
 import { commandToRun, listCommands } from "../port/extcmd";
 import { ArrowChords, keyCode, takeLine, type KeyLike } from "../port/keys";
-import { configFile, OPTIONS_TEMPLATE } from "../port/options";
+import { configFile, OPTIONS_TEMPLATE, savedOptionsFile } from "../port/options";
 import { applyEvents, initialState, nextBatch } from "../port/state";
 import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, textSizeFromOptions } from "../port/textsize";
 import type { Answer, GameRequest } from "../protocol";
@@ -270,7 +270,13 @@ export function App() {
       new GameClient({
         events: (events) => {
           setState((s) => applyEvents(s, events));
-          for (const e of events) if (e.type === "text_size") optionsTextSize.current(e.size, e.atStart);
+          for (const e of events) {
+            if (e.type === "text_size") optionsTextSize.current(e.size, e.atStart);
+            if (e.type === "options_file")
+              try {
+                localStorage.setItem(OPTIONS_KEY, savedOptionsFile(e.text, BASE_OPTIONS));
+              } catch {}
+          }
         },
         request: (id, request) => {
           // a pick is for the menu the inventory key opens next, or nothing
