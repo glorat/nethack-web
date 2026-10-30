@@ -23,6 +23,8 @@ export interface SessionOptions {
   wizard?: boolean;
   /** Extra NETHACKOPTIONS, appended. */
   options?: string;
+  /** A .nethackrc, for what only a config file sets, such as MENUCOLOR. */
+  config?: string;
   /** Files to put in /save first, e.g. from an earlier session. */
   saves?: Map<string, Uint8Array>;
 }
@@ -98,6 +100,8 @@ export class Session {
           mod.ENV.USER = "player";
           mod.ENV.NETHACKOPTIONS = nethackOptions;
           mod.ENV.NETHACK_SEED = String(options.seed ?? 1);
+          // Emscripten's HOME, which it creates
+          if (options.config !== undefined) mod.FS.writeFile("/home/web_user/.nethackrc", new TextEncoder().encode(options.config));
           mod.FS.mkdir("/save");
           for (const [file, data] of options.saves ?? []) mod.FS.writeFile(`/save/${file}`, data);
         },

@@ -419,3 +419,15 @@ test("a stat that changes shows an arrow beside it", async ({ page }) => {
   await expect(ac.locator(".stat-change.worse")).toHaveText("↑");
   await page.locator(".stats").screenshot({ path: "test-results/stat-change.png" });
 });
+
+test("the inventory shows blessed items green", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Who are you?").fill(`Holy${Date.now() % 100000}`);
+  await page.getByRole("button", { name: "Play" }).click();
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  await picker.getByRole("option", { name: /Priest/ }).click();
+  await picker.getByRole("button", { name: "Play" }).click();
+  await untilPlaying(page);
+  // a priest starts with holy water and sees that it's blessed
+  await expect(page.locator(".inv-text", { hasText: "holy water" })).toHaveCSS("color", "rgb(60, 176, 67)");
+});

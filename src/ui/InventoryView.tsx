@@ -1,5 +1,7 @@
 import type { MenuItem } from "../protocol";
 import { tileStyle, type TileSheet } from "../tiles";
+import { textStyle } from "./colors";
+import { headingStyle } from "./dialogs/MenuDialog";
 
 const ICON = 24;
 
@@ -15,12 +17,16 @@ export function InventoryView({ items, sheet, onChoose }: Props) {
       <h2>Inventory</h2>
       {items.map((item) =>
         item.identifier === 0 ? (
-          <h3 class="inv-heading">{item.text}</h3>
+          <h3 class="inv-heading" style={headingStyle(item)}>
+            {item.text}
+          </h3>
         ) : (
           <button class="inv-item" onClick={() => onChoose(item.accelerator)} title={item.text}>
             <span class="inv-icon" style={tileStyle(sheet, item.tile, ICON)} />
             <span class="inv-letter">{item.accelerator}</span>
-            <span class="inv-text">{item.text}</span>
+            <span class="inv-text" style={textStyle(item.color, item.attr)}>
+              {item.text}
+            </span>
           </button>
         ),
       )}

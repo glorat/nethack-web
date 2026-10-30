@@ -1,11 +1,16 @@
 import { useLayoutEffect, useState } from "preact/hooks";
 import type { MenuHow, MenuItem, MenuSelection } from "../../protocol";
 import { tileStyle, type TileSheet } from "../../tiles";
-import { nhColor } from "../colors";
+import { textStyle } from "../colors";
 
 const ICON = 24;
 const ATR_BOLD = 1;
 const ATR_INVERSE = 7;
+
+/** A heading's inverse (menu_headings' default) is drawn as a strong heading instead. */
+export function headingStyle(item: MenuItem): Record<string, string> {
+  return textStyle(item.color, item.attr === ATR_INVERSE ? 0 : item.attr);
+}
 
 interface Props {
   how: MenuHow;
@@ -64,7 +69,12 @@ export function MenuDialog({ how, prompt, items, sheet, onDone }: Props) {
   // with menu_tab_sep the core separates columns with tabs; a grid lines them up,
   // and a heading row of columns starts where the items' text does
   const columns = Math.max(...items.map((item) => item.text.split("\t").length));
-  const fields = (text: string) => text.split("\t").map((f) => <span class="menu-field">{f}</span>);
+  const fields = (text: string, style?: Record<string, string>) =>
+    text.split("\t").map((f) => (
+      <span class="menu-field" style={style}>
+        {f}
+      </span>
+    ));
 
   return (
     <div class="dialog-backdrop">
@@ -75,18 +85,24 @@ export function MenuDialog({ how, prompt, items, sheet, onDone }: Props) {
             item.identifier === 0 ? (
               <div
                 class={`menu-heading${item.attr === ATR_INVERSE || item.attr === ATR_BOLD ? " strong" : ""}${item.text.includes("\t") ? " columns" : ""}`}
+                style={item.text.includes("\t") ? undefined : headingStyle(item)}
               >
-                {item.text.includes("\t") ? fields(item.text) : item.text || " "}
+                {item.text.includes("\t") ? fields(item.text, headingStyle(item)) : item.text || " "}
               </div>
             ) : (
               <button
                 class={`menu-item${selected.has(i) ? " selected" : ""}`}
                 onClick={() => toggle(i)}
-                style={{ color: nhColor(item.color) }}
               >
                 <span class="inv-icon" style={tileStyle(sheet, item.tile, ICON)} />
                 <span class="inv-letter">{item.accelerator}</span>
-                {columns > 1 ? fields(item.text) : <span class="menu-text">{item.text}</span>}
+                {columns > 1 ? (
+                  fields(item.text, textStyle(item.color, item.attr))
+                ) : (
+                  <span class="menu-text" style={textStyle(item.color, item.attr)}>
+                    {item.text}
+                  </span>
+                )}
               </button>
             ),
           )}
