@@ -830,3 +830,14 @@ test("the menu bar runs commands by name while the game waits for one", async ({
   await bar.getByRole("menuitem", { name: "View" }).click();
   await expect(page.getByRole("menu", { name: "View" }).getByRole("menuitem", { name: /Show Inventory/ })).toBeVisible();
 });
+
+test("a menu's lines of text read as text, its headings as headings", async ({ page }) => {
+  await startGame(page, `Lines${Date.now() % 100000}`);
+  await page.keyboard.press("Control+x");
+  const dialog = page.getByRole("dialog");
+  // "Background:" ends in a colon, so it heads the lines under it, which are text
+  const line = dialog.locator(".menu-line", { hasText: /^ *You are/ }).first();
+  await expect(line).toBeVisible();
+  await expect(dialog.locator(".menu-heading", { hasText: /Background:/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+});

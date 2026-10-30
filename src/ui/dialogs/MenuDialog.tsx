@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { MenuHow, MenuItem, MenuSelection } from "../../protocol";
-import { isQuestion } from "../../port/question";
+import { isHeading, isQuestion } from "../../port/question";
 import { sortedOrder } from "../../port/sort";
 import { tileStyle, type TileSheet } from "../../tiles";
 import { textStyle } from "../colors";
@@ -232,7 +232,11 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
           style={{ "--menu-columns": columns }}
         >
           {order.map((i) => [items[i], i] as const).map(([item, i]) =>
-            item.identifier === 0 ? (
+            item.identifier === 0 && !item.text.includes("\t") && !isHeading(item, items[i + 1]) ? (
+              <div class="menu-line" style={textStyle(item.color, item.attr)}>
+                {item.text || " "}
+              </div>
+            ) : item.identifier === 0 ? (
               <div
                 class={`menu-heading${item.attr === ATR_INVERSE || item.attr === ATR_BOLD ? " strong" : ""}${item.text.includes("\t") ? " columns" : ""}`}
                 style={item.text.includes("\t") ? undefined : headingStyle(item)}

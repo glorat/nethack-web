@@ -22,7 +22,7 @@ export function splitFields(line: string): string[] {
 }
 
 /** A line is a heading if items come under it, it has an attribute, or it ends in a colon; otherwise it's text. */
-function isHeading(line: MenuItem, next: MenuItem | undefined): boolean {
+export function isHeading(line: MenuItem, next: MenuItem | undefined): boolean {
   const text = line.text.trim();
   return (next !== undefined && next.identifier !== 0) || (line.attr !== 0 && text.length > 0) || (!line.text.startsWith(" ") && text.endsWith(":"));
 }
