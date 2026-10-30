@@ -39,7 +39,7 @@ const ESC = 27;
 const HASH = "#".charCodeAt(0);
 // Save & Quit is a deliberate choice, as Cocoa takes it
 const ALWAYS_YES = ["Really save?", "Overwrite the old file?"];
-const OLD_GAME = "Old game in progress. Destroy [y], Recover [r], or Cancel [n]?";
+export const OLD_GAME = "Old game in progress. Destroy [y], Recover [r], or Cancel [n]?";
 // left behind by a recovery that never reached play, so the next start asks instead of failing again
 const RECOVERING = "/save/recovering";
 
@@ -56,7 +56,10 @@ export interface GameHost {
   request(request: GameRequest): Promise<Answer | null>;
   /** Resolves with the next key or click the player makes. */
   nextInput(request: Extract<GameRequest, { kind: "poskey" }>): Promise<Input>;
-  persist(): Promise<void>;
+  /** Keeps /save; `exiting` when the core is about to end, after which the page may go at any moment. */
+  persist(exiting?: boolean): Promise<void>;
+  /** An answer Game gave the core itself, going by something outside it. */
+  decided?(request: GameRequest, answer: Answer | null): void;
   /** No other tab is playing, so a game left unfinished can't be one still going on there. */
   readonly alone: boolean;
   /** Seconds since 1970, for every time the core reads. */
@@ -297,7 +300,7 @@ export class Game {
         return 0;
       case "shim_exit_nhwindows":
         this.flush();
-        await this.host.persist();
+        await this.host.persist(true);
         this.emit({ type: "game_over", text: (args[0] as string) ?? "" });
         this.flush();
         return 0;
@@ -533,6 +536,10 @@ export class Game {
         // saved before recovering, in case the recovery crashes the core
         await this.host.persist();
         this.recovering = true;
+        this.host.decided?.(
+          { kind: "yn", query, choices: choices ?? "", defaultChoice: def ? String.fromCharCode(def) : "" },
+          { kind: "yn", key: "r" },
+        );
         return "r".charCodeAt(0);
       }
       this.m.FS.unlink(RECOVERING);

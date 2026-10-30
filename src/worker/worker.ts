@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import type { Answer, GameEvent, GameRequest, StartOptions, UiMessage, WorkerMessage } from "../protocol";
 import { CONFIG_FILE, Game, type Input } from "./game";
+import { Recorder } from "./recorder";
 import { describeSquare, type NetHackModule } from "./memory";
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -13,6 +14,7 @@ const answerWaiters = new Map<number, (answer: Answer | null) => void>();
 let nextRequestId = 1;
 let module: NetHackModule | null = null;
 let game: Game | null = null;
+let recorder: Recorder | null = null;
 
 function send(message: WorkerMessage): void {
   self.postMessage(message);
@@ -127,7 +129,13 @@ async function start({ assetBase, options, config }: StartOptions): Promise<void
   });
   await syncfs(true);
 
-  game = new Game(module, host);
+  recorder = new Recorder(host, module, {
+    options,
+    config,
+    stream: (lines) => send({ type: "events", events: [{ type: "recorded", lines }] }),
+    finished: (text) => send({ type: "events", events: [{ type: "recording", text }] }),
+  });
+  game = new Game(module, recorder);
   (globalThis as Record<string, unknown>).nethackCallback = (name: string, ...args: unknown[]) =>
     game!.callback(name, args);
   module.ccall("shim_graphics_set_callback", null, ["string"], ["nethackCallback"]);
@@ -155,6 +163,7 @@ self.onmessage = (ev: MessageEvent<UiMessage>) => {
       break;
     case "ascii_map":
       // like describe, this arrives only while the core is paused in a callback
+      recorder?.asciiMap(msg.on);
       game?.setAsciiMap(msg.on);
       break;
     case "describe":

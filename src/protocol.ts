@@ -72,6 +72,10 @@ export type GameEvent =
   /** The core's ascii_map option, changed in its options menu. */
   | { type: "ascii_map"; on: boolean }
   | { type: "game_over"; text: string }
+  /** Lines added to the game's recording, as they're written. */
+  | { type: "recorded"; lines: string[] }
+  /** The whole recording of a game that has ended. */
+  | { type: "recording"; text: string }
   | { type: "error"; text: string };
 
 export type MenuHow = "none" | "one" | "any";
