@@ -72,10 +72,10 @@ async function start({ assetBase, options, config }: StartOptions): Promise<void
       return new Promise((resolve) => answerWaiters.set(id, resolve));
     },
     nextInput(request: Extract<GameRequest, { kind: "poskey" }>): Promise<Input> {
+      // the core has finished its turn: a restore has deleted its save, a checkpoint written level files
+      void persist();
       const queued = inputs.shift();
       if (queued) return Promise.resolve(queued);
-      // the core has finished its turn: a restore has deleted its save, a level change written level files
-      void persist();
       send({ type: "request", id: nextRequestId++, request });
       return new Promise((resolve) => (inputWaiter = resolve));
     },
