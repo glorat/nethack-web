@@ -25,6 +25,8 @@ export interface GameState {
   gameOver: string | null;
   /** The core's ascii_map option as last changed in its options menu; null until then. */
   asciiMap: boolean | null;
+  /** font_size_message as last set in the options; null until then. */
+  textSize: number | null;
   error: string | null;
   batch: number;
   nextMessageId: number;
@@ -41,6 +43,7 @@ export function initialState(): GameState {
     equipment: [],
     gameOver: null,
     asciiMap: null,
+    textSize: null,
     error: null,
     batch: 0,
     nextMessageId: 1,
@@ -88,6 +91,9 @@ export function applyEvents(state: GameState, events: GameEvent[]): GameState {
         break;
       case "error":
         next = { ...next, error: event.text };
+        break;
+      case "text_size":
+        next = { ...next, textSize: event.size };
         break;
       case "ascii_map":
         next = { ...next, asciiMap: event.on };

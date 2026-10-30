@@ -3,6 +3,7 @@ import { GameClient } from "../client";
 import { commandToRun, listCommands } from "../port/extcmd";
 import { ArrowChords, keyCode, takeLine, type KeyLike } from "../port/keys";
 import { applyEvents, initialState, nextBatch } from "../port/state";
+import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, textSizeFromOptions } from "../port/textsize";
 import type { Answer, GameRequest } from "../protocol";
 import { loadTileSheet, type TileSheet } from "../tiles";
 import { DirectionDialog } from "./dialogs/DirectionDialog";
@@ -28,12 +29,38 @@ const ZOOM_KEYS: Record<string, -1 | 0 | 1> = { "=": 1, "+": 1, "-": -1, "0": 0 
 const ASCII_KEY = "nethack.asciiMap";
 const INVENTORY_KEY = "nethack.showInventory";
 const INVENTORY_WIDTH_KEY = "nethack.inventoryWidth";
-// Cocoa's narrowest sidebar, and the narrowest the map, stats and messages can be beside it
+const TEXT_SIZE_KEY = "nethack.textSize";
+// with Cmd or Ctrl and Option, as Cocoa's View menu has them; 0 is back to the default
+const TEXT_SIZE_KEYS: Record<string, (size: number) => number> = {
+  Equal: biggerTextSize,
+  Minus: smallerTextSize,
+  Digit0: () => DEFAULT_TEXT_SIZE,
+};
+
+
+/** The size chosen here, if one was: the options decide otherwise. */
+function savedTextSize(): number | null {
+  try {
+    const saved = Number(localStorage.getItem(TEXT_SIZE_KEY));
+    if (saved > 0) return nearestTextSize(saved);
+  } catch {}
+  return null;
+}
+
+/** Scales the UI's text, which the stylesheet draws at 13px. */
+function applyTextSize(size: number) {
+  document.documentElement.style.setProperty("--text-scale", String(size / DEFAULT_TEXT_SIZE));
+}
+// Cocoa's narrowest sidebar and main area, at the default text size; the stats and messages, which
+// grow with the text, sit beside the equipment, which doesn't
 const MIN_INVENTORY_WIDTH = 180;
 const MIN_MAIN_WIDTH = 637;
+const STATS_AND_MESSAGES_WIDTH = 250 + 200;
+const EQUIPMENT_WIDTH = 120;
 
-function inventoryWidth(width: number): number {
-  return Math.round(Math.max(MIN_INVENTORY_WIDTH, Math.min(width, window.innerWidth - MIN_MAIN_WIDTH)));
+function inventoryWidth(width: number, scale: number): number {
+  const main = Math.max(MIN_MAIN_WIDTH, STATS_AND_MESSAGES_WIDTH * scale + EQUIPMENT_WIDTH);
+  return Math.round(Math.max(MIN_INVENTORY_WIDTH * scale, Math.min(width, window.innerWidth - main)));
 }
 
 function savedInventoryWidth(): number {
@@ -106,6 +133,28 @@ export function App() {
   };
   const [showInventory, setShowInventoryState] = useState(savedShowInventory);
   const shownInventory = useRef(showInventory);
+  const [textSize, setTextSizeState] = useState(() => savedTextSize() ?? DEFAULT_TEXT_SIZE);
+  const textSizeNow = useRef(textSize);
+  /** save: chosen here, so kept over the options' size; the default forgets the choice, as Cocoa's does. */
+  const setTextSize = (size: number, save: boolean) => {
+    textSizeNow.current = size;
+    setTextSizeState(size);
+    applyTextSize(size);
+    if (!save) return;
+    try {
+      if (size === DEFAULT_TEXT_SIZE) localStorage.removeItem(TEXT_SIZE_KEY);
+      else localStorage.setItem(TEXT_SIZE_KEY, String(size));
+    } catch {}
+  };
+  useLayoutEffect(() => applyTextSize(textSizeNow.current), []);
+  // read by the worker's events, which the client was made with before this render
+  const optionsTextSize = useRef<(size: number, atStart: boolean) => void>(() => {});
+  optionsTextSize.current = (size, atStart) => {
+    const next = textSizeFromOptions(size, atStart, savedTextSize());
+    if (next !== null) setTextSize(next, false);
+  };
+  // the sidebar is as wide at a bigger text size as its saved width is at the default
+  const textScale = textSize / DEFAULT_TEXT_SIZE;
   const [sidebarWidth, setSidebarWidth] = useState(savedInventoryWidth);
   // the sidebar's limit follows the window
   const [, setWindowWidth] = useState(window.innerWidth);
@@ -115,7 +164,7 @@ export function App() {
     return () => window.removeEventListener("resize", resized);
   }, []);
   const resizeInventory = (width: number, done: boolean) => {
-    const next = inventoryWidth(width);
+    const next = inventoryWidth(width, textScale) / textScale;
     setSidebarWidth(next);
     if (done)
       try {
@@ -159,7 +208,10 @@ export function App() {
   const client = useMemo(
     () =>
       new GameClient({
-        events: (events) => setState((s) => applyEvents(s, events)),
+        events: (events) => {
+          setState((s) => applyEvents(s, events));
+          for (const e of events) if (e.type === "text_size") optionsTextSize.current(e.size, e.atStart);
+        },
         request: (id, request) => {
           // a pick is for the menu the inventory key opens next, or nothing
           const letter = pendingPick.current;
@@ -232,11 +284,19 @@ export function App() {
     if (state.asciiMap !== null) saveAscii(state.asciiMap);
   }, [state.asciiMap]);
 
-  // zoom keys and Ctrl-Cmd-S work with a dialog open too, as Cocoa's menu shortcuts do: this listener is
+  // zoom keys, text size keys and Ctrl-Cmd-S work with a dialog open too, as Cocoa's menu shortcuts do: this listener is
   // added before any dialog's, and the browser would zoom the page otherwise
   useEffect(() => {
     if (!playing) return;
     const onKey = (e: KeyboardEvent) => {
+      // not AltGr, which Ctrl+Alt is on Windows and Linux, typing } \\ @ and the like
+      const textStep =
+        (e.metaKey || e.ctrlKey) && e.altKey && !e.getModifierState("AltGraph") ? TEXT_SIZE_KEYS[e.code] : undefined;
+      if (textStep) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return setTextSize(textStep(textSizeNow.current), true);
+      }
       // Ctrl-Cmd-S, as Cocoa's View menu has it
       if (e.ctrlKey && e.metaKey && e.key.toLowerCase() === "s") {
         e.preventDefault();
@@ -328,7 +388,7 @@ export function App() {
         <InventoryView
           items={state.inventory}
           sheet={sheet}
-          width={inventoryWidth(sidebarWidth)}
+          width={inventoryWidth(sidebarWidth * textScale, textScale)}
           onChoose={chooseItem}
           onHide={() => setShowInventory(false)}
           onResize={resizeInventory}

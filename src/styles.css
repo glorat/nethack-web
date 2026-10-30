@@ -11,6 +11,8 @@
   --danger: #e5534b;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* the text size chosen in the View keys or font_size_message, over the 13px the sizes here are drawn at */
+  --text-scale: 1;
   color-scheme: dark;
 }
 
@@ -56,7 +58,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   gap: 1px;
   background: var(--border);
   border-bottom: 1px solid var(--border);
-  height: 168px;
+  height: calc(168px * var(--text-scale));
   flex: none;
 }
 .top > * { background: var(--panel); }
@@ -83,17 +85,19 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .context-menu button:hover { background: var(--border); }
 
 /* stats */
-.stats { width: 250px; padding: 8px 10px; overflow: hidden; flex: none; }
+/* what Cocoa's text size scales: stats, messages, inventory, menus and text windows */
+.stats, .messages, .inventory, .menu-dialog, .text-dialog { font-size: calc(13px * var(--text-scale)); }
+.stats { width: calc(250px * var(--text-scale)); padding: 8px 10px; overflow: hidden; flex: none; }
 .stats-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.stats-sub { color: var(--muted); font-size: 12px; margin-bottom: 6px; white-space: nowrap; }
+.stats-sub { color: var(--muted); font-size: calc(12px * var(--text-scale)); margin-bottom: 6px; white-space: nowrap; }
 .meter { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
-.meter-label { width: 20px; color: var(--muted); font-size: 11px; }
-.meter-bar { position: relative; flex: 1; height: 14px; background: #161616; border-radius: 3px; overflow: hidden; }
+.meter-label { width: calc(20px * var(--text-scale)); color: var(--muted); font-size: calc(11px * var(--text-scale)); }
+.meter-bar { position: relative; flex: 1; height: calc(14px * var(--text-scale)); background: #161616; border-radius: 3px; overflow: hidden; }
 .meter-fill { position: absolute; inset: 0 auto 0 0; background: var(--hp); }
 .meter.pw .meter-fill { background: var(--pw); }
 .meter.low .meter-fill { background: var(--danger); }
-.meter-text { position: absolute; inset: 0; font: 11px/14px var(--mono); padding-left: 4px; }
-.stat-grid { display: grid; grid-template-columns: repeat(4, auto); gap: 0 10px; margin-top: 6px; font-size: 12px; }
+.meter-text { position: absolute; inset: 0; font: calc(11px * var(--text-scale))/calc(14px * var(--text-scale)) var(--mono); padding-left: 4px; }
+.stat-grid { display: grid; grid-template-columns: repeat(4, auto); gap: 0 10px; margin-top: 6px; font-size: calc(12px * var(--text-scale)); }
 .stat { display: flex; gap: 4px; white-space: nowrap; }
 .stat-label { color: var(--muted); }
 .stat-value { font-family: var(--mono); position: relative; }
@@ -103,7 +107,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .stat-change.worse { color: var(--danger); }
 .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 /* Cocoa's: grey, then yellow, orange and red as it gets worse, darkened for white text to read */
-.badge { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 8px; }
+.badge { font-size: calc(11px * var(--text-scale)); font-weight: 600; padding: 0 6px; border-radius: 8px; }
 .badge.info { background: #444; color: var(--text); }
 .badge.caution { background: #f5c518; color: #000; }
 .badge.warning { background: #c2410c; color: #fff; }
@@ -127,7 +131,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .equip-slot:disabled { opacity: 1; }
 
 /* messages */
-.messages { flex: 1; min-width: 200px; overflow-y: auto; padding: 6px 10px; }
+.messages { flex: 1; min-width: calc(200px * var(--text-scale)); overflow-y: auto; padding: 6px 10px; }
 .message { color: var(--muted); }
 .message.current { color: var(--text); }
 
@@ -138,10 +142,10 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 }
 /* over the sidebar's edge, clear of the map's scrollbar */
 .inv-resize { flex: none; width: 6px; margin-right: -6px; position: relative; z-index: 1; cursor: col-resize; touch-action: none; }
-.inventory h2 { font-size: 13px; margin: 0 12px 6px; display: flex; justify-content: space-between; align-items: center; }
-.hide-inventory { font-size: 11px; font-weight: 400; padding: 1px 8px; }
+.inventory h2 { font-size: calc(13px * var(--text-scale)); margin: 0 12px 6px; display: flex; justify-content: space-between; align-items: center; }
+.hide-inventory { font-size: calc(11px * var(--text-scale)); font-weight: 400; padding: 1px 8px; }
 .show-inventory { position: absolute; top: 8px; right: 20px; font-size: 11px; padding: 2px 8px; opacity: 0.8; }
-.inv-heading { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 10px 12px 2px; }
+.inv-heading { font-size: calc(11px * var(--text-scale)); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 10px 12px 2px; }
 .inv-item, .menu-item {
   display: flex; align-items: center; gap: 6px; width: 100%;
   border: 0; border-radius: 0; background: none; padding: 2px 12px; text-align: left;
@@ -178,7 +182,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .dialog-left { display: flex; align-items: center; gap: 8px; margin-right: auto; }
 .sort-toggle { display: flex; align-items: center; gap: 4px; color: var(--muted); }
 .menu-items, .ext-list { overflow-y: auto; margin: 0 -14px; }
-.menu-heading { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 8px 14px 2px; }
+.menu-heading { font-size: calc(11px * var(--text-scale)); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 8px 14px 2px; }
 .menu-heading.strong { color: var(--text); }
 .menu-item { padding: 3px 14px; }
 .menu-item.selected { background: #23395d; }
@@ -187,10 +191,12 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .menu-items.readonly .menu-item { cursor: text; }
 .menu-items.readonly .menu-item:hover { background: none; }
 .menu-text { white-space: pre; }
-.menu-dialog.question { width: 380px; }
+.menu-dialog.question { width: calc(380px * var(--text-scale)); }
 .answers { display: flex; flex-direction: column; gap: 8px; }
 .answers .hint { margin: 0; font-size: 12px; }
+.menu-dialog .answers .hint { font-size: calc(12px * var(--text-scale)); }
 .answer { display: flex; gap: 12px; align-items: center; width: 100%; padding: 8px 12px; text-align: left; font-size: 14px; }
+.menu-dialog .answer { font-size: calc(14px * var(--text-scale)); }
 .answer.primary .inv-letter { color: inherit; }
 .answer-key { font-family: var(--mono); opacity: 0.7; }
 .dialog-buttons .answer-key + span { white-space: pre; }
@@ -201,7 +207,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .menu-heading.columns { text-transform: none; letter-spacing: normal; }
 .menu-heading.columns > :first-child { grid-column: 3; }
 .menu-field { white-space: pre; padding-right: 10px; }
-.text-body { font: 12px/1.35 var(--mono); overflow: auto; margin: 0; user-select: text; }
+.text-body { font: calc(12px * var(--text-scale))/1.35 var(--mono); overflow: auto; margin: 0; user-select: text; }
 .text-body .strong { font-weight: 700; }
 .ext-item { display: flex; gap: 12px; width: 100%; border: 0; border-radius: 0; background: none; padding: 3px 14px; text-align: left; }
 .ext-item.active, .ext-item:hover { background: #23395d; }

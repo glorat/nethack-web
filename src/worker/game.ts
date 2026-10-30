@@ -165,6 +165,8 @@ export class Game {
     const a = args as number[];
     switch (name) {
       case "shim_init_nhwindows":
+        // the options have been read by now
+        this.textSize(true);
         return 0;
       case "shim_status_init":
         this.changes.clear();
@@ -233,11 +235,13 @@ export class Game {
         return 0;
       case "shim_status_update":
         return this.statusUpdate(a[0], a[1], a[2], a[3], a[4]);
-      case "shim_preference_update":
+      case "shim_preference_update": {
+        const pref = this.m.UTF8ToString(a[0]);
         // tiled_map switches ascii_map too
-        if (["ascii_map", "tiled_map"].includes(this.m.UTF8ToString(a[0])))
-          this.emit({ type: "ascii_map", on: !!this.m._nhweb_ascii_map() });
+        if (pref === "ascii_map" || pref === "tiled_map") this.emit({ type: "ascii_map", on: !!this.m._nhweb_ascii_map() });
+        if (pref === "font_size_message" || pref === "font_size_status") this.textSize(false);
         return 0;
+      }
       case "shim_nhbell":
         this.emit({ type: "bell" });
         return 0;
@@ -346,6 +350,11 @@ export class Game {
     this.cells.set(y * COLNO + x, cell);
     this.mapBatch.push(cell);
     return 0;
+  }
+
+  private textSize(atStart: boolean): void {
+    const size = this.m._nhweb_font_size_message();
+    if (size > 0) this.emit({ type: "text_size", size, atStart });
   }
 
   /** Switches ascii_map from outside the core's options menu. */

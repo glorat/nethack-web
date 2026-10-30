@@ -756,3 +756,40 @@ test("dragging the inventory's edge resizes it, within limits, and the width is 
   await untilPlaying(page);
   expect(Math.round((await sidebar.boundingBox())!.width)).toBe(kept);
 });
+
+test("Cmd-Option = and - change the text size, which is kept, and the sidebar grows with it", async ({ page }) => {
+  const name = `Text${Date.now() % 100000}`;
+  await startGame(page, name);
+  const size = () => page.locator(".messages").evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  const sidebar = async () => (await page.locator(".inventory").boundingBox())!.width;
+  expect(await size()).toBe(13);
+  const narrow = await sidebar();
+  const map = async () => (await page.locator(".map canvas").boundingBox())!.width;
+  const mapWidth = await map();
+
+  await page.keyboard.press("Meta+Alt+Equal");
+  await expect.poll(size).toBe(14);
+  await page.keyboard.press("Control+Alt+Equal");
+  await expect.poll(size).toBe(16);
+  expect(await sidebar()).toBeCloseTo((narrow * 16) / 13, 0);
+  // the map doesn't scale with the text, nor do questions, as in Cocoa
+  expect(await map()).toBe(mapWidth);
+  await page.keyboard.press("Shift+S");
+  const question = page.getByRole("dialog");
+  await expect(question).toContainText(/Really save/);
+  expect(await question.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBe(13);
+  await page.keyboard.press("n");
+  await expect(question).toBeHidden();
+
+  await page.reload();
+  await page.getByLabel("Who are you?").fill(`${name}b`);
+  await page.getByRole("button", { name: "Play" }).click();
+  await untilPlaying(page);
+  expect(await size()).toBe(16);
+  await page.keyboard.press("Meta+Alt+Minus");
+  await expect.poll(size).toBe(14);
+  await page.keyboard.press("Meta+Alt+Digit0");
+  await expect.poll(size).toBe(13);
+  // the default forgets the choice, so the options decide again
+  expect(await page.evaluate(() => localStorage.getItem("nethack.textSize"))).toBeNull();
+});
