@@ -32,6 +32,20 @@ export const GAME_MENU: (CommandItem | null)[] = [
   c("Save & Quit", "save", "S"),
 ];
 
+export const WIZARD_MENU: Menu = {
+  title: "Wizard Mode",
+  items: [
+    c("Detect", "wizdetect", "^E"),
+    c("Map", "wizmap", "^F"),
+    c("Genesis", "wizgenesis", "^G"),
+    c("Identify", "wizidentify", "^I"),
+    c("Where", "wizwhere"),
+    c("Level Teleport", "wizlevelport", "^V"),
+    c("Wish", "wizwish", "^W"),
+    c("Level Change", "levelchange"),
+  ],
+};
+
 export const COMMAND_MENUS: Menu[] = [
   {
     title: "Move",

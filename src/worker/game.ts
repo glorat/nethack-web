@@ -127,6 +127,7 @@ export class Game {
       kind: "poskey",
       inventoryKey: this.m._nhweb_inventory_key(),
       commandKey: this.m._nhweb_command_key(),
+      wizard: !!this.m._nhweb_wizard(),
     });
   }
 

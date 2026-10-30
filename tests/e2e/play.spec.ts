@@ -797,6 +797,8 @@ test("Cmd-Option = and - change the text size, which is kept, and the sidebar gr
 test("the menu bar runs commands by name while the game waits for one", async ({ page }) => {
   await startGame(page, `Bar${Date.now() % 100000}`);
   const bar = page.getByRole("menubar");
+  // only a debug-mode game has it
+  await expect(bar.getByRole("menuitem", { name: "Wizard Mode" })).toHaveCount(0);
   await bar.getByRole("menuitem", { name: "Act" }).click();
   await expect(page.getByRole("menu", { name: "Act" }).getByRole("menuitem", { name: /Kick/ })).toBeEnabled();
   await page.keyboard.press("Escape");

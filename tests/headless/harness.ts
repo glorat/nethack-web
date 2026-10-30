@@ -65,6 +65,8 @@ export class Session {
   drawn: MapCell[] = [];
   /** While the core waits for a key: what the UI would type to open an item's actions, 0 inside a prompt. */
   inventoryKey = 0;
+  /** While the core waits for a key: whether the game is in debug mode, for the Wizard Mode menu. */
+  wizard = false;
   /** What the core printed outside its windows, such as errors before the game starts. */
   output: string[] = [];
 
@@ -248,9 +250,10 @@ export class Session {
           this.giveAnswer = give;
           this.settle();
         }),
-      nextInput: (request: { inventoryKey: number }) =>
+      nextInput: (request: { inventoryKey: number; wizard: boolean }) =>
         new Promise<Input>((give) => {
           this.inventoryKey = request.inventoryKey;
+          this.wizard = request.wizard;
           this.giveInput = give;
           if (this.queue.length) this.feed();
           else this.settle();

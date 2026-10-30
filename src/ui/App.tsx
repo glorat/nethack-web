@@ -17,7 +17,7 @@ import { EquipmentView } from "./EquipmentView";
 import { InventoryView } from "./InventoryView";
 import { MapView } from "./MapView";
 import { type BarMenu, MenuBar, type MenuEntry } from "./MenuBar";
-import { COMMAND_MENUS, type CommandItem, GAME_MENU } from "./commands";
+import { COMMAND_MENUS, type CommandItem, GAME_MENU, WIZARD_MENU } from "./commands";
 import { MessageView } from "./MessageView";
 import { StartScreen } from "./StartScreen";
 import { StatsView } from "./StatsView";
@@ -205,6 +205,7 @@ export function App() {
   // bar's commands are only for then, and run as that key and the command's name
   const commandKey = useRef(0);
   const [commanding, setCommanding] = useState(false);
+  const [wizard, setWizard] = useState(false);
   const setCommandKey = (key: number) => {
     commandKey.current = key;
     setCommanding(key !== 0);
@@ -249,6 +250,7 @@ export function App() {
             waitingForKey.current = true;
             setInventoryKey(request.kind === "poskey" ? request.inventoryKey : 0);
             setCommandKey(request.kind === "poskey" ? request.commandKey : 0);
+            if (request.kind === "poskey") setWizard(request.wizard);
             return;
           }
           waitingForKey.current = false;
@@ -417,7 +419,8 @@ export function App() {
         { title: showInventory ? "Hide Inventory" : "Show Inventory", key: "⌃⌘S", run: () => setShowInventory(!showInventory) },
       ],
     },
-    ...COMMAND_MENUS.map((menu) => ({ title: menu.title, entries: menu.items.map(command) })),
+    // only in a debug-mode game, as Cocoa shows it
+    ...(wizard ? [...COMMAND_MENUS, WIZARD_MENU] : COMMAND_MENUS).map((menu) => ({ title: menu.title, entries: menu.items.map(command) })),
   ];
 
   if (state.error) return <div class="fatal">{state.error}</div>;

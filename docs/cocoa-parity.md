@@ -52,7 +52,7 @@ Decided for the web:
 ## Commands and settings
 
 - [x] Command menu grouped like Cocoa's menu bar (Act, Items, Magic, Info, …), each running `#` plus the command name, enabled only at the command prompt (`performMenuAction`, `validateMenuItem`).
-- [ ] Wizard Mode menu, shown only in wizard mode (`updateWizardMenu`).
+- [x] Wizard Mode menu, shown only in wizard mode (`updateWizardMenu`).
 - [ ] Options file (`.nethackrc`) kept in the browser, editable, read at start. `#saveoptions` writes the default menu colours out as the player's own; don't add them again when the file has them.
 - [ ] Tile set choice between 64px and classic 16px, and the `tile_file` option (`setTileSet`).
 - [ ] Game-over dialog offers Quit as well as New Game (`showGameOver`).
