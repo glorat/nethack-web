@@ -190,6 +190,9 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   display: flex; flex-direction: column; gap: 10px;
 }
 .input-dialog form { display: contents; }
+.options-dialog { width: min(640px, 92vw); }
+.options-text { font: 12px/1.4 var(--mono); height: 50vh; resize: vertical; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+.options-dialog .hint { margin-right: auto; font-size: 12px; }
 .dialog-backdrop.clear { background: none; }
 .direction-dialog { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 0; width: calc(3 * 64px + 2 * 6px + 28px + 2px); }
 .direction-grid { display: grid; grid-template-columns: repeat(3, 64px); gap: 6px; }

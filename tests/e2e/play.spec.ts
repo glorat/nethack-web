@@ -843,3 +843,33 @@ test("a menu's lines of text read as text, its headings as headings", async ({ p
   await expect(dialog.locator(".menu-heading", { hasText: /Background:/ })).toBeVisible();
   await page.keyboard.press("Escape");
 });
+
+test("the options file is edited in the browser and read when a game starts", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Edit Options File..." }).click();
+  const editor = page.getByRole("dialog", { name: "Options file" });
+  const text = editor.locator("textarea");
+  await expect(text).toHaveValue(/#OPTIONS=autodig/);
+  await text.fill(`${await text.inputValue()}OPTIONS=!time\n`);
+  await editor.getByRole("button", { name: "Save" }).click();
+  await expect(editor).toBeHidden();
+
+  await page.getByLabel("Who are you?").fill(`Rc${Date.now() % 100000}`);
+  await page.getByRole("button", { name: "Play" }).click();
+  await untilPlaying(page);
+  // the player's option wins over the game's, which still sets the rest, with no complaint
+  await expect(page.locator(".stat-label", { hasText: /^T$/ })).toHaveCount(0);
+  await expect(page.locator(".stat-label", { hasText: /^Exp$/ })).toHaveCount(1);
+  await expect(page.locator(".messages")).not.toContainText(/multiple times|error/i);
+
+  // typing in the editor is text, not play
+  await page.getByRole("menubar").getByRole("menuitem", { name: "Game" }).click();
+  await page.getByRole("menu", { name: "Game" }).getByRole("menuitem", { name: /Edit Options File/ }).click();
+  await expect(text).toHaveValue(/OPTIONS=!time/);
+  await text.press("End");
+  await page.keyboard.type("i");
+  await expect(text).toHaveValue(/i$/);
+  await expect(page.locator(".menu-dialog")).toHaveCount(0);
+  await editor.getByRole("button", { name: "Cancel" }).click();
+  await expect(editor).toBeHidden();
+});

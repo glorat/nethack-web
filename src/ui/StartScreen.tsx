@@ -12,7 +12,7 @@ function savedName(): string {
 }
 
 
-export function StartScreen({ onStart }: { onStart(name: string): void }) {
+export function StartScreen({ onStart, onOptions }: { onStart(name: string): void; onOptions(): void }) {
   const [name, setName] = useState(savedName);
   const valid = playerName(name).length > 0;
   return (
@@ -37,6 +37,9 @@ export function StartScreen({ onStart }: { onStart(name: string): void }) {
         <input id="name" value={name} autofocus maxLength={31} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
         <button type="submit" class="primary" disabled={!valid}>
           Play
+        </button>
+        <button type="button" onClick={onOptions}>
+          Edit Options File...
         </button>
       </form>
     </div>

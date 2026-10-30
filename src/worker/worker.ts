@@ -56,7 +56,7 @@ function persist(): Promise<void> {
   return persisting;
 }
 
-async function start({ assetBase, options }: StartOptions): Promise<void> {
+async function start({ assetBase, options, config }: StartOptions): Promise<void> {
   const url = new URL("nethack.js", assetBase).href;
   const { default: createModule } = (await import(/* @vite-ignore */ url)) as {
     default: (config: object) => Promise<NetHackModule>;
@@ -91,6 +91,8 @@ async function start({ assetBase, options }: StartOptions): Promise<void> {
       (m: NetHackModule) => {
         m.ENV.USER = "player";
         m.ENV.NETHACKOPTIONS = options;
+        // Emscripten's HOME, which it creates
+        m.FS.writeFile("/home/web_user/.nethackrc", config);
         m.FS.mkdir(SAVE_DIR);
         m.FS.mount(m.IDBFS, {}, SAVE_DIR);
       },

@@ -134,6 +134,8 @@ export interface StartOptions {
   assetBase: string;
   /** NETHACKOPTIONS, e.g. "name:Agnes,role:Valkyrie". */
   options: string;
+  /** The .nethackrc the game reads, before NETHACKOPTIONS. */
+  config: string;
 }
 
 export type UiMessage =

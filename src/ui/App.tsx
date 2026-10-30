@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/ho
 import { GameClient } from "../client";
 import { commandToRun, listCommands } from "../port/extcmd";
 import { ArrowChords, keyCode, takeLine, type KeyLike } from "../port/keys";
+import { configFile, OPTIONS_TEMPLATE } from "../port/options";
 import { applyEvents, initialState, nextBatch } from "../port/state";
 import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, textSizeFromOptions } from "../port/textsize";
 import type { Answer, GameRequest } from "../protocol";
@@ -10,6 +11,7 @@ import { DirectionDialog } from "./dialogs/DirectionDialog";
 import { ExtCommandDialog } from "./dialogs/ExtCommandDialog";
 import { InputDialog } from "./dialogs/InputDialog";
 import { MenuDialog } from "./dialogs/MenuDialog";
+import { OptionsDialog } from "./dialogs/OptionsDialog";
 import { PlayerDialog } from "./dialogs/PlayerDialog";
 import { TextDialog } from "./dialogs/TextDialog";
 import { YesNoDialog } from "./dialogs/YesNoDialog";
@@ -32,6 +34,15 @@ const ASCII_KEY = "nethack.asciiMap";
 const INVENTORY_KEY = "nethack.showInventory";
 const INVENTORY_WIDTH_KEY = "nethack.inventoryWidth";
 const TEXT_SIZE_KEY = "nethack.textSize";
+const OPTIONS_KEY = "nethack.options";
+
+function savedOptions(): string {
+  try {
+    return localStorage.getItem(OPTIONS_KEY) ?? OPTIONS_TEMPLATE;
+  } catch {
+    return OPTIONS_TEMPLATE;
+  }
+}
 // with Cmd or Ctrl and Option, as Cocoa's View menu has them; 0 is back to the default
 const TEXT_SIZE_KEYS: Record<string, (size: number) => number> = {
   Equal: biggerTextSize,
@@ -123,6 +134,18 @@ export function App() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [playing, setPlaying] = useState(false);
   const [cell, setCellState] = useState(savedCell);
+  const [editingOptions, setEditingOptions] = useState(false);
+  /** False if the browser wouldn't keep it, which the editor says. */
+  const saveOptions = (text: string | null): boolean => {
+    if (text !== null)
+      try {
+        localStorage.setItem(OPTIONS_KEY, text);
+      } catch {
+        return false;
+      }
+    setEditingOptions(false);
+    return true;
+  };
   const cellNow = useRef(cell);
   // settings are saved as they change: an effect waits for the next frame, which a reload can beat
   const zoom = (step: -1 | 0 | 1) => {
@@ -377,7 +400,8 @@ export function App() {
     setPlaying(true);
     client.start({
       assetBase: new URL("./", document.baseURI).href,
-      options: `name:${name},${BASE_OPTIONS}${ascii ? ",ascii_map" : ""}`,
+      options: `name:${name}`,
+      config: configFile(`${BASE_OPTIONS}${ascii ? ",ascii_map" : ""}`, savedOptions()),
     });
   };
 
@@ -390,9 +414,23 @@ export function App() {
       }
     : undefined;
   const command = (item: CommandItem | null): MenuEntry | null =>
-    item && { title: item.title, key: item.key, indent: item.indent, disabled: !commanding, run: () => runCommand(item.command) };
+    item && {
+      title: item.title,
+      key: item.key,
+      indent: item.indent,
+      disabled: !commanding || editingOptions,
+      run: () => runCommand(item.command),
+    };
   const menus: BarMenu[] = [
-    { title: "Game", entries: GAME_MENU.map(command) },
+    {
+      title: "Game",
+      entries: [
+        ...GAME_MENU.slice(0, 1).map(command),
+        // not over a question, whose keys the editor's text would answer
+        { title: "Edit Options File...", disabled: !!pending, run: () => setEditingOptions(true) },
+        ...GAME_MENU.slice(1).map(command),
+      ],
+    },
     {
       title: "View",
       entries: [
@@ -425,7 +463,14 @@ export function App() {
 
   if (state.error) return <div class="fatal">{state.error}</div>;
   if (!sheet) return <div class="loading">Loading tiles…</div>;
-  if (!playing) return <StartScreen onStart={start} />;
+  const optionsDialog = editingOptions ? <OptionsDialog text={savedOptions()} onDone={saveOptions} /> : null;
+  if (!playing)
+    return (
+      <>
+        <StartScreen onStart={start} onOptions={() => setEditingOptions(true)} />
+        {optionsDialog}
+      </>
+    );
 
   return (
     <div class="app">
@@ -478,6 +523,7 @@ export function App() {
             </div>
           </div>
         ) : null}
+        {optionsDialog}
         {pending ? <PendingDialog pending={pending} sheet={sheet} answer={answer} passOn={(k) => typeAhead.current.unshift(k)} /> : null}
       </div>
     </div>
