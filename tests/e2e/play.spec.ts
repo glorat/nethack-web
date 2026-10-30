@@ -483,3 +483,31 @@ test("a command's menu of suitable items still takes any item's letter", async (
   await expect(dialog).toBeHidden();
   await expect(page.locator(".messages")).toContainText(/silly thing to drink/);
 });
+
+test("in a menu of several picks, . or , picks everything, - or \\ nothing, and Select All everything", async ({ page }) => {
+  await startAs(page, `All${Date.now() % 100000}`, /Priest/);
+  await page.keyboard.press("Shift+D");
+  const dialog = page.getByRole("dialog");
+  await dialog.locator(".menu-item", { hasText: /all types/i }).click();
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(dialog).toContainText("holy water");
+  const items = dialog.locator(".menu-item");
+  const picked = dialog.locator(".menu-item.selected");
+  const all = await items.count();
+  expect(all).toBeGreaterThan(3);
+
+  await page.keyboard.type("5.");
+  await expect(picked).toHaveCount(all);
+  // the count was for one item
+  await expect(dialog.locator(".hint")).toBeHidden();
+  await page.keyboard.press("-");
+  await expect(picked).toHaveCount(0);
+  await page.keyboard.press(",");
+  await expect(picked).toHaveCount(all);
+  await page.keyboard.press("\\");
+  await expect(picked).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Select All" }).click();
+  await expect(picked).toHaveCount(all);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+});

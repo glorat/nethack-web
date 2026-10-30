@@ -54,6 +54,17 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     update();
   };
 
+  // a count typed first is for one item, so this drops it, as tty does
+  const setAll = (on: boolean) => {
+    count.current = 0;
+    items.forEach((item, i) => {
+      if (item.identifier === 0) return;
+      if (!on) selected.current.delete(i);
+      else if (!selected.current.has(i)) selected.current.set(i, -1);
+    });
+    update();
+  };
+
   const choose = (i: number) => {
     if (items[i].identifier === 0) return;
     if (how === "one") return finish(new Map([[i, taking()]]));
@@ -85,6 +96,8 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
       // an item's identifier in these menus is its letter
       if (!hits.length && how === "one" && e.key.length === 1 && unlisted.includes(e.key))
         return onDone([{ identifier: e.key.charCodeAt(0), count: taking() }]);
+      if (!hits.length && how === "any" && (e.key === "." || e.key === ",")) return setAll(true);
+      if (!hits.length && how === "any" && (e.key === "-" || e.key === "\\")) return setAll(false);
       if (!hits.length) return;
       if (how === "one") return choose(hits[0]);
       toggle(hits);
@@ -142,6 +155,11 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
           )}
         </div>
         <div class="dialog-buttons">
+          {how === "any" ? (
+            <button class="select-all" onClick={() => setAll(true)}>
+              Select All
+            </button>
+          ) : null}
           {count.current > 0 ? <span class="hint">Count: {count.current}</span> : null}
           <button onClick={() => onDone(null)}>{how === "none" ? "Close" : "Cancel"}</button>
           {how === "any" ? (
