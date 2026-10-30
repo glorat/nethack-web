@@ -37,6 +37,8 @@ export function tileStyle(sheet: TileSheet, tile: number, cell: number): Record<
   const cols = sheet.image.naturalWidth / sheet.size;
   const rows = sheet.image.naturalHeight / sheet.size;
   return {
+    // the classic tiles are small, and blur when drawn bigger
+    imageRendering: cell > sheet.size ? "pixelated" : "auto",
     backgroundImage: `url(${sheet.image.src})`,
     backgroundSize: `${cols * cell}px ${rows * cell}px`,
     backgroundPosition: `-${(tile % TILES_PER_ROW) * sheet.size * scale}px -${Math.floor(tile / TILES_PER_ROW) * sheet.size * scale}px`,

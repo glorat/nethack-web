@@ -873,3 +873,43 @@ test("the options file is edited in the browser and read when a game starts", as
   await editor.getByRole("button", { name: "Cancel" }).click();
   await expect(editor).toBeHidden();
 });
+
+test("the View menu switches between the painted and classic tiles, and the choice is kept", async ({ page }) => {
+  const name = `Tiles${Date.now() % 100000}`;
+  await startGame(page, name);
+  const icon = page.locator(".inv-icon").first();
+  await expect(icon).toHaveCSS("background-image", /tiles64\.png/);
+  const bar = page.getByRole("menubar");
+  await bar.getByRole("menuitem", { name: "View" }).click();
+  const view = page.getByRole("menu", { name: "View" });
+  await expect(view.getByRole("menuitemcheckbox", { name: /Painted Tiles/ })).toHaveAttribute("aria-checked", "true");
+  await view.getByRole("menuitemcheckbox", { name: /Classic Tiles/ }).click();
+  await expect(icon).toHaveCSS("background-image", /tiles16\.bmp/);
+  await page.screenshot({ path: "test-results/classic-tiles.png" });
+
+  await page.reload();
+  await page.getByLabel("Who are you?").fill(`${name}b`);
+  await page.getByRole("button", { name: "Play" }).click();
+  await untilPlaying(page);
+  await expect(page.locator(".inv-icon").first()).toHaveCSS("background-image", /tiles16\.bmp/);
+});
+
+test("tile_file in the options file chooses the tile set, and an unknown one falls back to the default", async ({ page }) => {
+  const play = async (name: string, options: string) => {
+    await page.goto("/");
+    await page.evaluate((options) => localStorage.setItem("nethack.options", options), options);
+    await page.reload();
+    await page.getByLabel("Who are you?").fill(name);
+    await page.getByRole("button", { name: "Play" }).click();
+    await untilPlaying(page);
+  };
+  const id = Date.now() % 100000;
+  await play(`Tf${id}`, "OPTIONS=tile_file:tiles16.bmp\n");
+  await expect(page.locator(".inv-icon").first()).toHaveCSS("background-image", /tiles16\.bmp/);
+  // the option's choice isn't kept as the menu's
+  expect(await page.evaluate(() => localStorage.getItem("nethack.tileSet"))).toBeNull();
+
+  await play(`Tg${id}`, "OPTIONS=tile_file:~/mine/nope.png\n");
+  await expect(page.locator(".inv-icon").first()).toHaveCSS("background-image", /tiles64\.png/);
+  await expect(page.locator(".messages")).toContainText(/The tile set "nope\.png" can't be used/);
+});

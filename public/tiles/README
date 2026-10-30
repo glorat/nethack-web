@@ -7,6 +7,9 @@ Copyright (c) 2026 Kevin Tam (glorat, https://github.com/glorat)
 Derived from the NetHack tiles and distributed under the NetHack General
 Public License (see nethack/dat/license).
 
-The sheet uses tile2bmp's order (monsters, objects, other, then a greyscale
+tiles16.bmp: the classic tiles, which scripts/build-wasm.sh draws from the
+core's win/share/*.txt with its tile2bmp tool.
+
+Each sheet uses tile2bmp's order (monsters, objects, other, then a greyscale
 copy of every monster tile for statues), 40 tiles per row; glyph_info's
 gm.tileidx indexes it.

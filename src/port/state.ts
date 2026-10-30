@@ -27,6 +27,8 @@ export interface GameState {
   asciiMap: boolean | null;
   /** font_size_message as last set in the options; null until then. */
   textSize: number | null;
+  /** The tile_file option; null if it isn't set. */
+  tileFile: string | null;
   error: string | null;
   batch: number;
   nextMessageId: number;
@@ -44,6 +46,7 @@ export function initialState(): GameState {
     gameOver: null,
     asciiMap: null,
     textSize: null,
+    tileFile: null,
     error: null,
     batch: 0,
     nextMessageId: 1,
@@ -91,6 +94,9 @@ export function applyEvents(state: GameState, events: GameEvent[]): GameState {
         break;
       case "error":
         next = { ...next, error: event.text };
+        break;
+      case "tile_file":
+        next = { ...next, tileFile: event.name };
         break;
       case "text_size":
         next = { ...next, textSize: event.size };

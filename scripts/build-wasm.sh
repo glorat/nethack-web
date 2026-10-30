@@ -40,4 +40,9 @@ make -j"$JOBS" CROSS_TO_WASM=1 all
 
 mkdir -p "$ROOT/public"
 cp targets/wasm/nethack.js targets/wasm/nethack.wasm "$ROOT/public/"
-ls -lh "$ROOT/public/nethack.js" "$ROOT/public/nethack.wasm"
+
+# the classic tiles, drawn from the core's own tile text by a host tool, in the order tileidx indexes
+make -C util CROSS_TO_WASM=1 tile2bmp >/dev/null
+(cd util && ./tile2bmp "$ROOT/public/tiles/tiles16.bmp" >/dev/null)
+
+ls -lh "$ROOT/public/nethack.js" "$ROOT/public/nethack.wasm" "$ROOT/public/tiles/tiles16.bmp"

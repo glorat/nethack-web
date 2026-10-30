@@ -10,3 +10,10 @@ test("the player's options override the game's in one file, with no complaint ab
   // the game's
   expect(g.state.status.BL_EXP).toBeDefined();
 });
+
+test("tile_file in the options is passed on for the tile set", async () => {
+  const g = await (await Session.start({ options: "tile_file:tiles16.bmp" })).skipText();
+  expect(g.state.tileFile).toBe("tiles16.bmp");
+  const plain = await (await Session.start()).skipText();
+  expect(plain.state.tileFile).toBeNull();
+});

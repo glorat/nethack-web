@@ -63,6 +63,8 @@ export type GameEvent =
   | { type: "status"; fields: Record<string, StatusValue> }
   | { type: "inventory"; items: MenuItem[]; equipment: EquipmentSlot[] }
   | { type: "bell" }
+  /** The tile_file option, as the game starts. */
+  | { type: "tile_file"; name: string }
   /** font_size_message (or font_size_status), in points: as the game starts, or changed in the options menu. */
   | { type: "text_size"; size: number; atStart: boolean }
   /** The core's ascii_map option, changed in its options menu. */

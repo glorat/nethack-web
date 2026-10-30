@@ -6,6 +6,7 @@ import { configFile, OPTIONS_TEMPLATE } from "../port/options";
 import { applyEvents, initialState, nextBatch } from "../port/state";
 import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, textSizeFromOptions } from "../port/textsize";
 import type { Answer, GameRequest } from "../protocol";
+import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port/tilesets";
 import { loadTileSheet, type TileSheet } from "../tiles";
 import { DirectionDialog } from "./dialogs/DirectionDialog";
 import { ExtCommandDialog } from "./dialogs/ExtCommandDialog";
@@ -24,7 +25,15 @@ import { MessageView } from "./MessageView";
 import { StartScreen } from "./StartScreen";
 import { StatsView } from "./StatsView";
 
-const TILE_SIZE = 64;
+const TILE_SET_KEY = "nethack.tileSet";
+
+function savedTileSet(): TileSet {
+  try {
+    return tileSetNamed(localStorage.getItem(TILE_SET_KEY) ?? "") ?? DEFAULT_TILE_SET;
+  } catch {
+    return DEFAULT_TILE_SET;
+  }
+}
 const MAP_CELLS = [16, 24, 32, 48, 64];
 const ZOOM_KEY = "nethack.mapCell";
 const DEFAULT_CELL = 32;
@@ -306,11 +315,43 @@ export function App() {
     [],
   );
 
+  const [tileSet, setTileSetState] = useState(savedTileSet);
+  /** save: chosen in the View menu; tile_file's choice isn't kept, as it is the option's. */
+  const setTileSet = (set: TileSet, save: boolean) => {
+    setTileSetState(set);
+    if (save)
+      try {
+        localStorage.setItem(TILE_SET_KEY, set.file);
+      } catch {}
+  };
+  /** forget: the saved choice can't load, so it is replaced, not tried again at every start. */
+  const tileSetProblem = (name: string, forget: boolean) => {
+    setState((s) =>
+      applyEvents(s, [{ type: "message", text: `The tile set "${name}" can't be used, so the default tile set is shown instead.`, attr: 0 }]),
+    );
+    setTileSet(DEFAULT_TILE_SET, forget);
+  };
   useEffect(() => {
-    loadTileSheet(new URL(`tiles/tiles${TILE_SIZE}.png`, document.baseURI).href, TILE_SIZE)
-      .then(setSheet)
-      .catch((e) => setState((s) => ({ ...s, error: String(e) })));
-  }, []);
+    // a choice made while this one loads wins, whichever arrives first
+    let live = true;
+    loadTileSheet(new URL(`tiles/${tileSet.file}`, document.baseURI).href, tileSet.size)
+      .then((loaded) => live && setSheet(loaded))
+      .catch((e) => {
+        if (!live) return;
+        if (tileSet === DEFAULT_TILE_SET) setState((s) => ({ ...s, error: String(e) }));
+        else tileSetProblem(tileSet.file, true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [tileSet]);
+  // tile_file overrides the menu's choice, as the Guidebook says it overrides the default
+  useEffect(() => {
+    if (state.tileFile === null) return;
+    const named = tileSetNamed(state.tileFile);
+    if (named) setTileSet(named, false);
+    else tileSetProblem(state.tileFile.split(/[/\\]/).pop()!, false);
+  }, [state.tileFile]);
 
   useEffect(() => {
     const type = (keys: KeyLike[]) => {
@@ -435,6 +476,17 @@ export function App() {
       title: "View",
       entries: [
         { title: "Use ASCII Mode", checked: ascii, disabled: !toggleAscii, run: () => toggleAscii?.(!ascii) },
+        ...TILE_SETS.map((set) => ({
+          title: `${set.title} Tiles`,
+          checked: !ascii && set.file === tileSet.file,
+          indent: true,
+          // choosing tiles is choosing to see them, which waits as switching ASCII mode does
+          disabled: ascii && !toggleAscii,
+          run: () => {
+            setTileSet(set, true);
+            if (ascii) toggleAscii?.(false);
+          },
+        })),
         null,
         { title: "Zoom In", key: "⌘=", run: () => zoom(1) },
         { title: "Zoom Out", key: "⌘-", run: () => zoom(-1) },

@@ -20,6 +20,7 @@ export interface NetHackModule {
   _nhweb_inventory_key(): number;
   _nhweb_command_key(): number;
   _nhweb_wizard(): number;
+  _nhweb_tile_file(): number;
   _nhweb_role_name(role: number, female: number): number;
   _nhweb_race_name(race: number): number;
   _nhweb_role_tile(role: number, female: number): number;

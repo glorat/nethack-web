@@ -172,6 +172,7 @@ export class Game {
       case "shim_init_nhwindows":
         // the options have been read by now
         this.textSize(true);
+        this.tileFile();
         return 0;
       case "shim_status_init":
         this.changes.clear();
@@ -355,6 +356,11 @@ export class Game {
     this.cells.set(y * COLNO + x, cell);
     this.mapBatch.push(cell);
     return 0;
+  }
+
+  private tileFile(): void {
+    const name = this.m.UTF8ToString(this.m._nhweb_tile_file());
+    if (name) this.emit({ type: "tile_file", name });
   }
 
   private textSize(atStart: boolean): void {

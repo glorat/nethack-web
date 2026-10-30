@@ -2,6 +2,7 @@ node_modules/
 dist/
 public/nethack.js
 public/nethack.wasm
+public/tiles/tiles16.bmp
 test-results/
 playwright-report/
 .DS_Store
