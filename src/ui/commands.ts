@@ -32,6 +32,8 @@ export const GAME_MENU: (CommandItem | null)[] = [
   c("Save & Quit", "save", "S"),
 ];
 
+export const HELP_MENU: (CommandItem | null)[] = [c("Help", "help", "?")];
+
 export const WIZARD_MENU: Menu = {
   title: "Wizard Mode",
   items: [

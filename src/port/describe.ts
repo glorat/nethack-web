@@ -23,6 +23,8 @@ export function wikiTerm(farlook: string): string {
   return words.join(" ");
 }
 
+export const WIKI_URL = "https://nethackwiki.com/";
+
 export function wikiUrl(term: string): string {
-  return `https://nethackwiki.com/mediawiki/index.php?search=${encodeURIComponent(term)}`;
+  return `${WIKI_URL}mediawiki/index.php?search=${encodeURIComponent(term)}`;
 }

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { GameClient } from "../client";
+import { WIKI_URL } from "../port/describe";
 import { commandToRun, listCommands } from "../port/extcmd";
 import { ArrowChords, keyCode, takeLine, type KeyLike } from "../port/keys";
 import { configFile, OPTIONS_TEMPLATE } from "../port/options";
@@ -21,7 +22,7 @@ import { EquipmentView } from "./EquipmentView";
 import { InventoryView } from "./InventoryView";
 import { MapView } from "./MapView";
 import { type BarMenu, MenuBar, type MenuEntry } from "./MenuBar";
-import { COMMAND_MENUS, type CommandItem, GAME_MENU, WIZARD_MENU } from "./commands";
+import { COMMAND_MENUS, type CommandItem, GAME_MENU, HELP_MENU, WIZARD_MENU } from "./commands";
 import { MessageView } from "./MessageView";
 import { StartScreen } from "./StartScreen";
 import { StatsView } from "./StatsView";
@@ -515,6 +516,10 @@ export function App() {
     },
     // only in a debug-mode game, as Cocoa shows it
     ...(wizard ? [...COMMAND_MENUS, WIZARD_MENU] : COMMAND_MENUS).map((menu) => ({ title: menu.title, entries: menu.items.map(command) })),
+    {
+      title: "Help",
+      entries: [...HELP_MENU.map(command), null, { title: "NetHack Wiki", run: () => window.open(WIKI_URL, "_blank", "noopener") }],
+    },
   ];
 
   if (state.error) return <div class="fatal">{state.error}</div>;

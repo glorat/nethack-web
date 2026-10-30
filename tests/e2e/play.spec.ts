@@ -942,3 +942,23 @@ test("when the game ends, a dialog offers a new game or to quit, which leaves th
   await page.getByRole("menu", { name: "Game" }).getByRole("menuitem", { name: "New Game" }).click();
   await expect(page.getByLabel("Who are you?")).toBeVisible();
 });
+
+test("the Help menu opens the game's help and the NetHack Wiki", async ({ page, context }) => {
+  await startGame(page, `Help${Date.now() % 100000}`);
+  const bar = page.getByRole("menubar");
+  await bar.getByRole("menuitem", { name: "Help" }).click();
+  await page.getByRole("menu", { name: "Help" }).getByRole("menuitem", { name: /^Help/ }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText(/About NetHack/);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  await context.route("https://nethackwiki.com/**", (route) => route.fulfill({ body: "wiki" }));
+  await bar.getByRole("menuitem", { name: "Help" }).click();
+  const [wiki] = await Promise.all([
+    page.waitForEvent("popup"),
+    page.getByRole("menu", { name: "Help" }).getByRole("menuitem", { name: "NetHack Wiki" }).click(),
+  ]);
+  expect(wiki.url()).toBe("https://nethackwiki.com/");
+  await wiki.close();
+});
