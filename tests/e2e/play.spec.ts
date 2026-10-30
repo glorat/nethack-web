@@ -26,7 +26,7 @@ async function untilPlaying(page: Page) {
       if (text.includes("choose your character")) await page.keyboard.press("Enter");
       else if (text.includes("shall i pick") || text.includes("is this ok")) await page.keyboard.press("y");
       else if (text.includes("tutorial")) await dialog.getByRole("button", { name: /just start play/i }).click();
-      else if (await dialog.getByRole("button", { name: "OK" }).isVisible()) await dialog.getByRole("button", { name: "OK" }).click();
+      else if (await dialog.getByRole("button", { name: "OK", exact: true }).isVisible()) await dialog.getByRole("button", { name: "OK", exact: true }).click();
       else await page.keyboard.press("Escape");
     }
     await page.waitForTimeout(300);
@@ -99,6 +99,9 @@ test("a game in progress can be recovered after a reload", async ({ page }) => {
   await page.getByRole("button", { name: "Play" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText(/old game in progress/i, { timeout: 15_000 });
+  // each answer shows its key
+  await expect(dialog.getByRole("button", { name: "r Recover" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "y Destroy" })).toBeVisible();
   await dialog.getByRole("button", { name: "Recover" }).click();
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
   await expect(page.locator(".stats-title")).toHaveText(title);

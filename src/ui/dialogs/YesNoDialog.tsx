@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { keyCode } from "../../port/keys";
-import { countKey } from "../../port/yn";
+import { answerLabel, answersInRow, countKey, visibleAnswers } from "../../port/yn";
 
 interface Props {
   query: string;
@@ -10,22 +10,17 @@ interface Props {
   onDone(key: string | null, count?: number): void;
 }
 
-const LABELS: Record<string, string> = { y: "Yes", n: "No", q: "Quit", a: "All" };
-
-// choices may carry a count marker after ESC ("yn#\033..."); only the letters before it are buttons
-function buttons(choices: string): string[] {
-  const visible = choices.split("\x1b")[0];
-  return [...visible].filter((c) => c !== "#");
-}
-
-// a query such as "Destroy [y], Recover [r], or Cancel [n]?" names its own answers
-function namedAnswers(query: string): Record<string, string> {
-  return Object.fromEntries([...query.matchAll(/(\w+) \[(\w)\]/g)].map((m) => [m[2], m[1]]));
-}
-
 export function YesNoDialog({ query, choices, defaultChoice, onDone }: Props) {
-  const keys = buttons(choices);
-  const named = namedAnswers(query);
+  const keys = visibleAnswers(choices);
+  const labels = keys.map((k) => answerLabel(choices, k));
+  const inRow = answersInRow(labels);
+  // every button shows its key, so players learn to answer from the keyboard
+  const button = (k: string, n: number) => (
+    <button class={[inRow ? "" : "answer", k === defaultChoice ? "primary" : ""].join(" ").trim()} onClick={() => answer(k)}>
+      <span class="answer-key">{k}</span>
+      {labels[n] !== k ? <span> {labels[n]}</span> : null}
+    </button>
+  );
   // with '#' in the choices, digits typed first take only that many; a ref, for keys typed ahead
   const allowsCount = choices.includes("#");
   const count = useRef<number | null>(null);
@@ -72,14 +67,15 @@ export function YesNoDialog({ query, choices, defaultChoice, onDone }: Props) {
             {count.current !== null ? `Count: ${count.current}. Press Return to take that many.` : "Type a number first to take only that many."}
           </div>
         ) : null}
-        <div class="dialog-buttons">
-          {keys.map((k) => (
-            <button class={k === defaultChoice ? "primary" : undefined} onClick={() => answer(k)}>
-              {named[k] ?? LABELS[k] ?? k}
-            </button>
-          ))}
-          {!keys.length ? <span class="hint">Press a key</span> : null}
-        </div>
+        {inRow || !keys.length ? (
+          <div class="dialog-buttons">
+            {/* the first answer rightmost, as Cocoa lays them out */}
+            {keys.map(button).reverse()}
+            {!keys.length ? <span class="hint">Press a key</span> : null}
+          </div>
+        ) : (
+          <div class="answers">{keys.map(button)}</div>
+        )}
       </div>
     </div>
   );

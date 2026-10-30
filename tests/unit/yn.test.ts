@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { countKey, keyText, ynAnswer, ynQuestion } from "../../src/port/yn";
+import { answerLabel, answersInRow, countKey, keyText, visibleAnswers, ynAnswer, ynQuestion } from "../../src/port/yn";
 
 const code = (c: string) => c.charCodeAt(0);
 
@@ -58,4 +58,25 @@ test("Escape or another key stops counting, and without a count other keys aren'
 
 test("a count stops growing past what Cocoa allows", () => {
   expect(countKey(100000000, "5")).toEqual({ count: 100000000 });
+});
+
+test("a question's buttons are its shown choices, without # or pickup's 'or'", () => {
+  expect(visibleAnswers("yn#aq")).toEqual(["y", "n", "a", "q"]);
+  expect(visibleAnswers(":oibrsq or ?")).toEqual([":", "o", "i", "b", "r", "s", "q", "?"]);
+  expect(visibleAnswers("yn\x1bm")).toEqual(["y", "n"]);
+});
+
+test("answers are labelled as Cocoa labels them, else by key", () => {
+  expect(answerLabel("yn", "y")).toBe("Yes");
+  expect(answerLabel(":oibrsq", "o")).toBe("Take something out");
+  expect(answerLabel("rl", "l")).toBe("Left");
+  expect(answerLabel("ynr", "r")).toBe("Recover");
+  expect(answerLabel("hsq", "s")).toBe("Spin a web");
+  expect(answerLabel("xz", "x")).toBe("x");
+});
+
+test("up to three short answers sit in a row", () => {
+  expect(answersInRow(["Yes", "No", "Quit"])).toBe(true);
+  expect(answersInRow(["Yes", "No", "All", "Quit"])).toBe(false);
+  expect(answersInRow(["Take something out", "Quit"])).toBe(false);
 });

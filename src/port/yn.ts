@@ -61,3 +61,41 @@ export function countKey(count: number | null, key: string): CountStep | null {
   // Escape, or anything else, stops counting
   return { count: null };
 }
+
+/** The answers a question shows as buttons: its choices before any ESC, without '#', and not pickup's " or ?" word. */
+export function visibleAnswers(choices: string): string[] {
+  const answers: string[] = [];
+  for (const word of choices.split("\x1b")[0].split(" ")) {
+    if (word === "or") continue;
+    for (const c of word) if (c !== "#" && !answers.includes(c)) answers.push(c);
+  }
+  return answers;
+}
+
+const CONTAINER: Record<string, string> = {
+  ":": "Look inside", o: "Take something out", i: "Put something in", b: "Both: take out, then put in",
+  r: "Reversed: put in, then take out", s: "Stash one item", n: "Next container", q: "Quit", "?": "Help",
+};
+const YES_NO: Record<string, string> = { y: "Yes", n: "No", a: "All", q: "Quit", m: "Menu" };
+
+/** A button's label, as Cocoa names the answers of the questions it knows; else the key. */
+export function answerLabel(choices: string, key: string): string {
+  const answers = visibleAnswers(choices);
+  const labels: Record<string, string> = choices.includes(":")
+    ? CONTAINER
+    : choices === "rl"
+      ? { r: "Right", l: "Left" }
+      : choices === "ynr"
+        ? { y: "Destroy", r: "Recover", n: "Cancel" }
+        : choices.startsWith("hs")
+          ? { h: "Hide", s: "Spin a web", q: "Quit" }
+          : answers.every((a) => a in YES_NO)
+            ? YES_NO
+            : {};
+  return labels[key] ?? key;
+}
+
+/** Up to three short answers sit in a row; more, or a long one, stack as full-width buttons. */
+export function answersInRow(labels: string[]): boolean {
+  return labels.length <= 3 && labels.every((l) => l.length <= 12);
+}
