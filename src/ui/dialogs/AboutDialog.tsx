@@ -36,6 +36,13 @@ export function AboutDialog({ onClose }: { onClose(): void }) {
           .
         </p>
         <p>
+          Interface after{" "}
+          <a href="https://github.com/glorat/nethack-cocoa" target="_blank" rel="noopener">
+            nethack-cocoa
+          </a>
+          , the Cocoa interface by Bryce Cogswell and Dirk Zimmermann.
+        </p>
+        <p>
           Painted tiles by Kevin Tam, derived from the NetHack tiles and distributed under the NetHack General Public
           License. Classic tiles from NetHack.
         </p>
