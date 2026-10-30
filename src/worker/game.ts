@@ -325,6 +325,8 @@ export class Game {
 
   /** A monster can be angered or pacified without being redrawn, as Cocoa found. */
   private refreshPeaceful(): void {
+    // once the game is over, keep the marks the map last showed, as Cocoa does
+    if (!this.m._nhweb_in_play()) return;
     for (const [at, cell] of this.cells) {
       const marks = this.m._nhweb_map_marks(cell.x, cell.y, cell.glyph, cell.glyphFlags);
       if ((marks & MARK_PEACEFUL) === (cell.marks & MARK_PEACEFUL)) continue;

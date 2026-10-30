@@ -74,3 +74,15 @@ test("a monster sensed but not seen is marked as detected", async () => {
   await g.skipText();
   expect(marked(g, MARK_DETECTED).length).toBeGreaterThan(0);
 });
+
+test("peaceful marks stay on the map once the game is over", async () => {
+  const g = await (await Session.start({ wizard: true, options: OPTIONS })).skipText();
+  await create(g, "peaceful gnome lord");
+  await g.send("#quit\n");
+  if (g.prompt?.kind === "ext_cmd") await g.answer({ kind: "ext_cmd", index: g.prompt.commands.find((c) => c.name === "quit")!.index });
+  await g.yn("y");
+  // debug mode asks first whether to dump core
+  while (g.prompt?.kind === "yn" && !/possessions/.test(g.prompt.query)) await g.yn("n");
+  expect(g.prompt).toMatchObject({ kind: "yn", query: expect.stringMatching(/possessions/) });
+  expect(marked(g, MARK_PEACEFUL)).toHaveLength(1);
+});
