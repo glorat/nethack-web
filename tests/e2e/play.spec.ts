@@ -299,7 +299,7 @@ test("ASCII mode draws the map as text and is kept across a reload", async ({ pa
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("textbox").fill("optionsfull");
   await page.keyboard.press("Enter");
-  await expect(dialog.locator(".menu-item", { hasText: /^ascii_map/ })).toContainText("[true]");
+  await expect(dialog.locator(".menu-item", { has: page.locator(".menu-field", { hasText: /^ascii_map$/ }) })).toContainText("[true]");
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 

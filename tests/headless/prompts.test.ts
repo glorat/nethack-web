@@ -59,3 +59,14 @@ test("the version history and help files open in a text window", async () => {
   expect(g.prompt).toMatchObject({ kind: "text" });
   expect(g.prompt?.kind === "text" && g.prompt.lines.length).toBeGreaterThan(20);
 });
+
+test("a menu's items the core gave no letter get one", async () => {
+  const g = await (await Session.start()).skipText();
+  await g.send("#");
+  if (g.prompt?.kind !== "ext_cmd") throw new Error("no extended command prompt");
+  await g.answer({ kind: "ext_cmd", index: g.prompt.commands.find((c) => c.name === "herecmdmenu")!.index });
+  if (g.prompt?.kind !== "menu") throw new Error(`expected a menu, have ${JSON.stringify(g.prompt)}`);
+  const items = g.prompt.items.filter((i) => i.identifier !== 0);
+  expect(items.length).toBeGreaterThan(1);
+  expect(items.map((i) => i.accelerator)).toEqual([..."abcdefghijklmnopqrstuvwxyz"].slice(0, items.length));
+});
