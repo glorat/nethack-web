@@ -79,7 +79,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           URL: ${{ steps.deploy.outputs.url }}
-        run: gh pr comment "$PR" --edit-last --create-if-none --body "Preview: $URL"
+        run: |
+          gh pr comment "$PR" --edit-last --create-if-none --body "Preview: $URL"
 
       - uses: actions/upload-artifact@v7
         if: failure()
