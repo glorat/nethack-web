@@ -276,12 +276,23 @@ export function App() {
           </div>
         </div>
       ) : null}
-      {pending ? <PendingDialog pending={pending} sheet={sheet} answer={answer} /> : null}
+      {pending ? <PendingDialog pending={pending} sheet={sheet} answer={answer} passOn={(k) => typeAhead.current.unshift(k)} /> : null}
     </div>
   );
 }
 
-function PendingDialog({ pending, sheet, answer }: { pending: Pending; sheet: TileSheet; answer(a: Answer): void }) {
+function PendingDialog({
+  pending,
+  sheet,
+  answer,
+  passOn,
+}: {
+  pending: Pending;
+  sheet: TileSheet;
+  answer(a: Answer): void;
+  /** Gives the game a key, ahead of any typed already. */
+  passOn(k: KeyLike): void;
+}) {
   const r = pending.request;
   switch (r.kind) {
     case "yn":
@@ -310,7 +321,15 @@ function PendingDialog({ pending, sheet, answer }: { pending: Pending; sheet: Ti
         />
       );
     case "text":
-      return <TextDialog lines={r.lines} onDone={() => answer({ kind: "text" })} />;
+      return (
+        <TextDialog
+          lines={r.lines}
+          onDone={(next) => {
+            if (next) passOn(next);
+            answer({ kind: "text" });
+          }}
+        />
+      );
     case "ext_cmd":
       return <ExtCommandDialog commands={r.commands} initial={pending.typed} onDone={(index) => answer({ kind: "ext_cmd", index })} />;
     case "player":

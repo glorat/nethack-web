@@ -656,3 +656,33 @@ test("a direction prompt shows buttons for each way, beside the hero", async ({ 
   await expect(dialog).toBeHidden();
   await expect(page.locator(".messages")).toContainText(/In what direction\? l/);
 });
+
+test("a key pressed at a text window, other than one to close it, closes it and plays on", async ({ page }) => {
+  await startGame(page, `On${Date.now() % 100000}`);
+  const dialog = page.getByRole("dialog");
+  await page.keyboard.press("#");
+  await dialog.getByRole("textbox").fill("history");
+  await page.keyboard.press("Enter");
+  await expect(dialog.locator(".text-body")).toBeVisible();
+  // : looks at what is here
+  await page.keyboard.press(":");
+  await expect(dialog).toBeHidden();
+  await expect(page.locator(".messages")).toContainText(/here/i);
+});
+
+test("a key typed before a text window opened doesn't close it unseen", async ({ page }) => {
+  await startGame(page, `Ahead${Date.now() % 100000}`);
+  const turn = () => page.locator(".stat", { hasText: "T" }).last().innerText();
+  const before = await turn();
+  // all typed at once, so s is typed ahead of the history window it lands in
+  await page.evaluate(() => {
+    for (const key of ["#", ..."history", "Enter", "s"]) window.dispatchEvent(new KeyboardEvent("keydown", { key, cancelable: true }));
+  });
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.locator(".text-body")).toBeVisible();
+  await page.waitForTimeout(300);
+  await expect(dialog.locator(".text-body")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  expect(await turn()).toBe(before);
+});

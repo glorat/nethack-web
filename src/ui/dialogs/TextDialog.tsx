@@ -1,10 +1,14 @@
 import { useLayoutEffect } from "preact/hooks";
+import { keyCode, type KeyLike } from "../../port/keys";
 
 interface Props {
   lines: { attr: number; text: string }[];
-  onDone(): void;
+  /** next: a key that closed the window, for the game to have next. */
+  onDone(next?: KeyLike): void;
 }
 
+// Return, ^J, ^C, space and Esc
+const DISMISS = [13, 10, 3, 32, 27];
 const ATR_BOLD = 1;
 const ATR_INVERSE = 7;
 
@@ -12,11 +16,15 @@ export function TextDialog({ lines, onDone }: Props) {
   // layout effect: listen before the dialog is painted, or a fast key press is lost
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        e.stopPropagation();
-        onDone();
-      }
+      const code = keyCode(e);
+      if (code === null) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // a dismiss key passed on would answer the game's next prompt; any other is the player playing on
+      if (DISMISS.includes(code)) return onDone();
+      // but not a key typed before the window opened, replayed into it: the window waits to be seen
+      if (!e.isTrusted) return;
+      onDone({ key: e.key, code: e.code, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey });
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -30,7 +38,7 @@ export function TextDialog({ lines, onDone }: Props) {
           ))}
         </pre>
         <div class="dialog-buttons">
-          <button class="primary" onClick={onDone}>
+          <button class="primary" onClick={() => onDone()}>
             OK
           </button>
         </div>
