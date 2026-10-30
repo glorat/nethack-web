@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { cursorColor } from "../port/cursor";
 import { tooltipText, wikiTerm, wikiUrl } from "../port/describe";
 import { COLNO, ROWNO, type GameState } from "../port/state";
 import { drawTile, type TileSheet } from "../tiles";
@@ -66,6 +67,8 @@ export function MapView({ state, sheet, cell, ascii, onAscii, onClick, describe,
   const text = ascii ? asciiCell(cell) : null;
   const width = text?.width ?? cell;
   const height = cell;
+  // BL_HP is the polymorphed form's while polymorphed, as Cocoa's u.mh
+  const cursorStroke = cursorColor(Number(state.status.BL_HP?.text), Number(state.status.BL_HPMAX?.text));
 
   // before paint: resizing the canvas has cleared it
   useLayoutEffect(() => {
@@ -88,11 +91,11 @@ export function MapView({ state, sheet, cell, ascii, onAscii, onClick, describe,
       }
     }
     if (state.cursor) {
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+      ctx.strokeStyle = cursorStroke;
       ctx.lineWidth = 1;
       ctx.strokeRect(state.cursor.x * width + 0.5, state.cursor.y * height + 0.5, width - 1, height - 1);
     }
-  }, [state.map, state.cursor, sheet, cell, text, petMark]);
+  }, [state.map, state.cursor, cursorStroke, sheet, cell, text, petMark]);
 
   // keep the hero in view, as cliparound asks
   useEffect(() => {
