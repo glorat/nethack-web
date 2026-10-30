@@ -1,7 +1,8 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { WIKI_URL } from "../port/describe";
 import { playerName, PLAY_PATH, savedName, saveName } from "../port/name";
 import { saveOptions, savedOptions } from "../port/options";
+import { updateWhenIdle } from "../sw/register";
 import { AboutDialog } from "./dialogs/AboutDialog";
 import { OptionsDialog } from "./dialogs/OptionsDialog";
 
@@ -12,7 +13,11 @@ export function Landing() {
   const [editingOptions, setEditingOptions] = useState(false);
   const [about, setAbout] = useState(false);
   const [offlineReady, setOfflineReady] = useState(false);
+  // a reload would lose what's being typed
+  const busy = useRef(false);
+  busy.current = editingOptions || name !== remembered;
   useEffect(() => {
+    updateWhenIdle(() => busy.current);
     if (import.meta.env.PROD) navigator.serviceWorker?.ready.then(() => setOfflineReady(true));
   }, []);
   const valid = playerName(name).length > 0;
