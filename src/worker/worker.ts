@@ -12,6 +12,7 @@ let inputWaiter: ((input: Input) => void) | null = null;
 const answerWaiters = new Map<number, (answer: Answer | null) => void>();
 let nextRequestId = 1;
 let module: NetHackModule | null = null;
+let game: Game | null = null;
 
 function send(message: WorkerMessage): void {
   self.postMessage(message);
@@ -97,9 +98,9 @@ async function start({ assetBase, options }: StartOptions): Promise<void> {
   });
   await syncfs(true);
 
-  const game = new Game(module, host);
+  game = new Game(module, host);
   (globalThis as Record<string, unknown>).nethackCallback = (name: string, ...args: unknown[]) =>
-    game.callback(name, args);
+    game!.callback(name, args);
   module.ccall("shim_graphics_set_callback", null, ["string"], ["nethackCallback"]);
   send({ type: "events", events: [{ type: "ready" }] });
   try {
@@ -122,6 +123,10 @@ self.onmessage = (ev: MessageEvent<UiMessage>) => {
       break;
     case "click":
       pushInput({ click: { x: msg.x, y: msg.y, button: msg.button } });
+      break;
+    case "ascii_map":
+      // like describe, this arrives only while the core is paused in a callback
+      game?.setAsciiMap(msg.on);
       break;
     case "describe":
       // messages only arrive while the core is paused in a callback, so the map is settled

@@ -30,6 +30,9 @@ export interface NetHackModule {
   _nhweb_describe(x: number, y: number): number;
   _nhweb_map_marks(x: number, y: number, glyph: number, glyphFlags: number): number;
   _nhweb_in_play(): number;
+  _nhweb_ascii_map(): number;
+  _nhweb_set_ascii_map(on: number): void;
+  _nhweb_dec_graphics(): number;
   _main(argc: number, argv: number): number;
   ENV: Record<string, string>;
   FS: EmscriptenFS;

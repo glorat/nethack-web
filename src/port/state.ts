@@ -23,6 +23,8 @@ export interface GameState {
   inventory: MenuItem[];
   equipment: EquipmentSlot[];
   gameOver: string | null;
+  /** The core's ascii_map option as last changed in its options menu; null until then. */
+  asciiMap: boolean | null;
   error: string | null;
   batch: number;
   nextMessageId: number;
@@ -38,6 +40,7 @@ export function initialState(): GameState {
     inventory: [],
     equipment: [],
     gameOver: null,
+    asciiMap: null,
     error: null,
     batch: 0,
     nextMessageId: 1,
@@ -85,6 +88,9 @@ export function applyEvents(state: GameState, events: GameEvent[]): GameState {
         break;
       case "error":
         next = { ...next, error: event.text };
+        break;
+      case "ascii_map":
+        next = { ...next, asciiMap: event.on };
         break;
       case "bell":
         break;

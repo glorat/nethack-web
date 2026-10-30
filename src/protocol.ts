@@ -15,6 +15,8 @@ export interface MapCell {
   glyphFlags: number;
   /** MARK_* bits from port/marks. */
   marks: number;
+  /** ch as text, for ASCII mode. */
+  symbol: string;
 }
 
 export interface MenuItem {
@@ -59,6 +61,8 @@ export type GameEvent =
   | { type: "status"; fields: Record<string, StatusValue> }
   | { type: "inventory"; items: MenuItem[]; equipment: EquipmentSlot[] }
   | { type: "bell" }
+  /** The core's ascii_map option, changed in its options menu. */
+  | { type: "ascii_map"; on: boolean }
   | { type: "game_over"; text: string }
   | { type: "error"; text: string };
 
@@ -126,6 +130,7 @@ export type UiMessage =
   | { type: "start"; start: StartOptions }
   | { type: "key"; code: number }
   | { type: "click"; x: number; y: number; button: number }
+  | { type: "ascii_map"; on: boolean }
   | { type: "answer"; id: number; answer: Answer }
   /** Farlook's text for a map square; answered with a "description" message of the same id. */
   | { type: "describe"; id: number; x: number; y: number };

@@ -71,6 +71,8 @@ export class Session {
   private giveAnswer: ((answer: Answer | null) => void) | null = null;
   private settled: { resolve(): void; reject(e: unknown): void } | null = null;
 
+  private game!: Game;
+
   private constructor(private readonly m: Module) {}
 
   static async start(options: SessionOptions = {}): Promise<Session> {
@@ -111,6 +113,7 @@ export class Session {
     if (shared) shared.shimFunctionRunning = null;
     session = new Session(m);
     const game = new Game(m, session.host());
+    session.game = game;
     // one callback name per session, so sessions don't share one global
     const callback = `nethackCallback${++sessions}`;
     (globalThis as Record<string, unknown>)[callback] = (name: string, ...args: unknown[]) => game.callback(name, args);
@@ -123,6 +126,11 @@ export class Session {
     }
     await ready;
     return session;
+  }
+
+  /** Switches ascii_map as the map's ASCII button does. */
+  setAsciiMap(on: boolean): void {
+    this.game.setAsciiMap(on);
   }
 
   /** Types keys as the player would; arrows and the like as their vi-key letters. */

@@ -41,6 +41,11 @@ export class GameClient {
     this.send({ type: "click", x, y, button });
   }
 
+  /** Switches the core's ascii_map option, as its options menu would. */
+  asciiMap(on: boolean): void {
+    this.send({ type: "ascii_map", on });
+  }
+
   answer(id: number, answer: Answer): void {
     this.send({ type: "answer", id, answer });
   }

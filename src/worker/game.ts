@@ -8,6 +8,7 @@ import type {
   StatusValue,
 } from "../protocol";
 import { MARK_PEACEFUL } from "../port/marks";
+import { symbolText } from "../port/symbols";
 import { COLNO } from "../port/state";
 import {
   type GlyphInfo,
@@ -214,6 +215,11 @@ export class Game {
         return 0;
       case "shim_status_update":
         return this.statusUpdate(a[0], a[1], a[3], a[4]);
+      case "shim_preference_update":
+        // tiled_map switches ascii_map too
+        if (["ascii_map", "tiled_map"].includes(this.m.UTF8ToString(a[0])))
+          this.emit({ type: "ascii_map", on: !!this.m._nhweb_ascii_map() });
+        return 0;
       case "shim_nhbell":
         this.emit({ type: "bell" });
         return 0;
@@ -317,10 +323,16 @@ export class Game {
       color: gi.color,
       glyphFlags: gi.glyphFlags,
       marks: this.m._nhweb_map_marks(x, y, gi.glyph, gi.glyphFlags),
+      symbol: symbolText(gi.ch, !!this.m._nhweb_dec_graphics()),
     };
     this.cells.set(y * COLNO + x, cell);
     this.mapBatch.push(cell);
     return 0;
+  }
+
+  /** Switches ascii_map from outside the core's options menu. */
+  setAsciiMap(on: boolean): void {
+    this.m._nhweb_set_ascii_map(on ? 1 : 0);
   }
 
   /** A monster can be angered or pacified without being redrawn, as Cocoa found. */

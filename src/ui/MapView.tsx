@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { tooltipText, wikiTerm, wikiUrl } from "../port/describe";
 import { COLNO, ROWNO, type GameState } from "../port/state";
 import { drawTile, type TileSheet } from "../tiles";
+import { asciiCell, drawSymbol } from "./ascii";
 import { drawMarks } from "./marks";
 import petMarkUrl from "./petmark.png";
 
@@ -9,6 +10,9 @@ interface Props {
   state: GameState;
   sheet: TileSheet;
   cell: number;
+  ascii: boolean;
+  /** Absent until the core has read its options, which would overrule a switch made before. */
+  onAscii?(on: boolean): void;
   onClick(x: number, y: number, button: number): void;
   describe(x: number, y: number): Promise<string | null>;
   onZoom(step: -1 | 1): void;
@@ -35,7 +39,7 @@ const TOOLTIP_DELAY = 500;
 const CLICK_PRIMARY = 1;
 const CLICK_SECONDARY = 2;
 
-export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props) {
+export function MapView({ state, sheet, cell, ascii, onAscii, onClick, describe, onZoom }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
@@ -59,45 +63,53 @@ export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props
   // what was under the mouse may have moved or gone
   useEffect(cancelTooltip, [state.map]);
 
-  useEffect(() => {
+  const text = ascii ? asciiCell(cell) : null;
+  const width = text?.width ?? cell;
+  const height = cell;
+
+  // before paint: resizing the canvas has cleared it
+  useLayoutEffect(() => {
     const ctx = canvas.current?.getContext("2d");
     if (!ctx) return;
     ctx.imageSmoothingEnabled = cell < sheet.size;
     ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, COLNO * cell, ROWNO * cell);
+    ctx.fillRect(0, 0, COLNO * width, ROWNO * height);
     for (let y = 0; y < ROWNO; y++) {
       for (let x = 0; x < COLNO; x++) {
         const c = state.map[y * COLNO + x];
         if (!c) continue;
-        drawTile(ctx, sheet, c.bgTile, x * cell, y * cell, cell);
-        drawTile(ctx, sheet, c.tile, x * cell, y * cell, cell);
-        if (c.marks) drawMarks(ctx, c.marks, x * cell, y * cell, cell, petMark);
+        if (text) {
+          drawSymbol(ctx, text, c.symbol, c.color, x * width, y * height);
+        } else {
+          drawTile(ctx, sheet, c.bgTile, x * width, y * height, cell);
+          drawTile(ctx, sheet, c.tile, x * width, y * height, cell);
+        }
+        if (c.marks) drawMarks(ctx, c.marks, x * width, y * height, width, height, petMark);
       }
     }
     if (state.cursor) {
       ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
       ctx.lineWidth = 1;
-      ctx.strokeRect(state.cursor.x * cell + 0.5, state.cursor.y * cell + 0.5, cell - 1, cell - 1);
+      ctx.strokeRect(state.cursor.x * width + 0.5, state.cursor.y * height + 0.5, width - 1, height - 1);
     }
-  }, [state.map, state.cursor, sheet, cell, petMark]);
+  }, [state.map, state.cursor, sheet, cell, text, petMark]);
 
   // keep the hero in view, as cliparound asks
   useEffect(() => {
     const el = scroller.current;
     if (!el || !state.cursor) return;
-    const cx = state.cursor.x * cell + cell / 2;
-    const cy = state.cursor.y * cell + cell / 2;
-    const margin = cell * 4;
-    if (cx < el.scrollLeft + margin || cx > el.scrollLeft + el.clientWidth - margin)
+    const cx = state.cursor.x * width + width / 2;
+    const cy = state.cursor.y * height + height / 2;
+    if (cx < el.scrollLeft + width * 4 || cx > el.scrollLeft + el.clientWidth - width * 4)
       el.scrollLeft = cx - el.clientWidth / 2;
-    if (cy < el.scrollTop + margin || cy > el.scrollTop + el.clientHeight - margin)
+    if (cy < el.scrollTop + height * 4 || cy > el.scrollTop + el.clientHeight - height * 4)
       el.scrollTop = cy - el.clientHeight / 2;
-  }, [state.cursor, cell]);
+  }, [state.cursor, width, height]);
 
   const square = (e: MouseEvent) => {
     const rect = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / cell);
-    const y = Math.floor((e.clientY - rect.top) / cell);
+    const x = Math.floor((e.clientX - rect.left) / width);
+    const y = Math.floor((e.clientY - rect.top) / height);
     return x >= 1 && x < COLNO && y >= 0 && y < ROWNO ? { x, y } : null;
   };
 
@@ -176,8 +188,8 @@ export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props
       >
         <canvas
           ref={canvas}
-          width={COLNO * cell}
-          height={ROWNO * cell}
+          width={COLNO * width}
+          height={ROWNO * height}
           onClick={click}
           onContextMenu={openMenu}
           onMouseMove={move}
@@ -185,6 +197,9 @@ export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props
         />
       </div>
       <div class="map-zoom">
+        <button class="ascii-toggle" aria-pressed={ascii} disabled={!onAscii} onClick={() => onAscii?.(!ascii)}>
+          ASCII
+        </button>
         <button aria-label="Zoom out" onClick={() => onZoom(-1)}>−</button>
         <button aria-label="Zoom in" onClick={() => onZoom(1)}>+</button>
       </div>

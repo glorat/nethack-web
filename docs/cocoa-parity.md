@@ -15,7 +15,7 @@ Decided for the web:
 - [x] Map marks (`MainView.m` `drawMarks`): pet heart, peaceful dot, steed saddle, item-pile badge, dashed outline on sensed-but-unseen monsters. Cocoa turns on `hilite_pet` and `hilite_pile`; the marks need the peaceful and ridden flags passed through.
 - [x] Right-click menu: "Search the NetHack Wiki for '…'", with the description cleaned of tame/peaceful/articles (`menuForEvent`, `cleanTileDescription`), plus an item for the core's secondary click.
 - [x] Two arrow keys held together move diagonally (`MainView.m` `keyDown`/`keyUp`).
-- [ ] ASCII mode: characters and colours instead of tiles, cell sized to the font (`enableAsciiMode`), with brighter blue, green and brown.
+- [x] ASCII mode: characters and colours instead of tiles, cell sized to the font (`enableAsciiMode`), with brighter blue, green and brown.
 - [ ] The hero's cursor is green above 75% HP, yellow above 50%, red below (`MainView.m` `drawRect:`).
 - [ ] Pinch zoom, actual size (⌘0) and zoom keyboard shortcuts.
 

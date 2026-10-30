@@ -21,6 +21,7 @@ import { StatsView } from "./StatsView";
 const TILE_SIZE = 64;
 const MAP_CELLS = [16, 24, 32, 48, 64];
 const ZOOM_KEY = "nethack.mapCell";
+const ASCII_KEY = "nethack.asciiMap";
 
 function savedCell(): number {
   try {
@@ -29,6 +30,21 @@ function savedCell(): number {
   } catch {}
   return 32;
 }
+
+function savedAscii(): boolean {
+  try {
+    return localStorage.getItem(ASCII_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveAscii(on: boolean) {
+  try {
+    localStorage.setItem(ASCII_KEY, on ? "1" : "0");
+  } catch {}
+}
+
 const BASE_OPTIONS = "perm_invent,!autopickup,menucolors,time,showexp,hilite_pet,hilite_pile";
 
 interface Pending {
@@ -44,6 +60,8 @@ export function App() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [playing, setPlaying] = useState(false);
   const [cell, setCell] = useState(savedCell);
+  // the core's options menu can switch it too, which comes back as state.asciiMap
+  const ascii = state.asciiMap ?? savedAscii();
   // non-zero only while the core waits for a command with no keys queued
   const inventoryKey = useRef(0);
   const pendingPick = useRef<string | null>(null);
@@ -141,6 +159,10 @@ export function App() {
     };
   }, [playing, client]);
 
+  useEffect(() => {
+    if (state.asciiMap !== null) saveAscii(state.asciiMap);
+  }, [state.asciiMap]);
+
   // keys typed before a dialog opened are its first keys; its listeners are attached by now
   useLayoutEffect(() => {
     while (pending && answered.current !== pending.id && typeAhead.current.length) {
@@ -171,7 +193,7 @@ export function App() {
     setPlaying(true);
     client.start({
       assetBase: new URL("./", document.baseURI).href,
-      options: `name:${name},${BASE_OPTIONS}`,
+      options: `name:${name},${BASE_OPTIONS}${ascii ? ",ascii_map" : ""}`,
     });
   };
 
@@ -191,6 +213,15 @@ export function App() {
           state={state}
           sheet={sheet}
           cell={cell}
+          ascii={ascii}
+          onAscii={
+            state.status.BL_TITLE
+              ? (on) => {
+                  setState((s) => ({ ...s, asciiMap: on }));
+                  client.asciiMap(on);
+                }
+              : undefined
+          }
           describe={(x, y) => client.describe(x, y)}
           onZoom={(step) => {
             const next = MAP_CELLS[Math.min(MAP_CELLS.length - 1, Math.max(0, MAP_CELLS.indexOf(cell) + step))];

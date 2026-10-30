@@ -253,13 +253,49 @@ test("a right-click near the window's corner keeps the menu on screen", async ({
   // zoomed in, the map fills the pane to the window's bottom edge
   await page.getByRole("button", { name: "Zoom in" }).click();
   await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect(page.locator(".map canvas")).toHaveAttribute("width", String(80 * 64));
+  // the zoom's scroll to the hero closes a menu, so let it land first
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   const view = (await page.locator(".map").boundingBox())!;
-  // left of the zoom buttons and above any scrollbar, but closer to the edges than the menu is big
-  await page.mouse.click(view.x + view.width - 100, view.y + view.height - 20, { button: "right" });
+  // left of the map's buttons and above any scrollbar, but closer to the edges than the menu is big
+  const buttons = (await page.locator(".map-zoom").boundingBox())!;
+  await page.mouse.click(buttons.x - 40, view.y + view.height - 20, { button: "right" });
   const menu = page.getByRole("menu");
   await expect(menu.getByRole("menuitem", { name: /Search the NetHack Wiki/ })).toBeVisible();
   const box = (await menu.boundingBox())!;
   const size = page.viewportSize()!;
   expect(box.x + box.width).toBeLessThanOrEqual(size.width);
   expect(box.y + box.height).toBeLessThanOrEqual(size.height);
+});
+
+test("ASCII mode draws the map as text and is kept across a reload", async ({ page }) => {
+  const name = `Ascii${Date.now() % 100000}`;
+  await startGame(page, name);
+  const canvas = page.locator(".map canvas");
+  const tiled = Number(await canvas.getAttribute("width"));
+  const toggle = page.getByRole("button", { name: "ASCII" });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  // text cells are narrower than tiles
+  await expect.poll(async () => Number(await canvas.getAttribute("width"))).toBeLessThan(tiled);
+  await page.screenshot({ path: "test-results/ascii.png" });
+  const ascii = await canvas.getAttribute("width");
+
+  await page.reload();
+  await page.getByLabel("Who are you?").fill(`${name}b`);
+  await page.getByRole("button", { name: "Play" }).click();
+  await untilPlaying(page);
+  await expect(page.getByRole("button", { name: "ASCII" })).toHaveAttribute("aria-pressed", "true");
+  await expect(canvas).toHaveAttribute("width", ascii!);
+  // the core was started with ascii_map too
+  await page.keyboard.press("#");
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("textbox").fill("optionsfull");
+  await page.keyboard.press("Enter");
+  await expect(dialog.locator(".menu-item", { hasText: /^ascii_map/ })).toContainText("[true]");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  await page.getByRole("button", { name: "ASCII" }).click();
+  await expect(canvas).toHaveAttribute("width", String(tiled));
 });

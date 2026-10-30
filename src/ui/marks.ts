@@ -9,22 +9,30 @@ function badge(ctx: CanvasRenderingContext2D, path: Path2D, fill: string) {
 }
 
 /** Cocoa's map marks, drawn over the square at (left, top). */
-export function drawMarks(ctx: CanvasRenderingContext2D, marks: number, left: number, top: number, cell: number, petMark: HTMLImageElement | null) {
-  if (marks & MARK_PET && petMark) ctx.drawImage(petMark, left, top, cell, cell);
+export function drawMarks(
+  ctx: CanvasRenderingContext2D,
+  marks: number,
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+  petMark: HTMLImageElement | null,
+) {
+  if (marks & MARK_PET && petMark) ctx.drawImage(petMark, left, top, width, height);
   if (!(marks & ~MARK_PET)) return;
-  const size = Math.max(5, Math.round(cell * 0.2));
+  const size = Math.max(5, Math.round(Math.min(width, height) * 0.2));
   const inset = Math.max(1, Math.round(size * 0.3));
-  const right = left + cell;
-  const bottom = top + cell;
+  const right = left + width;
+  const bottom = top + height;
 
   if (marks & MARK_DETECTED) {
     ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
-    ctx.fillRect(left, top, cell, cell);
+    ctx.fillRect(left, top, width, height);
     ctx.save();
     ctx.setLineDash([size * 0.6, size * 0.4]);
     ctx.lineWidth = Math.max(1, Math.round(size * 0.15));
     ctx.strokeStyle = "rgba(102, 217, 255, 0.9)";
-    ctx.strokeRect(left + 1.5, top + 1.5, cell - 3, cell - 3);
+    ctx.strokeRect(left + 1.5, top + 1.5, width - 3, height - 3);
     ctx.restore();
   }
   if (marks & MARK_PEACEFUL) {

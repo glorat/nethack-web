@@ -65,6 +65,8 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .map { flex: 1; overflow: auto; background: #000; }
 .map-zoom { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 4px; }
 .map-zoom button { width: 28px; padding: 2px 0; opacity: 0.8; }
+.map-zoom .ascii-toggle { width: auto; padding: 2px 8px; }
+.map-zoom .ascii-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 .map-tooltip {
   position: fixed; z-index: 5; pointer-events: none; max-width: 320px;
   background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
