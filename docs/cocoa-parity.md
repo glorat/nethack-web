@@ -17,7 +17,7 @@ Decided for the web:
 - [x] Two arrow keys held together move diagonally (`MainView.m` `keyDown`/`keyUp`).
 - [x] ASCII mode: characters and colours instead of tiles, cell sized to the font (`enableAsciiMode`), with brighter blue, green and brown.
 - [x] The hero's cursor is green above 75% HP, yellow above 50%, red below (`MainView.m` `drawRect:`).
-- [ ] Pinch zoom, actual size (⌘0) and zoom keyboard shortcuts.
+- [x] Pinch zoom, actual size (⌘0) and zoom keyboard shortcuts.
 
 ## Status
 

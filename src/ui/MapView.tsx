@@ -5,6 +5,7 @@ import { COLNO, ROWNO, type GameState } from "../port/state";
 import { drawTile, type TileSheet } from "../tiles";
 import { asciiCell, drawSymbol } from "./ascii";
 import { drawMarks } from "./marks";
+import { clipAround } from "./scroll";
 import petMarkUrl from "./petmark.png";
 
 interface Props {
@@ -16,7 +17,8 @@ interface Props {
   onAscii?(on: boolean): void;
   onClick(x: number, y: number, button: number): void;
   describe(x: number, y: number): Promise<string | null>;
-  onZoom(step: -1 | 1): void;
+  /** 0 goes back to the starting size. */
+  onZoom(step: -1 | 0 | 1): void;
 }
 
 interface Tooltip {
@@ -35,6 +37,8 @@ interface ContextMenu {
 }
 
 const TOOLTIP_DELAY = 500;
+// how far a pinch goes for one zoom step, near Cocoa's 0.15 magnification (Safari's scale is times 100)
+const PINCH_STEP = 15;
 
 // CLICK_1 / CLICK_2 in the core
 const CLICK_PRIMARY = 1;
@@ -43,6 +47,7 @@ const CLICK_SECONDARY = 2;
 export function MapView({ state, sheet, cell, ascii, onAscii, onClick, describe, onZoom }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const pane = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const hover = useRef<{ x: number; y: number; timer: number } | null>(null);
   const [petMark, setPetMark] = useState<HTMLImageElement | null>(null);
@@ -97,17 +102,82 @@ export function MapView({ state, sheet, cell, ascii, onAscii, onClick, describe,
     }
   }, [state.map, state.cursor, cursorStroke, sheet, cell, text, petMark]);
 
-  // keep the hero in view, as cliparound asks
+  // the middle of the view in squares, kept as it scrolls: once the canvas has been resized, the browser
+  // has already clamped the scroll position to it
+  const shown = useRef({ width, height });
+  const middle = useRef<{ x: number; y: number } | null>(null);
+  const recordMiddle = () => {
+    const el = scroller.current;
+    if (el)
+      middle.current = {
+        x: (el.scrollLeft + el.clientWidth / 2) / shown.current.width,
+        y: (el.scrollTop + el.clientHeight / 2) / shown.current.height,
+      };
+  };
+
+  // a zoom keeps what was in the middle of the view there, then keeps the hero in view, as Cocoa's does
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    const before = shown.current;
+    if (before.width === width && before.height === height) return;
+    if (!middle.current) recordMiddle();
+    shown.current = { width, height };
+    if (!el || !middle.current) return;
+    el.scrollLeft = middle.current.x * width - el.clientWidth / 2;
+    el.scrollTop = middle.current.y * height - el.clientHeight / 2;
+    if (state.cursor) clipAround(el, state.cursor.x, state.cursor.y, width, height);
+    recordMiddle();
+  }, [width, height]);
+
+  // a trackpad pinch arrives as a wheel with ctrlKey in most browsers and as gesture events in Safari;
+  // either would otherwise zoom the page
+  const zoom = useRef(onZoom);
+  zoom.current = onZoom;
+  useEffect(() => {
+    const el = pane.current;
+    if (!el) return;
+    let pinched = 0;
+    let idle = 0;
+    let scale = 1;
+    const pinch = (by: number) => {
+      pinched += by;
+      clearTimeout(idle);
+      idle = window.setTimeout(() => (pinched = 0), 200);
+      if (Math.abs(pinched) < PINCH_STEP) return;
+      zoom.current(pinched > 0 ? 1 : -1);
+      pinched = 0;
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      pinch(-e.deltaY);
+    };
+    const onGestureStart = (e: Event) => {
+      e.preventDefault();
+      scale = 1;
+    };
+    const onGestureChange = (e: Event) => {
+      e.preventDefault();
+      const next = (e as Event & { scale: number }).scale;
+      pinch((next - scale) * 100);
+      scale = next;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("gesturestart", onGestureStart);
+    el.addEventListener("gesturechange", onGestureChange);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("gesturestart", onGestureStart);
+      el.removeEventListener("gesturechange", onGestureChange);
+      clearTimeout(idle);
+    };
+  }, []);
+
+  // keep the hero in view when the core asks
   useEffect(() => {
     const el = scroller.current;
-    if (!el || !state.cursor) return;
-    const cx = state.cursor.x * width + width / 2;
-    const cy = state.cursor.y * height + height / 2;
-    if (cx < el.scrollLeft + width * 4 || cx > el.scrollLeft + el.clientWidth - width * 4)
-      el.scrollLeft = cx - el.clientWidth / 2;
-    if (cy < el.scrollTop + height * 4 || cy > el.scrollTop + el.clientHeight - height * 4)
-      el.scrollTop = cy - el.clientHeight / 2;
-  }, [state.cursor, width, height]);
+    if (el && state.cursor) clipAround(el, state.cursor.x, state.cursor.y, shown.current.width, shown.current.height);
+  }, [state.cursor]);
 
   const square = (e: MouseEvent) => {
     const rect = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect();
@@ -180,17 +250,19 @@ export function MapView({ state, sheet, cell, ascii, onAscii, onClick, describe,
   };
 
   return (
-    <div class="map-pane">
+    <div class="map-pane" ref={pane}>
       <div
         class="map"
         ref={scroller}
         onScroll={() => {
           cancelTooltip();
           setMenu(null);
+          recordMiddle();
         }}
       >
         <canvas
           ref={canvas}
+          data-cursor={state.cursor ? `${state.cursor.x},${state.cursor.y}` : undefined}
           width={COLNO * width}
           height={ROWNO * height}
           onClick={click}

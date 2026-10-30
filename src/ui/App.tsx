@@ -21,6 +21,9 @@ import { StatsView } from "./StatsView";
 const TILE_SIZE = 64;
 const MAP_CELLS = [16, 24, 32, 48, 64];
 const ZOOM_KEY = "nethack.mapCell";
+const DEFAULT_CELL = 32;
+// with Cmd or Ctrl, as Cocoa's View menu has them; 0 is back to the starting size
+const ZOOM_KEYS: Record<string, -1 | 0 | 1> = { "=": 1, "+": 1, "-": -1, "0": 0 };
 const ASCII_KEY = "nethack.asciiMap";
 
 function savedCell(): number {
@@ -28,7 +31,12 @@ function savedCell(): number {
     const saved = Number(localStorage.getItem(ZOOM_KEY));
     if (MAP_CELLS.includes(saved)) return saved;
   } catch {}
-  return 32;
+  return DEFAULT_CELL;
+}
+
+function zoomed(cell: number, step: -1 | 0 | 1): number {
+  if (step === 0) return DEFAULT_CELL;
+  return MAP_CELLS[Math.min(MAP_CELLS.length - 1, Math.max(0, MAP_CELLS.indexOf(cell) + step))];
 }
 
 function savedAscii(): boolean {
@@ -163,6 +171,27 @@ export function App() {
     if (state.asciiMap !== null) saveAscii(state.asciiMap);
   }, [state.asciiMap]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(ZOOM_KEY, String(cell));
+    } catch {}
+  }, [cell]);
+
+  // zoom keys work with a dialog open too, as Cocoa's menu shortcuts do: this listener is added before any
+  // dialog's, and the browser would zoom the page otherwise
+  useEffect(() => {
+    if (!playing) return;
+    const onKey = (e: KeyboardEvent) => {
+      const zoom = (e.metaKey || e.ctrlKey) && !e.altKey ? ZOOM_KEYS[e.key] : undefined;
+      if (zoom === undefined) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setCell((c) => zoomed(c, zoom));
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [playing]);
+
   // keys typed before a dialog opened are its first keys; its listeners are attached by now
   useLayoutEffect(() => {
     while (pending && answered.current !== pending.id && typeAhead.current.length) {
@@ -223,13 +252,7 @@ export function App() {
               : undefined
           }
           describe={(x, y) => client.describe(x, y)}
-          onZoom={(step) => {
-            const next = MAP_CELLS[Math.min(MAP_CELLS.length - 1, Math.max(0, MAP_CELLS.indexOf(cell) + step))];
-            setCell(next);
-            try {
-              localStorage.setItem(ZOOM_KEY, String(next));
-            } catch {}
-          }}
+          onZoom={(step) => setCell((c) => zoomed(c, step))}
           onClick={(x, y, button) => {
             if (pending) return;
             inventoryKey.current = 0;

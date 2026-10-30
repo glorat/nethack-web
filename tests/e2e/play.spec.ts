@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { clipAround } from "../../src/ui/scroll";
 
 /** Answers the character-creation prompts until the map is showing. */
 async function startGame(page: Page, name: string) {
@@ -254,7 +255,7 @@ test("a right-click near the window's corner keeps the menu on screen", async ({
   await page.getByRole("button", { name: "Zoom in" }).click();
   await page.getByRole("button", { name: "Zoom in" }).click();
   await expect(page.locator(".map canvas")).toHaveAttribute("width", String(80 * 64));
-  // the zoom's scroll to the hero closes a menu, so let it land first
+  // a zoom's scroll closes a menu, so let it land first
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   const view = (await page.locator(".map").boundingBox())!;
   // left of the map's buttons and above any scrollbar, but closer to the edges than the menu is big
@@ -298,4 +299,107 @@ test("ASCII mode draws the map as text and is kept across a reload", async ({ pa
 
   await page.getByRole("button", { name: "ASCII" }).click();
   await expect(canvas).toHaveAttribute("width", String(tiled));
+});
+
+test("keyboard shortcuts and a pinch zoom the map, and Cmd-0 goes back", async ({ page }) => {
+  await startGame(page, `Pinch${Date.now() % 100000}`);
+  const canvas = page.locator(".map canvas");
+  const width = async () => Number(await canvas.getAttribute("width"));
+  const start = await width();
+
+  await page.keyboard.press("Control+=");
+  await expect.poll(width).toBe(start * 1.5);
+  await page.keyboard.press("Meta+=");
+  await expect.poll(width).toBe(start * 2);
+  await page.keyboard.press("Control+0");
+  await expect.poll(width).toBe(start);
+  await page.keyboard.press("Meta+-");
+  await expect.poll(width).toBeLessThan(start);
+  await page.keyboard.press("Meta+0");
+  await expect.poll(width).toBe(start);
+
+  // the page doesn't zoom as well: the events are cancelled
+  const pinch = (type: string, init: object) =>
+    page.locator(".map").evaluate(
+      (el, [type, init]) => {
+        const event = type === "wheel" ? new WheelEvent("wheel", { ...init, bubbles: true, cancelable: true }) : Object.assign(new Event(type, { bubbles: true, cancelable: true }), init);
+        return el.dispatchEvent(event);
+      },
+      [type, init] as const,
+    );
+  for (let i = 0; i < 4; i++) expect(await pinch("wheel", { deltaY: -5, ctrlKey: true })).toBe(false);
+  await expect.poll(width).toBe(start * 1.5);
+  for (let i = 0; i < 4; i++) await pinch("wheel", { deltaY: 5, ctrlKey: true });
+  await expect.poll(width).toBe(start);
+  // Safari's pinch
+  expect(await pinch("gesturestart", { scale: 1 })).toBe(false);
+  expect(await pinch("gesturechange", { scale: 1.2 })).toBe(false);
+  await expect.poll(width).toBe(start * 1.5);
+});
+
+test("zoom keys work with a dialog open", async ({ page }) => {
+  await startGame(page, `DlgZoom${Date.now() % 100000}`);
+  const canvas = page.locator(".map canvas");
+  const start = Number(await canvas.getAttribute("width"));
+  await page.keyboard.press("Control+x");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Control+=");
+  await expect(canvas).toHaveAttribute("width", String(start * 1.5));
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+});
+
+const settle = (page: Page) => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+
+/**
+ * Zooms with `key` from `from`px squares to `to`px and checks the view ends where Cocoa's would:
+ * the middle kept as far as the new map size allows, then scrolled as little as shows the hero.
+ */
+async function expectZoomKeepsView(page: Page, key: string, from: number, to: number) {
+  const map = page.locator(".map");
+  const canvas = map.locator("canvas");
+  const view = await map.evaluate((el) => ({ left: el.scrollLeft, top: el.scrollTop, width: el.clientWidth, height: el.clientHeight }));
+  const [x, y] = (await canvas.getAttribute("data-cursor"))!.split(",").map(Number);
+  await page.keyboard.press(key);
+  await expect(canvas).toHaveAttribute("width", String(80 * to));
+  await settle(page);
+
+  const clamp = (v: number, max: number) => Math.max(0, Math.min(max, v));
+  const maxLeft = Math.max(0, 80 * to - view.width);
+  const maxTop = Math.max(0, 21 * to - view.height);
+  let left = clamp(((view.left + view.width / 2) / from) * to - view.width / 2, maxLeft);
+  let top = clamp(((view.top + view.height / 2) / from) * to - view.height / 2, maxTop);
+  const expected = {
+    get scrollLeft() { return left; },
+    set scrollLeft(v) { left = clamp(v, maxLeft); },
+    get scrollTop() { return top; },
+    set scrollTop(v) { top = clamp(v, maxTop); },
+    clientWidth: view.width,
+    clientHeight: view.height,
+  };
+  clipAround(expected, x, y, to, to);
+  const actual = await map.evaluate((el) => ({ left: el.scrollLeft, top: el.scrollTop }));
+  expect(Math.abs(actual.left - left)).toBeLessThanOrEqual(1);
+  expect(Math.abs(actual.top - top)).toBeLessThanOrEqual(1);
+}
+
+test("zooming in keeps the middle of the view, then the hero, in view", async ({ page }) => {
+  await startGame(page, `Mid${Date.now() % 100000}`);
+  await expectZoomKeepsView(page, "Control+=", 32, 48);
+});
+
+test("zooming out from the far corner keeps the middle from before the browser clamps it", async ({ page }) => {
+  await startGame(page, `Corner${Date.now() % 100000}`);
+  await page.keyboard.press("Control+=");
+  await page.keyboard.press("Control+=");
+  await expect(page.locator(".map canvas")).toHaveAttribute("width", String(80 * 64));
+  await settle(page);
+  await page.locator(".map").evaluate((el) => {
+    el.scrollLeft = el.scrollWidth;
+    el.scrollTop = el.scrollHeight;
+  });
+  await settle(page);
+  await expectZoomKeepsView(page, "Control+-", 64, 48);
 });
