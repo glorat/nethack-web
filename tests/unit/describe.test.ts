@@ -22,3 +22,7 @@ test("the wiki is searched for the thing's name alone", () => {
 test("a wiki search URL encodes the term", () => {
   expect(wikiUrl("potion of see invisible")).toBe("https://nethackwiki.com/mediawiki/index.php?search=potion%20of%20see%20invisible");
 });
+
+test("the words left out of a wiki search are matched in any case", () => {
+  expect(wikiTerm("         The Oracle")).toBe("Oracle");
+});

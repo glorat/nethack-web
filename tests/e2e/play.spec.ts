@@ -247,3 +247,19 @@ test("right-clicking the map offers a look and a wiki search", async ({ page, co
   await expect(menu).toBeHidden();
   await expect.poll(() => page.locator(".message").count()).toBeGreaterThan(before);
 });
+
+test("a right-click near the window's corner keeps the menu on screen", async ({ page }) => {
+  await startGame(page, `Edge${Date.now() % 100000}`);
+  // zoomed in, the map fills the pane to the window's bottom edge
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  const view = (await page.locator(".map").boundingBox())!;
+  // left of the zoom buttons and above any scrollbar, but closer to the edges than the menu is big
+  await page.mouse.click(view.x + view.width - 100, view.y + view.height - 20, { button: "right" });
+  const menu = page.getByRole("menu");
+  await expect(menu.getByRole("menuitem", { name: /Search the NetHack Wiki/ })).toBeVisible();
+  const box = (await menu.boundingBox())!;
+  const size = page.viewportSize()!;
+  expect(box.x + box.width).toBeLessThanOrEqual(size.width);
+  expect(box.y + box.height).toBeLessThanOrEqual(size.height);
+});

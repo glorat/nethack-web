@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { tooltipText, wikiTerm, wikiUrl } from "../port/describe";
 import { COLNO, ROWNO, type GameState } from "../port/state";
 import { drawTile, type TileSheet } from "../tiles";
@@ -42,6 +42,7 @@ export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props
   const hover = useRef<{ x: number; y: number; timer: number } | null>(null);
   const [petMark, setPetMark] = useState<HTMLImageElement | null>(null);
   const [menu, setMenu] = useState<ContextMenu | null>(null);
+  const menuEl = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const image = new Image();
@@ -120,6 +121,17 @@ export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props
     });
   };
 
+  // flip the menu above or left of the pointer where it would run off the window, as a native menu does
+  useLayoutEffect(() => {
+    const el = menuEl.current;
+    if (!menu || !el) return;
+    const { width, height } = el.getBoundingClientRect();
+    const left = menu.left + width > window.innerWidth ? menu.left - width : menu.left;
+    const top = menu.top + height > window.innerHeight ? menu.top - height : menu.top;
+    el.style.left = `${Math.max(0, left)}px`;
+    el.style.top = `${Math.max(0, top)}px`;
+  }, [menu]);
+
   useEffect(() => {
     if (!menu) return;
     const close = () => setMenu(null);
@@ -178,7 +190,7 @@ export function MapView({ state, sheet, cell, onClick, describe, onZoom }: Props
       </div>
       {menu ? (
         <div class="context-backdrop" onMouseDown={() => setMenu(null)} onContextMenu={(e) => e.preventDefault()}>
-          <div class="context-menu" role="menu" style={{ left: `${menu.left}px`, top: `${menu.top}px` }} onMouseDown={(e) => e.stopPropagation()}>
+          <div class="context-menu" role="menu" ref={menuEl} onMouseDown={(e) => e.stopPropagation()}>
             <button
               role="menuitem"
               onClick={() => {

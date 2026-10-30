@@ -17,7 +17,7 @@ const NOT_SEARCHED = ["tame", "invisible", "peaceful", "a", "an", "the"];
 export function wikiTerm(farlook: string): string {
   let words = tooltipText(farlook).split("[")[0].split(/\s+/).filter(Boolean);
   for (const word of NOT_SEARCHED) {
-    const at = words.indexOf(word);
+    const at = words.findIndex((w) => w.toLowerCase() === word);
     if (at >= 0) words = [...words.slice(0, at), ...words.slice(at + 1)];
   }
   return words.join(" ");
