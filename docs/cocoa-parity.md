@@ -31,7 +31,8 @@ Decided for the web:
 - [x] Any inventory letter is accepted in a suitable-items menu, not only those listed (`UnlistedInventory`).
 - [x] Pick-any keys `.` `,` select all and `-` `\` clear; a Select All button.
 - [x] Sort A–Z checkbox, sorting items under each heading (`sortItems`).
-- [ ] Pick-one menus of 2–4 short items without tiles shown as answer buttons (`isQuestion`, `buildQuestionContents`).
+- [x] Pick-one menus of 2–4 short items without tiles shown as answer buttons (`isQuestion`, `buildQuestionContents`).
+- [ ] Items the core gave no letter get the next free one, as tty and Cocoa hand out (`buildRows`).
 - [ ] Read-only menus as selectable, copyable text.
 - [ ] Keyboard and hover highlight; Return or space picks the highlighted row.
 

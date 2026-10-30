@@ -170,6 +170,11 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .menu-item { padding: 3px 14px; }
 .menu-item.selected { background: #23395d; }
 .menu-text { white-space: pre; }
+.menu-dialog.question { width: 380px; }
+.answers { display: flex; flex-direction: column; gap: 8px; }
+.answers .hint { margin: 0; font-size: 12px; }
+.answer { display: flex; gap: 12px; align-items: center; width: 100%; padding: 8px 12px; text-align: left; font-size: 14px; }
+.answer.primary .inv-letter { color: inherit; }
 .menu-count { color: var(--accent); font-weight: 600; }
 .menu-items.tabbed { display: grid; grid-template-columns: 24px auto repeat(var(--menu-columns), auto) 1fr; column-gap: 6px; }
 .menu-items.tabbed > * { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; }

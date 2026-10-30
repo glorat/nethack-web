@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { MenuHow, MenuItem, MenuSelection } from "../../protocol";
+import { isQuestion } from "../../port/question";
 import { sortedOrder } from "../../port/sort";
 import { tileStyle, type TileSheet } from "../../tiles";
 import { textStyle } from "../colors";
@@ -126,6 +127,31 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     const n = selected.current.get(i) ?? -1;
     return n > 0 ? <span class="menu-count">{n} of </span> : null;
   };
+
+  if (isQuestion(how, items))
+    return (
+      <div class="dialog-backdrop">
+        <div class="dialog menu-dialog question" role="dialog">
+          {prompt ? <div class="dialog-title">{prompt}</div> : null}
+          <div class="answers">
+            {items.map((item, i) =>
+              item.identifier === 0 ? (
+                item.text.trim() ? <p class="hint">{item.text.trim()}</p> : null
+              ) : (
+                <button class={`answer${item.preselected ? " primary" : ""}`} onClick={() => choose(i)}>
+                  <span class="inv-letter">{item.accelerator}</span>
+                  <span style={textStyle(item.color, item.attr)}>{item.text}</span>
+                </button>
+              ),
+            )}
+          </div>
+          <div class="dialog-buttons">
+            {count.current > 0 ? <span class="hint">Count: {count.current}</span> : null}
+            <button onClick={() => onDone(null)}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    );
 
   return (
     <div class="dialog-backdrop">

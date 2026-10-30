@@ -543,3 +543,20 @@ test("Sort A–Z sorts a menu's items under each heading by name, and unticking 
   expect(await rows()).toEqual(before);
   await page.keyboard.press("Escape");
 });
+
+test("a short question from the game shows a button for each answer", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Who are you?").fill(`Ask${Date.now() % 100000}`);
+  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("dialog", { name: "Choose your character" }).getByRole("button", { name: "Play" }).click();
+  // the tutorial offer, after the intro, is a menu of a few short answers
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText(/Go bravely/i, { timeout: 15_000 });
+  await dialog.getByRole("button", { name: "OK" }).click();
+  await expect(dialog).toContainText(/tutorial/i);
+  await expect(dialog.locator(".answers .answer")).toHaveCount(2);
+  await dialog.screenshot({ path: "test-results/question.png" });
+  await dialog.getByRole("button", { name: /just start play/i }).click();
+  await untilPlaying(page);
+  await expect(page.locator(".stats-title")).toBeVisible();
+});
