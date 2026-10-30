@@ -42,8 +42,16 @@ function serviceWorker(): Plugin {
   };
 }
 
+/** "5.0.0", from the core's patchlevel.h. */
+function nethackVersion(): string {
+  const header = readFileSync(new URL("./nethack/include/patchlevel.h", import.meta.url), "utf8");
+  const level = (name: string) => header.match(new RegExp(`#define ${name} (\\d+)`))?.[1] ?? "0";
+  return [level("VERSION_MAJOR"), level("VERSION_MINOR"), level("PATCHLEVEL")].join(".");
+}
+
 export default defineConfig({
   base: "./",
+  define: { __NETHACK_VERSION__: JSON.stringify(nethackVersion()) },
   plugins: [preact(), serviceWorker()],
   worker: { format: "es" },
   test: {

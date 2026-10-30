@@ -1027,3 +1027,20 @@ test("the game beeps at a click on unexplored ground far away, and at an invento
   await expect.poll(beeps).toBe(2);
   await page.keyboard.press("Escape");
 });
+
+test("the Help menu's About box credits NetHack, this version and the painted tiles", async ({ page }) => {
+  await startGame(page, `About${Date.now() % 100000}`);
+  const bar = page.getByRole("menubar");
+  await bar.getByRole("menuitem", { name: "Help" }).click();
+  await page.getByRole("menu", { name: "Help" }).getByRole("menuitem", { name: "About NetHack" }).click();
+  const about = page.getByRole("dialog", { name: "About NetHack" });
+  await expect(about).toContainText(/Based on NetHack \d+\.\d+\.\d+ by the NetHack DevTeam/);
+  await expect(about).toContainText("Web version by Kevin Tam");
+  await expect(about).toContainText("Painted tiles by Kevin Tam");
+  // the game doesn't hear keys while it's open
+  await page.keyboard.press("i");
+  await page.keyboard.press("Escape");
+  await expect(about).toBeHidden();
+  await page.waitForTimeout(500);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});

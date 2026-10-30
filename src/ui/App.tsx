@@ -10,6 +10,7 @@ import type { Answer, GameRequest } from "../protocol";
 import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port/tilesets";
 import { loadTileSheet, type TileSheet } from "../tiles";
 import { beep, wakeBeep } from "./beep";
+import { AboutDialog } from "./dialogs/AboutDialog";
 import { DirectionDialog } from "./dialogs/DirectionDialog";
 import { ExtCommandDialog } from "./dialogs/ExtCommandDialog";
 import { GameOverDialog } from "./dialogs/GameOverDialog";
@@ -148,6 +149,7 @@ export function App() {
   const [playing, setPlaying] = useState(false);
   const [cell, setCellState] = useState(savedCell);
   const [editingOptions, setEditingOptions] = useState(false);
+  const [about, setAbout] = useState(false);
   const [quit, setQuit] = useState(false);
   /** False if the browser wouldn't keep it, which the editor says. */
   const saveOptions = (text: string | null): boolean => {
@@ -473,7 +475,7 @@ export function App() {
       title: item.title,
       key: item.key,
       indent: item.indent,
-      disabled: !commanding || editingOptions,
+      disabled: !commanding || editingOptions || about,
       run: () => runCommand(item.command),
     };
   const menus: BarMenu[] = [
@@ -482,7 +484,7 @@ export function App() {
       entries: [
         ...GAME_MENU.slice(0, 1).map(command),
         // not over a question, whose keys the editor's text would answer
-        { title: "Edit Options File...", disabled: !!pending, run: () => setEditingOptions(true) },
+        { title: "Edit Options File...", disabled: !!pending || about, run: () => setEditingOptions(true) },
         ...GAME_MENU.slice(1).map(command),
         null,
         { title: "New Game", disabled: state.gameOver === null, run: () => location.reload() },
@@ -529,7 +531,14 @@ export function App() {
     ...(wizard ? [...COMMAND_MENUS, WIZARD_MENU] : COMMAND_MENUS).map((menu) => ({ title: menu.title, entries: menu.items.map(command) })),
     {
       title: "Help",
-      entries: [...HELP_MENU.map(command), null, { title: "NetHack Wiki", run: () => window.open(WIKI_URL, "_blank", "noopener") }],
+      entries: [
+        ...HELP_MENU.map(command),
+        null,
+        { title: "NetHack Wiki", run: () => window.open(WIKI_URL, "_blank", "noopener") },
+        null,
+        // only while the game waits for a command or has ended, so no question comes up over it
+        { title: "About NetHack", disabled: (!commanding && state.gameOver === null) || editingOptions, run: () => setAbout(true) },
+      ],
     },
   ];
 
@@ -583,7 +592,7 @@ export function App() {
           />
         ) : null}
         {!state.started ? <div class="overlay-note">Starting…</div> : null}
-        {state.gameOver !== null && !quit && !editingOptions ? (
+        {state.gameOver !== null && !quit && !editingOptions && !about ? (
           <GameOverDialog
             text={state.gameOver}
             onNewGame={() => location.reload()}
@@ -595,6 +604,7 @@ export function App() {
           />
         ) : null}
         {optionsDialog}
+        {about ? <AboutDialog onClose={() => setAbout(false)} /> : null}
         {pending ? <PendingDialog pending={pending} sheet={sheet} answer={answer} passOn={(k) => typeAhead.current.unshift(k)} /> : null}
       </div>
     </div>
