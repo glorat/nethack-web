@@ -95,7 +95,8 @@ export type GameRequest =
   | { kind: "key" }
   /** inventoryKey is 0 unless the core is waiting for a command. */
   | { kind: "poskey"; inventoryKey: number }
-  | { kind: "yn"; query: string; choices: string; defaultChoice: string }
+  /** directions: for "In what direction?", the keys for W NW N NE E SE S SW down up. */
+  | { kind: "yn"; query: string; choices: string; defaultChoice: string; directions?: string }
   | { kind: "getlin"; query: string }
   /** unlisted: letters the menu takes as answers though it doesn't list them, each answered with its char code. */
   | { kind: "menu"; how: MenuHow; prompt: string; items: MenuItem[]; unlisted: string }

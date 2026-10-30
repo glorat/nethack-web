@@ -70,3 +70,23 @@ test("a menu's items the core gave no letter get one", async () => {
   expect(items.length).toBeGreaterThan(1);
   expect(items.map((i) => i.accelerator)).toEqual([..."abcdefghijklmnopqrstuvwxyz"].slice(0, items.length));
 });
+
+test("a direction prompt brings the core's direction keys, which number_pad changes", async () => {
+  const g = await (await Session.start()).skipText();
+  await g.send("\x04");
+  expect(g.prompt).toMatchObject({ kind: "yn", query: expect.stringMatching(/direction/), directions: "hykulnjb><" });
+  await g.yn("\x1b");
+
+  const pad = await (await Session.start({ options: "number_pad:1" })).skipText();
+  await pad.send("\x04");
+  expect(pad.prompt).toMatchObject({ kind: "yn", directions: "47896321><" });
+});
+
+test("a question with its own answers brings no direction keys", async () => {
+  const g = await (await Session.start()).skipText();
+  await g.send("#");
+  if (g.prompt?.kind !== "ext_cmd") throw new Error("no extended command prompt");
+  await g.answer({ kind: "ext_cmd", index: g.prompt.commands.find((c) => c.name === "pray")!.index });
+  expect(g.prompt).toMatchObject({ kind: "yn", choices: expect.stringMatching(/y/) });
+  expect((g.prompt as { directions?: string }).directions).toBeUndefined();
+});

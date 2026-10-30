@@ -32,7 +32,7 @@ export function YesNoDialog({ query, choices, defaultChoice, onDone }: Props) {
       e.stopPropagation();
       if (e.key === "Escape") return onDone(null);
       if (e.key === "Enter" || e.key === " ") return onDone(defaultChoice || null);
-      // with no choices any key answers, as for "In what direction?", so arrows map to hjkl as in play
+      // with no choices any key answers, as for "Open where? [.>]", so arrows map to hjkl as in play
       if (!keys.length) {
         const code = keyCode(e);
         if (code !== null && code < 128) onDone(String.fromCharCode(code));

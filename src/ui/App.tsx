@@ -5,6 +5,7 @@ import { ArrowChords, keyCode, takeLine, type KeyLike } from "../port/keys";
 import { applyEvents, initialState, nextBatch } from "../port/state";
 import type { Answer, GameRequest } from "../protocol";
 import { loadTileSheet, type TileSheet } from "../tiles";
+import { DirectionDialog } from "./dialogs/DirectionDialog";
 import { ExtCommandDialog } from "./dialogs/ExtCommandDialog";
 import { InputDialog } from "./dialogs/InputDialog";
 import { MenuDialog } from "./dialogs/MenuDialog";
@@ -154,7 +155,7 @@ export function App() {
       if (!playing || pendingRef.current) return;
       if (keyCode(e) === null) return;
       e.preventDefault();
-      type(chords.current.down({ key: e.key, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey }));
+      type(chords.current.down({ key: e.key, code: e.code, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey }));
     };
     const onRelease = () => type(chords.current.up());
     window.addEventListener("keydown", onKey);
@@ -284,6 +285,8 @@ function PendingDialog({ pending, sheet, answer }: { pending: Pending; sheet: Ti
   const r = pending.request;
   switch (r.kind) {
     case "yn":
+      if (r.directions)
+        return <DirectionDialog query={r.query} directions={r.directions} onDone={(key) => answer({ kind: "yn", key: key ?? "\x1b" })} />;
       return (
         <YesNoDialog
           query={r.query}

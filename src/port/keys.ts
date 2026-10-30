@@ -2,6 +2,8 @@
 
 export interface KeyLike {
   key: string;
+  /** The physical key, which tells the numeric keypad's digits from the row above the letters. */
+  code?: string;
   ctrlKey: boolean;
   altKey: boolean;
   metaKey: boolean;
@@ -104,4 +106,25 @@ export class ArrowChords {
     this.held = null;
     return held ? [held] : [];
   }
+}
+
+// indices into the core's direction keys: W NW N NE E SE S SW down up
+const DIRECTION_INDEX: Record<string, number> = {
+  ArrowLeft: 0, Home: 1, ArrowUp: 2, PageUp: 3, ArrowRight: 4, PageDown: 5, ArrowDown: 6, End: 7,
+};
+const KEYPAD_INDEX: Record<string, number> = {
+  Numpad4: 0, Numpad7: 1, Numpad8: 2, Numpad9: 3, Numpad6: 4, Numpad3: 5, Numpad2: 6, Numpad1: 7,
+};
+
+/**
+ * A key at a direction prompt: arrows and the keypad go the way they point whatever number_pad says,
+ * keypad 5 is self and keypad Enter is Return; others as keyCode.
+ */
+export function directionKey(e: KeyLike, directions: string): number | null {
+  if (e.metaKey) return null;
+  const at = (e.code ? KEYPAD_INDEX[e.code] : undefined) ?? DIRECTION_INDEX[e.key];
+  if (at !== undefined && directions[at]) return directions.charCodeAt(at);
+  if (e.code === "Numpad5") return ".".charCodeAt(0);
+  if (e.code === "NumpadEnter") return 13;
+  return keyCode(e);
 }

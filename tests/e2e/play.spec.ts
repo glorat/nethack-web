@@ -627,3 +627,29 @@ test("arrow keys highlight a menu's rows, and Return or space picks the highligh
   await expect(dialog).toBeHidden();
   await expect(page.locator(".inv-item", { hasText: "holy water" })).toContainText("3 potions");
 });
+
+test("a direction prompt shows buttons for each way, beside the hero", async ({ page }) => {
+  await startGame(page, `Way${Date.now() % 100000}`);
+  await page.keyboard.press("Control+d");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText(/in what direction/i);
+  await expect(dialog.locator(".direction-grid .direction")).toHaveCount(9);
+  await expect(dialog.getByRole("button", { name: /Self/ })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /Up/ })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /Down/ })).toBeVisible();
+
+  // beside the hero, past the squares next to them
+  const [x, y] = (await page.locator(".map canvas").getAttribute("data-cursor"))!.split(",").map(Number);
+  const map = (await page.locator(".map canvas").boundingBox())!;
+  const cell = map.width / 80;
+  const hero = { left: map.x + x * cell, top: map.y + y * cell };
+  const box = (await dialog.boundingBox())!;
+  const right = Math.abs(box.x - (hero.left + 2 * cell + 8));
+  const left = Math.abs(box.x + box.width - (hero.left - cell - 8));
+  expect(Math.min(right, left)).toBeLessThan(2);
+  await page.screenshot({ path: "test-results/direction.png" });
+
+  await dialog.getByRole("button", { name: "→" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator(".messages")).toContainText(/In what direction\? l/);
+});

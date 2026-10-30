@@ -38,7 +38,7 @@ Decided for the web:
 
 ## Prompts
 
-- [ ] Direction picker: 3×3 arrows, Self, Up and Down, with a key hint, placed near the hero (`DirectionWindowController.m`).
+- [x] Direction picker: 3×3 arrows, Self, Up and Down, with a key hint, placed near the hero (`DirectionWindowController.m`).
 - [ ] Count line for yn prompts that allow one (`YesNoWindowController.m`, `YesNoInput`).
 - [ ] Vertical answer buttons when labels are long (`isHorizontal`).
 - [ ] A non-dismiss key closes a text window and goes to the game (`MessageWindowController.m` `keyDown`).

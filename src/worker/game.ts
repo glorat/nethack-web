@@ -460,6 +460,8 @@ export class Game {
       query,
       choices: choices ?? "",
       defaultChoice: def ? String.fromCharCode(def) : "",
+      // getdir() asks with no choices, which any key answers
+      directions: !choices && /direction/.test(query) ? this.m.UTF8ToString(this.m._nhweb_dirchars()) : undefined,
     });
     const code = ynAnswer(answer?.kind === "yn" ? answer.key : null, choices ?? "", def ? String.fromCharCode(def) : "");
     // the log keeps the question with its answer, as tty's message line does

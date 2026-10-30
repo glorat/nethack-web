@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { ArrowChords, keyCode, takeLine, type KeyLike } from "../../src/port/keys";
+import { ArrowChords, directionKey, keyCode, takeLine, type KeyLike } from "../../src/port/keys";
 
 const k = (key: string, mods: Partial<{ ctrlKey: boolean; altKey: boolean; metaKey: boolean }> = {}) =>
   keyCode({ key, ctrlKey: false, altKey: false, metaKey: false, ...mods });
@@ -75,4 +75,24 @@ test("an arrow with a modifier is neither held nor part of a diagonal", () => {
   expect(chords.down(event("ArrowLeft", { ctrlKey: true }))).toHaveLength(1);
   chords.down(event("ArrowLeft"));
   expect(chords.down(event("ArrowUp", { altKey: true })).map((e) => e.key)).toEqual(["ArrowLeft", "ArrowUp"]);
+});
+
+test("at a direction prompt the arrows give the core's own direction keys", () => {
+  expect(String.fromCharCode(directionKey(event("ArrowLeft"), "hykulnjb><")!)).toBe("h");
+  expect(String.fromCharCode(directionKey(event("PageDown"), "hykulnjb><")!)).toBe("n");
+  // number_pad
+  expect(String.fromCharCode(directionKey(event("ArrowUp"), "47896321><")!)).toBe("8");
+  expect(String.fromCharCode(directionKey(event("End"), "47896321><")!)).toBe("1");
+  expect(String.fromCharCode(directionKey(event("."), "47896321><")!)).toBe(".");
+});
+
+test("at a direction prompt the keypad and modified arrows point the same way", () => {
+  expect(String.fromCharCode(directionKey(event("8", { code: "Numpad8" }), "hykulnjb><")!)).toBe("k");
+  expect(String.fromCharCode(directionKey(event("Home", { code: "Numpad7" }), "hykulnjb><")!)).toBe("y");
+  expect(String.fromCharCode(directionKey(event("5", { code: "Numpad5" }), "hykulnjb><")!)).toBe(".");
+  expect(directionKey(event("Enter", { code: "NumpadEnter" }), "hykulnjb><")).toBe(13);
+  expect(String.fromCharCode(directionKey(event("ArrowLeft", { ctrlKey: true }), "47896321><")!)).toBe("4");
+  // the digit row is a digit
+  expect(String.fromCharCode(directionKey(event("8", { code: "Digit8" }), "hykulnjb><")!)).toBe("8");
+  expect(directionKey(event("ArrowLeft", { metaKey: true }), "hykulnjb><")).toBeNull();
 });

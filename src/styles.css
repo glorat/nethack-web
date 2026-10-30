@@ -160,6 +160,14 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   display: flex; flex-direction: column; gap: 10px;
 }
 .input-dialog form { display: contents; }
+.dialog-backdrop.clear { background: none; }
+.direction-dialog { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 0; width: calc(3 * 64px + 2 * 6px + 28px + 2px); }
+.direction-grid { display: grid; grid-template-columns: repeat(3, 64px); gap: 6px; }
+.direction-vertical { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.direction { height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 6px; }
+.direction-key { font-family: var(--mono); color: var(--muted); }
+.direction-arrow { font-size: 18px; }
+.direction-dialog .hint { font-size: 12px; }
 .dialog-title { font-weight: 600; }
 .dialog-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; align-items: center; }
 .hint { color: var(--muted); }
