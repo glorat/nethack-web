@@ -18,11 +18,13 @@ interface Props {
   how: MenuHow;
   prompt: string;
   items: MenuItem[];
+  /** Letters the menu takes as answers too, though it doesn't list them. */
+  unlisted?: string;
   sheet: TileSheet;
   onDone(selection: MenuSelection[] | null): void;
 }
 
-export function MenuDialog({ how, prompt, items, sheet, onDone }: Props) {
+export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }: Props) {
   // what is picked, each with how many of it: -1 for all. Refs, as keys typed ahead are replayed
   // one after another before a render would bring new state.
   const [preselected] = useState(
@@ -80,6 +82,9 @@ export function MenuDialog({ how, prompt, items, sheet, onDone }: Props) {
         return update();
       }
       const hits = letters.length ? letters : group;
+      // an item's identifier in these menus is its letter
+      if (!hits.length && how === "one" && e.key.length === 1 && unlisted.includes(e.key))
+        return onDone([{ identifier: e.key.charCodeAt(0), count: taking() }]);
       if (!hits.length) return;
       if (how === "one") return choose(hits[0]);
       toggle(hits);

@@ -7,6 +7,7 @@ import type {
   MenuItem,
   StatusValue,
 } from "../protocol";
+import { unlistedLetters } from "../port/getobj";
 import { MARK_PEACEFUL } from "../port/marks";
 import { symbolText } from "../port/symbols";
 import { COLNO } from "../port/state";
@@ -419,7 +420,9 @@ export class Game {
       return 0;
     }
     const howName: MenuHow = how === 0 ? "none" : how === 1 ? "one" : "any";
-    const answer = await this.ask({ kind: "menu", how: howName, prompt: menu.prompt, items: menu.items });
+    const carried = this.m.UTF8ToString(this.m._nhweb_invent_letters());
+    const unlisted = unlistedLetters(howName, menu.items, carried);
+    const answer = await this.ask({ kind: "menu", how: howName, prompt: menu.prompt, items: menu.items, unlisted });
     const selection = answer?.kind === "menu" ? answer.selection : null;
     if (!selection) return -1;
     if (how === 0 || !selection.length) return 0;

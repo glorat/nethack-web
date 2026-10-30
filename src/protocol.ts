@@ -97,7 +97,8 @@ export type GameRequest =
   | { kind: "poskey"; inventoryKey: number }
   | { kind: "yn"; query: string; choices: string; defaultChoice: string }
   | { kind: "getlin"; query: string }
-  | { kind: "menu"; how: MenuHow; prompt: string; items: MenuItem[] }
+  /** unlisted: letters the menu takes as answers though it doesn't list them, each answered with its char code. */
+  | { kind: "menu"; how: MenuHow; prompt: string; items: MenuItem[]; unlisted: string }
   | { kind: "text"; lines: { attr: number; text: string }[] }
   | { kind: "ext_cmd"; commands: ExtCommand[] }
   | { kind: "player"; choices: PlayerChoices };

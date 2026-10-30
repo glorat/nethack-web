@@ -53,7 +53,7 @@ function saveAscii(on: boolean) {
   } catch {}
 }
 
-const BASE_OPTIONS = "perm_invent,!autopickup,menucolors,time,showexp,hilite_pet,hilite_pile";
+const BASE_OPTIONS = "perm_invent,!autopickup,menucolors,time,showexp,hilite_pet,hilite_pile,force_invmenu";
 
 interface Pending {
   id: number;
@@ -301,6 +301,7 @@ function PendingDialog({ pending, sheet, answer }: { pending: Pending; sheet: Ti
           how={r.how}
           prompt={r.prompt}
           items={r.items}
+          unlisted={r.unlisted}
           sheet={sheet}
           onDone={(selection) => answer({ kind: "menu", selection })}
         />

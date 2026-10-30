@@ -470,3 +470,16 @@ test("a count too big for the core stops growing, and the game carries on", asyn
   await expect(water).toBeHidden();
   await expect(page.locator(".messages")).toContainText(/You drop 4 potions/);
 });
+
+test("a command's menu of suitable items still takes any item's letter", async ({ page }) => {
+  await startAs(page, `Unlisted${Date.now() % 100000}`, /Priest/);
+  const mace = (await page.locator(".inv-item", { hasText: "mace" }).locator(".inv-letter").innerText()).trim();
+  await page.keyboard.press("q");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText(/drink/i);
+  await expect(dialog).toContainText("holy water");
+  await expect(dialog).not.toContainText("mace");
+  await page.keyboard.press(mace);
+  await expect(dialog).toBeHidden();
+  await expect(page.locator(".messages")).toContainText(/silly thing to drink/);
+});
