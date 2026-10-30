@@ -143,7 +143,9 @@ test("arrow keys answer a direction prompt", async ({ page }) => {
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText(/in what direction/i);
   await page.keyboard.press("ArrowLeft");
-  await expect(dialog).toBeHidden();
+  // what kicking west brings, a question about a pet there say, is another matter
+  await expect(page.locator(".direction-dialog")).toHaveCount(0);
+  await expect(page.locator(".messages")).toContainText(/In what direction\? h/);
 });
 
 test("the character picker starts the chosen role", async ({ page }) => {
