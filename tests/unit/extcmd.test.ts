@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { commandToRun, listCommands } from "../../src/port/extcmd";
+import { commandToRun, completionOf, listCommands } from "../../src/port/extcmd";
 import type { ExtCommand } from "../../src/protocol";
 
 const cmd = (index: number, name: string, description: string, autocompletes = true): ExtCommand => ({ index, name, description, autocompletes });
@@ -26,4 +26,14 @@ test("a name typed in full runs even without autocomplete, and beats the highlig
 test("otherwise the highlighted row runs, and nothing highlighted cancels", () => {
   expect(commandToRun(all, "pr", pray)).toBe(pray);
   expect(commandToRun(all, "zzz", undefined)).toBeNull();
+});
+
+test("a prefix only one command's name starts with completes to it, but not while deleting", () => {
+  expect(completionOf(all, "pi", "p")).toBe("pickup");
+  expect(completionOf(all, "Pr", "P")).toBe("pray");
+  expect(completionOf(all, "p", "")).toBeNull();
+  expect(completionOf(all, "pi", "pic")).toBeNull();
+  // terrain doesn't autocomplete
+  expect(completionOf(all, "te", "t")).toBeNull();
+  expect(completionOf(all, "pray", "pra")).toBeNull();
 });

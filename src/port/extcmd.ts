@@ -9,6 +9,14 @@ export function listCommands(commands: ExtCommand[], typed: string): ExtCommand[
   return [...byName, ...byHelp];
 }
 
+/** As tty, a prefix only one command starts with completes to its name, but not while deleting. */
+export function completionOf(commands: ExtCommand[], typed: string, before: string): string | null {
+  if (!typed || typed.length <= before.length) return null;
+  const t = typed.toLowerCase();
+  const named = commands.filter((c) => c.autocompletes && c.name.length > 1 && c.name.toLowerCase().startsWith(t));
+  return named.length === 1 && named[0].name.length > typed.length ? named[0].name : null;
+}
+
 /** A name typed in full runs, even one that doesn't autocomplete; otherwise the highlighted row. */
 export function commandToRun(commands: ExtCommand[], typed: string, highlighted: ExtCommand | undefined): ExtCommand | null {
   const t = typed.trim().toLowerCase();

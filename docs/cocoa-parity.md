@@ -63,7 +63,7 @@ Decided for the web:
 
 - [x] Save & Quit doesn't ask "Really save?" or "Overwrite the old file?" (`wincocoa.m` `AlwaysYes`).
 - [x] Equipment tooltips as Cocoa words them: "(a) +1 long sword", without "(being worn)" (`EquipmentView.m`).
-- [ ] Extended commands: a sole match is completed and selected as you type; Esc clears what's typed before it cancels (`ExtCommandWindowController.m`).
+- [x] Extended commands: a sole match is completed and selected as you type; Esc clears what's typed before it cancels (`ExtCommandWindowController.m`).
 - [ ] The bell, and a refused click or inventory pick, are heard or seen (`nhbell`, `NSBeep`).
 - [ ] Choose the ASCII map's font and size, remembered; choosing one switches to ASCII (`changeFont`).
 - [ ] An About box: NetHack, this port and the painted tiles by Kevin Tam, the classic tiles, the licence.

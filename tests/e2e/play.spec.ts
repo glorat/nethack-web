@@ -979,3 +979,22 @@ test("Option or Alt with a letter gives a meta command, such as loot", async ({ 
   );
   await expect(page.getByRole("dialog")).toContainText(/Loot in what direction/);
 });
+
+test("an extended command only one name starts with completes as it's typed, and Escape clears before it cancels", async ({ page }) => {
+  await startGame(page, `Ext${Date.now() % 100000}`);
+  await page.keyboard.press("#");
+  const dialog = page.getByRole("dialog");
+  const field = dialog.getByRole("textbox");
+  // typed at once, as a fast typist would
+  await page.keyboard.type("enha");
+  await expect(field).toHaveValue("enhance");
+  expect(await field.evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd])).toEqual([4, 7]);
+  // deleting the completion doesn't complete again
+  await page.keyboard.press("Backspace");
+  await expect(field).toHaveValue("enha");
+  await page.keyboard.press("Escape");
+  await expect(field).toHaveValue("");
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+});
