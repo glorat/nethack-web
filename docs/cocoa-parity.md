@@ -26,7 +26,7 @@ Decided for the web:
 
 ## Menus
 
-- [x] Default menu colours: blessed and holy water green, cursed and unholy water red, ahead of the player's `MENUCOLOR` rules (`wincocoa.m` `AddDefaultMenuColors`); `MENUCOLOR` attributes shown in the inventory sidebar too.
+- [x] Default menu colours: blessed and holy water green, cursed and unholy water red, after the player's `MENUCOLOR` rules so those win (`wincocoa.m` `AddDefaultMenuColors`); `MENUCOLOR` attributes shown in the inventory sidebar too.
 - [ ] Counts: digits typed before a letter take that many.
 - [ ] Any inventory letter is accepted in a suitable-items menu, not only those listed (`UnlistedInventory`).
 - [ ] Pick-any keys `.` `,` select all and `-` `\` clear; a Select All button.
@@ -52,7 +52,7 @@ Decided for the web:
 
 - [ ] Command menu grouped like Cocoa's menu bar (Act, Items, Magic, Info, …), each running `#` plus the command name, enabled only at the command prompt (`performMenuAction`, `validateMenuItem`).
 - [ ] Wizard Mode menu, shown only in wizard mode (`updateWizardMenu`).
-- [ ] Options file (`.nethackrc`) kept in the browser, editable, read at start.
+- [ ] Options file (`.nethackrc`) kept in the browser, editable, read at start. `#saveoptions` writes the default menu colours out as the player's own; don't add them again when the file has them.
 - [ ] Tile set choice between 64px and classic 16px, and the `tile_file` option (`setTileSet`).
 - [ ] Game-over dialog offers Quit as well as New Game (`showGameOver`).
 - [ ] Help: what a key does, NetHack Wiki search.
