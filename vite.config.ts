@@ -9,7 +9,8 @@ function publicFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) return publicFiles(path);
-    return name === "README" || name.startsWith(".") ? [] : [path];
+    // 404.html: hosts redirect .html addresses, and a cached redirect can't answer a navigation
+    return ["README", "404.html", "social.jpg"].includes(name) || name.startsWith(".") ? [] : [path];
   });
 }
 

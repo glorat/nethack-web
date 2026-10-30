@@ -1,0 +1,6 @@
+favicon.png, apple-touch-icon.png: the NetHack Cocoa application icon, resized,
+from https://github.com/glorat/nethack-cocoa win/cocoa/Resources/images/ at
+commit 3d9ea10b8, under the GNU General Public License, version 2, as that
+repository's win/cocoa is (see third-party-licenses.txt).
+
+screenshot.jpg, social.jpg: this game, in a scene set up in debug mode.

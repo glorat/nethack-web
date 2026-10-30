@@ -32,9 +32,9 @@ self.addEventListener("fetch", (event) => {
       const cached = await cache.match(request, { ignoreSearch: true, ignoreVary: true });
       if (cached) return cached;
       if (request.mode === "navigate") {
-        // not index.html: hosts that redirect it to the directory would cache a redirect, which a navigation can't take
-        const page = await cache.match(/\/play\/?$/.test(new URL(request.url).pathname) ? "./play/" : "./");
-        if (page) return page;
+        if (/\/play$/.test(new URL(request.url).pathname)) return (await cache.match("./play/")) ?? fetch(request);
+        // anywhere else is the host's to answer, with a 404 if nothing is there
+        return fetch(request).catch(async () => (await cache.match("./")) ?? Response.error());
       }
       return fetch(request);
     }),

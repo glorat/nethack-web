@@ -19,4 +19,7 @@ test("the production build plays offline after one visit", async ({ page, contex
 
   await page.reload();
   await expect(picker).toBeVisible({ timeout: 15_000 });
+
+  await page.goto(`${PROD}nowhere`);
+  await expect(page.getByText("Ready to play offline")).toBeVisible();
 });

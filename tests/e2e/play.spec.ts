@@ -103,6 +103,9 @@ test("the landing page opens without loading the game, and Back returns to it fr
   await expect(page.locator(".landing-shot")).toHaveJSProperty("complete", true);
   expect(core).toEqual([]);
 
+  for (const asset of ["/favicon.png", "/apple-touch-icon.png", "/social.jpg"]) expect((await page.request.get(asset)).ok()).toBe(true);
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", "https://nethack.app/social.jpg");
+
   const licence = await page.request.get("/license.txt");
   expect(await licence.text()).toContain("NETHACK GENERAL PUBLIC LICENSE");
 
