@@ -4,7 +4,7 @@ const PROD = "http://127.0.0.1:5198/";
 
 test("the production build plays offline after one visit", async ({ page, context }) => {
   await page.goto(PROD);
-  await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+  await expect(page.getByText("Ready to play offline")).toBeVisible({ timeout: 15_000 });
   // the first load isn't controlled yet; one reload puts the page under the worker
   await page.reload();
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
