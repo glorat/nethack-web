@@ -1,6 +1,5 @@
-favicon.png, apple-touch-icon.png: the NetHack Cocoa application icon, resized,
-from https://github.com/glorat/nethack-cocoa win/cocoa/Resources/images/ at
-commit 3d9ea10b8, under the GNU General Public License, version 2, as that
-repository's win/cocoa is (see third-party-licenses.txt).
+favicon.png, apple-touch-icon.png: the red dragon from the painted tiles,
+resized from its original, under the same copyright and licence as those tiles
+(see tiles/README).
 
 screenshot.jpg, social.jpg: this game, in a scene set up in debug mode.

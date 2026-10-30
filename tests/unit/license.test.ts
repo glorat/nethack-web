@@ -10,5 +10,5 @@ test("the licence the site and this repository carry is the core's", () => {
 });
 
 test("the third-party notices keep each project's copyright", () => {
-  for (const notice of ["Lua.org, PUC-Rio", "Jason Miller", "Emscripten authors", "Rich Felker", "GNU GENERAL PUBLIC LICENSE"]) expect(thirdParty).toContain(notice);
+  for (const notice of ["Lua.org, PUC-Rio", "Jason Miller", "Emscripten authors", "Rich Felker"]) expect(thirdParty).toContain(notice);
 });
