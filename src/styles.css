@@ -102,8 +102,12 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .stat-change.better { color: var(--hp); }
 .stat-change.worse { color: var(--danger); }
 .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-.badge { font-size: 11px; padding: 0 6px; border-radius: 8px; background: #4a3b10; color: #f0d070; }
-.badge.urgent { background: #5a1a1a; color: #ff8a8a; }
+/* Cocoa's: grey, then yellow, orange and red as it gets worse, darkened for white text to read */
+.badge { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 8px; }
+.badge.info { background: #444; color: var(--text); }
+.badge.caution { background: #f5c518; color: #000; }
+.badge.warning { background: #c2410c; color: #fff; }
+.badge.danger { background: #c0392b; color: #fff; }
 
 /* equipment */
 .equipment {

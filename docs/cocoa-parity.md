@@ -22,7 +22,7 @@ Decided for the web:
 ## Status
 
 - [x] Green/red ↑↓ beside St, Dx, Co, In, Wi, Ch, AC, XL or HD for a few turns after a change (`StatsView.m` `showChange`, `iHack/NhStatus.m`).
-- [ ] Badge colours by severity for hunger, encumbrance and conditions (`NhStatusBadge`).
+- [x] Badge colours by severity for hunger, encumbrance and conditions (`NhStatusBadge`).
 
 ## Menus
 

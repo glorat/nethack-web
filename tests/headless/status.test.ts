@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { encumbranceSeverity } from "../../src/port/badges";
 import { Session } from "./harness";
 
 async function polyself(g: Session, form: string) {
@@ -82,4 +83,28 @@ test("a level gained shows as up even with a hilite rule on experience level", a
     await g.skipText();
     expect(changed(g)).toContainEqual(["BL_XP", { direction: 1, improved: true }]);
   }
+});
+
+async function wish(g: Session, item: string) {
+  await g.send("\x17");
+  await g.getlin(item);
+  await g.skipText();
+}
+
+test("the conditions come most serious first, as the core ranks them", async () => {
+  const g = await (await Session.start({ wizard: true })).skipText();
+  await wish(g, "blindfold");
+  await wish(g, "cursed amulet of strangulation");
+  await g.send("P");
+  await g.yn(g.state.inventory.find((i) => /blindfold/.test(i.text))!.accelerator);
+  await g.send("P");
+  await g.yn(g.state.inventory.find((i) => /amulet/.test(i.text))!.accelerator);
+  expect(g.state.status.BL_CONDITION?.text).toBe("STRNGL BLIND");
+});
+
+test("encumbrance is graded from the text the core sends", async () => {
+  const g = await (await Session.start({ wizard: true })).skipText();
+  await wish(g, "loadstone");
+  await wish(g, "loadstone");
+  expect(encumbranceSeverity(g.state.status.BL_CAP!.text)).toBe("caution");
 });

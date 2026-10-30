@@ -1,3 +1,4 @@
+import { conditionSeverity, encumbranceSeverity, hungerSeverity, type Severity } from "../port/badges";
 import type { StatusValue } from "../protocol";
 import { nhColor } from "./colors";
 
@@ -10,8 +11,6 @@ const CONDITION_LABELS: Record<string, string> = {
   SUBMERGED: "Underwater", TERMILL: "Ill", TETHERED: "Tethered", TRAPPED: "Trapped",
   UNCONSC: "Unconscious", WOUNDEDL: "Wounded legs", HOLDING: "Holding",
 };
-
-const URGENT = new Set(["FOODPOIS", "TERMILL", "STONE", "SLIME", "STRNGL", "INLAVA"]);
 
 // the gold field is "<encoded gold glyph>:<amount>"; the glyph is "\G" plus 8 hex digits
 function clean(text: string | undefined): string {
@@ -61,7 +60,11 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
     );
   };
   const conditions = (fields.BL_CONDITION?.text ?? "").split(" ").filter(Boolean);
-  const badges = [value(fields, "BL_HUNGER"), value(fields, "BL_CAP")].filter(Boolean);
+  const hunger = value(fields, "BL_HUNGER");
+  const encumbrance = value(fields, "BL_CAP");
+  const badges = conditions.map((c): [string, Severity] => [CONDITION_LABELS[c] ?? c, conditionSeverity(c)]);
+  if (encumbrance) badges.unshift([encumbrance, encumbranceSeverity(encumbrance)]);
+  if (hunger) badges.unshift([hunger, hungerSeverity(hunger)]);
   const exp = value(fields, "BL_EXP");
   return (
     <div class="stats">
@@ -85,13 +88,10 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
         {fields.BL_TIME?.text ? stat("T", "BL_TIME") : null}
         {fields.BL_SCORE?.text ? stat("Score", "BL_SCORE") : null}
       </div>
-      {badges.length || conditions.length ? (
+      {badges.length ? (
         <div class="badges">
-          {badges.map((b) => (
-            <span class="badge">{b}</span>
-          ))}
-          {conditions.map((c) => (
-            <span class={`badge${URGENT.has(c) ? " urgent" : ""}`}>{CONDITION_LABELS[c] ?? c}</span>
+          {badges.map(([text, severity]) => (
+            <span class={`badge ${severity}`}>{text}</span>
           ))}
         </div>
       ) : null}

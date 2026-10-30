@@ -51,15 +51,13 @@ export interface GameHost {
   persist(): Promise<void>;
 }
 
-/** "BL_MASK_FOODPOIS" style names of the bits set in a BL_CONDITION mask. */
-function conditionNames(table: Record<string | number, string | number> | undefined, mask: number): string[] {
+/** "FOODPOIS" style names of the bits set in a BL_CONDITION mask, in `order`. */
+function conditionNames(table: Record<string | number, string | number> | undefined, order: number[], mask: number): string[] {
   if (!table) return [];
-  const names: string[] = [];
-  for (const [name, bit] of Object.entries(table)) {
-    if (typeof bit === "number" && name.startsWith("BL_MASK_") && (mask & bit) !== 0)
-      names.push(name.slice("BL_MASK_".length));
-  }
-  return names;
+  const names = new Map<number, string>();
+  for (const [name, bit] of Object.entries(table))
+    if (typeof bit === "number" && name.startsWith("BL_MASK_")) names.set(bit, name.slice("BL_MASK_".length));
+  return order.filter((bit) => (mask & bit) !== 0 && names.has(bit)).map((bit) => names.get(bit)!);
 }
 
 /** The fields that show an arrow when they change, and whether going up is good. */
@@ -495,6 +493,13 @@ export class Game {
     if (expired) this.emit({ type: "status", fields: this.statusWithChanges() });
   }
 
+  /** The condition bits most serious first, as tty and Cocoa show them. */
+  private conditionOrder(): number[] {
+    const order: number[] = [];
+    for (let i = 0, bit; (bit = this.m._nhweb_condition_mask(i) >>> 0); i++) order.push(bit);
+    return order;
+  }
+
   private statusFieldName(field: number): string {
     const constants = (globalThis as { nethackGlobal?: { constants?: Record<string, Record<string | number, string | number>> } })
       .nethackGlobal?.constants;
@@ -515,7 +520,7 @@ export class Game {
         return 0;
       case "BL_CONDITION": {
         const mask = ptr ? this.m.getValue(ptr, "i32") >>> 0 : 0;
-        this.status[name] = { text: conditionNames(constants?.CONDITION, mask).join(" "), color, percent, mask };
+        this.status[name] = { text: conditionNames(constants?.CONDITION, this.conditionOrder(), mask).join(" "), color, percent, mask };
         return 0;
       }
       default: {
