@@ -36,7 +36,7 @@ export function AboutDialog({ onClose }: { onClose(): void }) {
           .
         </p>
         <p>
-          Interface after{" "}
+          Modelled on{" "}
           <a href="https://github.com/glorat/nethack-cocoa" target="_blank" rel="noopener">
             nethack-cocoa
           </a>
