@@ -19,5 +19,11 @@ export default defineConfig({
       url: "http://127.0.0.1:5198/",
       reuseExistingServer: !process.env.CI,
     },
+    {
+      // reads dist/, which the preview server above has built by the time the tests start
+      command: "node scripts/serve-update-test.mjs 5197",
+      url: "http://127.0.0.1:5197/__next-version",
+      reuseExistingServer: !process.env.CI,
+    },
   ],
 });

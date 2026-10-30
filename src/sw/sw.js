@@ -8,9 +8,13 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) => cache.addAll(PRECACHE.map((path) => new Request(path, { cache: "reload" }))))
-      .then(() => self.skipWaiting()),
+      .then((cache) => cache.addAll(PRECACHE.map((path) => new Request(path, { cache: "reload" })))),
   );
+});
+
+// a new version waits for the landing page to ask, so that it never takes over from a game in progress
+self.addEventListener("message", (event) => {
+  if (event.data === "activate") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
