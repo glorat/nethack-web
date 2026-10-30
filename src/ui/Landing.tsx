@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { WIKI_URL } from "../port/describe";
 import { playerName, PLAY_PATH, savedName, saveName } from "../port/name";
 import { saveOptions, savedOptions } from "../port/options";
@@ -11,6 +11,10 @@ export function Landing() {
   const [name, setName] = useState(remembered);
   const [editingOptions, setEditingOptions] = useState(false);
   const [about, setAbout] = useState(false);
+  const [offlineReady, setOfflineReady] = useState(false);
+  useEffect(() => {
+    if (import.meta.env.PROD) navigator.serviceWorker?.ready.then(() => setOfflineReady(true));
+  }, []);
   const valid = playerName(name).length > 0;
   return (
     <div class="landing">
@@ -31,7 +35,7 @@ export function Landing() {
             }}
           >
             <h1>NetHack</h1>
-            <p class="start-sub">The classic dungeon crawl, on your device. A saved game under your name is restored.</p>
+            <p class="start-sub">The classic dungeon crawl, played entirely on your device. No account, no server, and no connection needed once it's loaded.</p>
             {changing ? (
               <>
                 <label for="name">Who are you?</label>
@@ -49,10 +53,25 @@ export function Landing() {
             <button type="button" onClick={() => setEditingOptions(true)}>
               Edit Options File...
             </button>
+            {offlineReady ? <p class="landing-ready">✓ Ready to play offline</p> : null}
           </form>
           <img class="landing-shot" src={`${import.meta.env.BASE_URL}screenshot.jpg`} alt="A NetHack game: the dungeon map in painted tiles, with stats, equipment, messages and inventory around it" />
         </section>
         <section class="landing-panels">
+          <div class="landing-panel">
+            <h2>Plays offline</h2>
+            <p>The whole game runs in your browser, on this device. No server plays it for you and your games aren't uploaded anywhere.</p>
+            <ul>
+              <li>Your first visit downloads the game, about 10 MB. After that it opens and plays with no connection, even on a plane.</li>
+              <li>You can close the tab at any time. Your game comes back when you next press Play.</li>
+              <li>There's nothing online to join: no multiplayer and no shared high scores.</li>
+            </ul>
+          </div>
+          <div class="landing-panel">
+            <h2>Your saved games</h2>
+            <p>A game is saved under your character's name, and playing under that name again restores it.</p>
+            <p class="landing-warning">Saved games are kept only in this browser on this device. They don't follow you to other devices, and clearing this site's data deletes them.</p>
+          </div>
           <div class="landing-panel">
             <h2>Playing</h2>
             <ul>
@@ -62,11 +81,6 @@ export function Landing() {
               <li><kbd>?</kbd> opens the game's help, and <kbd>S</kbd> saves and brings you back here.</li>
             </ul>
             <p>New to the game? The <a href={WIKI_URL} target="_blank" rel="noopener">NetHack Wiki</a> covers everything.</p>
-          </div>
-          <div class="landing-panel">
-            <h2>Your games</h2>
-            <p>The game runs on this device, and keeps working offline after your first visit. There's no account and nothing to install.</p>
-            <p class="landing-warning">Saved games are kept only in this browser. Clearing this site's data deletes them.</p>
           </div>
           <div class="landing-panel">
             <h2>About this site</h2>

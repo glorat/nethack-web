@@ -272,7 +272,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .landing-hero { display: flex; gap: 16px; align-items: stretch; }
 .landing-hero .start-card { flex: none; }
 .landing-shot { flex: 1; min-width: 0; object-fit: cover; object-position: left top; border: 1px solid var(--border); border-radius: 12px; }
-.landing-panels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.landing-panels { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 .landing-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
 .landing-panel h2 { margin: 0 0 8px; font-size: 15px; }
 .landing-panel p { margin: 8px 0 0; }
@@ -281,6 +281,8 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .landing-panel a { color: var(--accent); }
 .landing-panel kbd { font: 12px var(--mono); }
 .landing-warning { color: #e3b341; }
+.landing-ready { margin: 0; color: var(--hp); }
+.landing-panel ul { margin-top: 8px; }
 
 /* start screen */
 .start, .loading, .fatal { height: 100%; display: flex; align-items: center; justify-content: center; }
