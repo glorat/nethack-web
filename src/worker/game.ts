@@ -59,6 +59,10 @@ export interface GameHost {
   persist(): Promise<void>;
   /** No other tab is playing, so a game left unfinished can't be one still going on there. */
   readonly alone: boolean;
+  /** Seconds since 1970, for every time the core reads. */
+  now(): number;
+  /** An unguessable 32-bit seed, asked for at the start and at each level change. */
+  randomSeed(): number;
 }
 
 /** "FOODPOIS" style names of the bits set in a BL_CONDITION mask, in `order`. */
@@ -276,6 +280,10 @@ export class Game {
       case "shim_getmsghistory":
       case "shim_get_color_string":
         return "";
+      case "shim_now":
+        return this.host.now();
+      case "shim_random_seed":
+        return this.host.randomSeed();
       case "shim_doprev_message":
         return 0;
       case "shim_exit_nhwindows":

@@ -11,6 +11,20 @@ test("the same seed makes the same game, and another seed a different one", asyn
   expect(tiles(a)).not.toEqual(tiles(c));
 });
 
+test("the page's seeds make the game", async () => {
+  const play = async (pageSeed: number) => (await (await Session.start({ pageSeed })).skipText()).send("hjkl");
+  const [a, b, c] = [await play(3), await play(3), await play(4)];
+  expect(tiles(a)).toEqual(tiles(b));
+  expect(tiles(a)).not.toEqual(tiles(c));
+});
+
+test("the page's clock is the game's", async () => {
+  const moon = async (date?: string) =>
+    (await (await Session.start({ date })).skipText()).messages.some((t) => /full moon tonight/i.test(t));
+  expect(await moon("2024-01-25T12:00:00Z")).toBe(true);
+  expect(await moon()).toBe(false);
+});
+
 test("debug mode lets a test wish for an item", async () => {
   const g = await (await Session.start({ wizard: true })).skipText();
   await g.send("\x17");

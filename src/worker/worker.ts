@@ -93,6 +93,8 @@ async function start({ assetBase, options, config }: StartOptions): Promise<void
     },
     persist,
     alone: await soleTab(),
+    now: () => Math.floor(Date.now() / 1000),
+    randomSeed: () => crypto.getRandomValues(new Uint32Array(1))[0],
   };
 
   module = await createModule({

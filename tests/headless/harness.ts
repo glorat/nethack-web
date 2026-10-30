@@ -2,7 +2,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { afterEach, vi } from "vitest";
 import type { Answer, GameEvent, GameRequest, MapCell } from "../../src/protocol";
 import { applyEvents, cellAt, initialState, type GameState } from "../../src/port/state";
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
@@ -18,6 +17,9 @@ export interface SessionOptions {
   /** NETHACKOPTIONS character fields. */
   character?: string;
   seed?: number;
+  /** Seeds the page gives the core instead, which then reseeds at each level change as in play. */
+  pageSeed?: number;
+  /** The page's clock, which stands still. */
   date?: string;
   /** Debug mode, for ^W wishes, ^F maps and the like. */
   wizard?: boolean;
@@ -47,10 +49,6 @@ function cursorKeys(d: number, back: string, forward: string): string {
   const n = Math.abs(d);
   return key.toUpperCase().repeat(Math.floor(n / 8)) + key.repeat(n % 8);
 }
-
-afterEach(() => {
-  vi.useRealTimers();
-});
 
 /**
  * A game the test drives. Each step resolves once the core is waiting again:
@@ -82,7 +80,6 @@ export class Session {
   private constructor(private readonly m: Module) {}
 
   static async start(options: SessionOptions = {}): Promise<Session> {
-    vi.useFakeTimers({ toFake: ["Date"], now: new Date(options.date ?? DEFAULT_DATE) });
     const { default: createModule } = await import(pathToFileURL(resolve(ROOT, "public/nethack.js")).href);
     const nethackOptions = [
       `name:${options.name ?? "Tester"}`,
@@ -103,7 +100,7 @@ export class Session {
         (mod: Module) => {
           mod.ENV.USER = "player";
           mod.ENV.NETHACKOPTIONS = nethackOptions;
-          mod.ENV.NETHACK_SEED = String(options.seed ?? 1);
+          if (options.pageSeed === undefined) mod.ENV.NETHACK_SEED = String(options.seed ?? 1);
           // Emscripten's HOME, which it creates
           if (options.config !== undefined) mod.FS.writeFile(CONFIG_FILE, new TextEncoder().encode(options.config));
           mod.FS.mkdir("/save");
@@ -120,7 +117,7 @@ export class Session {
     const shared = (globalThis as { nethackGlobal?: { shimFunctionRunning?: unknown } }).nethackGlobal;
     if (shared) shared.shimFunctionRunning = null;
     session = new Session(m);
-    const game = new Game(m, session.host(!options.otherTab));
+    const game = new Game(m, session.host(options));
     session.game = game;
     // one callback name per session, so sessions don't share one global
     const callback = `nethackCallback${++sessions}`;
@@ -235,7 +232,8 @@ export class Session {
     return this.prompt as Extract<GameRequest, { kind: K }>;
   }
 
-  private host(alone: boolean) {
+  private host(options: SessionOptions) {
+    const now = Math.floor(new Date(options.date ?? DEFAULT_DATE).getTime() / 1000);
     return {
       post: (events: GameEvent[]) => {
         if (this.failPost?.(events)) {
@@ -261,7 +259,9 @@ export class Session {
           else this.settle();
         }),
       persist: async () => {},
-      alone,
+      alone: !options.otherTab,
+      now: () => now,
+      randomSeed: () => options.pageSeed ?? 0,
     };
   }
 
