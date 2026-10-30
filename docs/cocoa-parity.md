@@ -72,7 +72,15 @@ Decided for the web:
 ## Later
 
 - [ ] Importing a tile set, kept in the browser (`importTileSet`).
-- [ ] Sound (`sound/macsound`; Cocoa's bundle ships no sound files yet).
-- [ ] Speech of messages (`speakString`).
-- [ ] Notes window (`NotesWindowController.m`).
-- [ ] Reaching wizard mode from the browser (sysconf `WIZARDS`).
+- [ ] Sound: a core feature, not Cocoa's. 5.0 calls a sound library (`include/sndprocs.h`; `sound/macsound` and others) for effects, achievements, instrument tunes, ambience and user sounds. A web one would be a fork sound library passing these to Web Audio.
+  - **Clips:** the core ships 61 clips in `sound/wav` as uuencoded `.uu` files, about 6 MB. Decode them at build time, as `sys/unix/hints/include/multisnd2-pre.500` does, and consider a compressed format.
+  - **Credits:** some clips are CC BY 4.0 (`sound/wav/attributions.txt`), so the About box needs a credit.
+  - **Turning it off:** the `sounds` option, and play only after a gesture (as `src/ui/beep.ts` does).
+  - **Coverage:** few events have clips, so the payoff is modest.
+- [ ] Speech, in two parts:
+  - the core's spoken lines (`sound_verbal` with `SetVoice()`, which `macsound` speaks), through `speechSynthesis` in the same sound library;
+  - Cocoa's "Use Speech" toggle that reads every message aloud (`speakString`, called from `NhWindow.m`), a UI feature.
+- [ ] Notes window, only if someone asks. It's Cocoa-only: one free-text pad, kept across games (`NotesWindowController.m`). The core's `#annotate` and `#name` already cover per-game notes.
+- [ ] Reaching wizard mode from the browser, only if someone asks.
+  - **What's needed:** `sys/libnh/sysconf` has `WIZARDS=root games`, and the core's user is `web_user`, so `playmode:debug` is refused. Cocoa doesn't offer it to players either.
+  - **The catch:** opening it with `WIZARDS=*` first needs a fork guard in `can_make_bones()` refusing debug mode, as it refuses explore mode, because a debug game's bones would reach later normal games (the `wizard_bones` flag is never read).
