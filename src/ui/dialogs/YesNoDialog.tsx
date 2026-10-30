@@ -1,11 +1,13 @@
-import { useLayoutEffect } from "preact/hooks";
+import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { keyCode } from "../../port/keys";
+import { countKey } from "../../port/yn";
 
 interface Props {
   query: string;
   choices: string;
   defaultChoice: string;
-  onDone(key: string | null): void;
+  /** count: with '#', how many a counted answer takes. */
+  onDone(key: string | null, count?: number): void;
 }
 
 const LABELS: Record<string, string> = { y: "Yes", n: "No", q: "Quit", a: "All" };
@@ -24,12 +26,29 @@ function namedAnswers(query: string): Record<string, string> {
 export function YesNoDialog({ query, choices, defaultChoice, onDone }: Props) {
   const keys = buttons(choices);
   const named = namedAnswers(query);
+  // with '#' in the choices, digits typed first take only that many; a ref, for keys typed ahead
+  const allowsCount = choices.includes("#");
+  const count = useRef<number | null>(null);
+  const [, rerender] = useState(0);
+  const setCount = (n: number | null) => {
+    count.current = n;
+    rerender((r) => r + 1);
+  };
+  // Yes while counting takes the count, as the y key does
+  const answer = (k: string) => {
+    const step = k === "y" && count.current !== null ? countKey(count.current, "y") : null;
+    if (step && "answer" in step) return onDone(step.answer, step.count);
+    onDone(k);
+  };
   // layout effect: listen before the dialog is painted, or a fast key press is lost
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Shift" || e.key === "Control" || e.key === "Alt" || e.key === "Meta") return;
       e.preventDefault();
       e.stopPropagation();
+      const step = allowsCount ? countKey(count.current, e.key) : null;
+      if (step && "answer" in step) return onDone(step.answer, step.count);
+      if (step) return setCount(step.count);
       if (e.key === "Escape") return onDone(null);
       if (e.key === "Enter" || e.key === " ") return onDone(defaultChoice || null);
       // with no choices any key answers, as for "Open where? [.>]", so arrows map to hjkl as in play
@@ -48,9 +67,14 @@ export function YesNoDialog({ query, choices, defaultChoice, onDone }: Props) {
     <div class="dialog-backdrop">
       <div class="dialog yn-dialog" role="dialog">
         <div class="dialog-title">{query}</div>
+        {allowsCount ? (
+          <div class="hint">
+            {count.current !== null ? `Count: ${count.current}. Press Return to take that many.` : "Type a number first to take only that many."}
+          </div>
+        ) : null}
         <div class="dialog-buttons">
           {keys.map((k) => (
-            <button class={k === defaultChoice ? "primary" : undefined} onClick={() => onDone(k)}>
+            <button class={k === defaultChoice ? "primary" : undefined} onClick={() => answer(k)}>
               {named[k] ?? LABELS[k] ?? k}
             </button>
           ))}

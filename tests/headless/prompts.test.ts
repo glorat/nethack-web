@@ -90,3 +90,18 @@ test("a question with its own answers brings no direction keys", async () => {
   expect(g.prompt).toMatchObject({ kind: "yn", choices: expect.stringMatching(/y/) });
   expect((g.prompt as { directions?: string }).directions).toBeUndefined();
 });
+
+test("a counted answer to a question that allows one takes only that many", async () => {
+  const g = await (await Session.start({ character: "role:Priest,race:human,gender:female,align:neutral", options: "menustyle:traditional" })).skipText();
+  // with two things here, the pickup asks which kinds, then about each
+  for (const thing of [/holy water/, /garlic/]) {
+    await g.send("d");
+    await g.yn(g.state.inventory.find((i) => thing.test(i.text))!.accelerator);
+  }
+  await g.send(",");
+  await g.getlin("!");
+  expect(g.prompt).toMatchObject({ kind: "yn", query: expect.stringMatching(/Pick up 4 potions/), choices: "yn#aq" });
+  await g.answer({ kind: "yn", key: "#", count: 3 });
+  expect(g.state.inventory.find((i) => /holy water/.test(i.text))?.text).toMatch(/^3 potions/);
+  expect(g.messages).toContain("Pick up 4 potions of holy water? [yn#aq] (y) #3");
+});

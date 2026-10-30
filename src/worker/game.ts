@@ -36,6 +36,7 @@ const CLICK_PRIMARY = 1;
 const MENU_BEHAVE_PERMINV = 1;
 const MENU_ITEMFLAGS_SELECTED = 1;
 const ESC = 27;
+const HASH = "#".charCodeAt(0);
 
 interface Window {
   kind: number;
@@ -464,8 +465,11 @@ export class Game {
       directions: !choices && /direction/.test(query) ? this.m.UTF8ToString(this.m._nhweb_dirchars()) : undefined,
     });
     const code = ynAnswer(answer?.kind === "yn" ? answer.key : null, choices ?? "", def ? String.fromCharCode(def) : "");
+    const count = answer?.kind === "yn" && code === HASH && (choices ?? "").includes("#") ? (answer.count ?? 0) : null;
+    // as tty sets it for every question
+    this.m._nhweb_set_yn_number(count ?? 0);
     // the log keeps the question with its answer, as tty's message line does
-    this.emit({ type: "message", text: `${ynQuestion(query, choices ?? "", def ? String.fromCharCode(def) : "")} ${keyText(code)}`, attr: 0 });
+    this.emit({ type: "message", text: `${ynQuestion(query, choices ?? "", def ? String.fromCharCode(def) : "")} ${count !== null ? `#${count}` : keyText(code)}`, attr: 0 });
     // the shim returns a C char; a wider value throws in the callback and hangs the core
     return code > 0 && code < 128 ? code : ESC;
   }

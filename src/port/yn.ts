@@ -40,3 +40,24 @@ export function keyText(code: number): string {
   if (code >= 128) return `M-${keyText(code & 0x7f)}`;
   return String.fromCharCode(code);
 }
+
+// as Cocoa caps it
+const MOST_COUNT = 100000000;
+
+export type CountStep = { count: number | null } | { answer: string; count?: number };
+
+/**
+ * A key at a question that allows a count: digits (and '#') build the count, Backspace takes a digit back,
+ * Escape drops it, and Return, space or y answers '#' with it. Null for a key that isn't about a count.
+ */
+export function countKey(count: number | null, key: string): CountStep | null {
+  if (/^[0-9#]$/.test(key)) {
+    const n = count ?? 0;
+    return { count: key === "#" || n >= MOST_COUNT ? n : n * 10 + Number(key) };
+  }
+  if (count === null) return null;
+  if (key === "Backspace" || key === "Delete") return { count: count >= 10 ? Math.floor(count / 10) : null };
+  if (key === "Enter" || key === " " || key === "y" || key === "Y") return count > 0 ? { answer: "#", count } : { answer: "n" };
+  // Escape, or anything else, stops counting
+  return { count: null };
+}

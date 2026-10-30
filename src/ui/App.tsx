@@ -292,7 +292,7 @@ function PendingDialog({ pending, sheet, answer }: { pending: Pending; sheet: Ti
           query={r.query}
           choices={r.choices}
           defaultChoice={r.defaultChoice}
-          onDone={(key) => answer({ kind: "yn", key: key ?? "\x1b" })}
+          onDone={(key, count) => answer({ kind: "yn", key: key ?? "\x1b", count })}
         />
       );
     case "getlin":

@@ -111,7 +111,8 @@ export interface MenuSelection {
 
 /** Answer types, matched to GameRequest by kind. */
 export type Answer =
-  | { kind: "yn"; key: string }
+  /** count: with key "#", how many to take. */
+  | { kind: "yn"; key: string; count?: number }
   | { kind: "getlin"; text: string | null }
   | { kind: "menu"; selection: MenuSelection[] | null }
   | { kind: "text" }

@@ -34,6 +34,7 @@ export interface NetHackModule {
   _nhweb_condition_mask(i: number): number;
   _nhweb_invent_letters(): number;
   _nhweb_dirchars(): number;
+  _nhweb_set_yn_number(n: number): void;
   _nhweb_ascii_map(): number;
   _nhweb_set_ascii_map(on: number): void;
   _nhweb_dec_graphics(): number;
