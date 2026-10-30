@@ -10,9 +10,11 @@ import type { Answer, GameRequest } from "../protocol";
 import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port/tilesets";
 import { loadTileSheet, type TileSheet } from "../tiles";
 import { beep, wakeBeep } from "./beep";
+import type { AsciiFont } from "./ascii";
 import { AboutDialog } from "./dialogs/AboutDialog";
 import { DirectionDialog } from "./dialogs/DirectionDialog";
 import { ExtCommandDialog } from "./dialogs/ExtCommandDialog";
+import { FontDialog, SIZES } from "./dialogs/FontDialog";
 import { GameOverDialog } from "./dialogs/GameOverDialog";
 import { InputDialog } from "./dialogs/InputDialog";
 import { MenuDialog } from "./dialogs/MenuDialog";
@@ -45,6 +47,7 @@ const DEFAULT_CELL = 32;
 // with Cmd or Ctrl, as Cocoa's View menu has them; 0 is back to the starting size
 const ZOOM_KEYS: Record<string, -1 | 0 | 1> = { "=": 1, "+": 1, "-": -1, "0": 0 };
 const ASCII_KEY = "nethack.asciiMap";
+const ASCII_FONT_KEY = "nethack.asciiFont";
 const INVENTORY_KEY = "nethack.showInventory";
 const INVENTORY_WIDTH_KEY = "nethack.inventoryWidth";
 const TEXT_SIZE_KEY = "nethack.textSize";
@@ -133,6 +136,23 @@ function saveAscii(on: boolean) {
   } catch {}
 }
 
+function savedAsciiFont(): AsciiFont | null {
+  try {
+    const font = JSON.parse(localStorage.getItem(ASCII_FONT_KEY) ?? "null");
+    // a quote would break the CSS font it goes into
+    if (typeof font?.family === "string" && /^[^"\\]+$/.test(font.family) && SIZES.includes(font.size))
+      return { family: font.family, size: font.size };
+  } catch {}
+  return null;
+}
+
+function saveAsciiFont(font: AsciiFont | null) {
+  try {
+    if (font) localStorage.setItem(ASCII_FONT_KEY, JSON.stringify(font));
+    else localStorage.removeItem(ASCII_FONT_KEY);
+  } catch {}
+}
+
 const BASE_OPTIONS = "perm_invent,!autopickup,menucolors,time,showexp,hilite_pet,hilite_pile,force_invmenu";
 
 interface Pending {
@@ -150,6 +170,10 @@ export function App() {
   const [cell, setCellState] = useState(savedCell);
   const [editingOptions, setEditingOptions] = useState(false);
   const [about, setAbout] = useState(false);
+  const [choosingFont, setChoosingFont] = useState(false);
+  const [asciiFont, setAsciiFont] = useState(savedAsciiFont);
+  // the browser's own dialogs, during which the game hears no keys
+  const ownDialog = editingOptions || about || choosingFont;
   const [quit, setQuit] = useState(false);
   /** False if the browser wouldn't keep it, which the editor says. */
   const saveOptions = (text: string | null): boolean => {
@@ -475,7 +499,7 @@ export function App() {
       title: item.title,
       key: item.key,
       indent: item.indent,
-      disabled: !commanding || editingOptions || about,
+      disabled: !commanding || ownDialog,
       run: () => runCommand(item.command),
     };
   const menus: BarMenu[] = [
@@ -484,7 +508,7 @@ export function App() {
       entries: [
         ...GAME_MENU.slice(0, 1).map(command),
         // not over a question, whose keys the editor's text would answer
-        { title: "Edit Options File...", disabled: !!pending || about, run: () => setEditingOptions(true) },
+        { title: "Edit Options File...", disabled: !!pending || ownDialog, run: () => setEditingOptions(true) },
         ...GAME_MENU.slice(1).map(command),
         null,
         { title: "New Game", disabled: state.gameOver === null, run: () => location.reload() },
@@ -505,6 +529,12 @@ export function App() {
             if (ascii) toggleAscii?.(false);
           },
         })),
+        {
+          title: "Choose Font...",
+          // it switches to ASCII mode, and no question should come up over it
+          disabled: (!ascii && !toggleAscii) || (!commanding && state.gameOver === null) || ownDialog,
+          run: () => setChoosingFont(true),
+        },
         null,
         { title: "Zoom In", key: "⌘=", run: () => zoom(1) },
         { title: "Zoom Out", key: "⌘-", run: () => zoom(-1) },
@@ -537,7 +567,7 @@ export function App() {
         { title: "NetHack Wiki", run: () => window.open(WIKI_URL, "_blank", "noopener") },
         null,
         // only while the game waits for a command or has ended, so no question comes up over it
-        { title: "About NetHack", disabled: (!commanding && state.gameOver === null) || editingOptions, run: () => setAbout(true) },
+        { title: "About NetHack", disabled: (!commanding && state.gameOver === null) || ownDialog, run: () => setAbout(true) },
       ],
     },
   ];
@@ -567,6 +597,8 @@ export function App() {
             state={state}
             sheet={sheet}
             cell={cell}
+            scale={cell / DEFAULT_CELL}
+            asciiFont={asciiFont}
             ascii={ascii}
             onAscii={toggleAscii}
             describe={(x, y) => client.describe(x, y)}
@@ -592,7 +624,7 @@ export function App() {
           />
         ) : null}
         {!state.started ? <div class="overlay-note">Starting…</div> : null}
-        {state.gameOver !== null && !quit && !editingOptions && !about ? (
+        {state.gameOver !== null && !quit && !ownDialog ? (
           <GameOverDialog
             text={state.gameOver}
             onNewGame={() => location.reload()}
@@ -605,6 +637,19 @@ export function App() {
         ) : null}
         {optionsDialog}
         {about ? <AboutDialog onClose={() => setAbout(false)} /> : null}
+        {choosingFont ? (
+          <FontDialog
+            font={asciiFont}
+            onDone={(font) => {
+              setChoosingFont(false);
+              if (font === undefined) return;
+              setAsciiFont(font);
+              saveAsciiFont(font);
+              // choosing a font is choosing to see it, as in Cocoa
+              if (font && !ascii) toggleAscii?.(true);
+            }}
+          />
+        ) : null}
         {pending ? <PendingDialog pending={pending} sheet={sheet} answer={answer} passOn={(k) => typeAhead.current.unshift(k)} /> : null}
       </div>
     </div>

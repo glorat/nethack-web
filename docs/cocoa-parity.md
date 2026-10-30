@@ -65,7 +65,7 @@ Decided for the web:
 - [x] Equipment tooltips as Cocoa words them: "(a) +1 long sword", without "(being worn)" (`EquipmentView.m`).
 - [x] Extended commands: a sole match is completed and selected as you type; Esc clears what's typed before it cancels (`ExtCommandWindowController.m`).
 - [x] The bell, and a refused click or inventory pick, are heard or seen (`nhbell`, `NSBeep`).
-- [ ] Choose the ASCII map's font and size, remembered; choosing one switches to ASCII (`changeFont`).
+- [x] Choose the ASCII map's font and size, remembered; choosing one switches to ASCII (`changeFont`).
 - [x] An About box: NetHack, this port and the painted tiles by Kevin Tam, the classic tiles, the licence.
 - [ ] Closing the tab mid-game keeps the game (Cocoa saves on ⌘Q or closing the window, `terminateApplication`). Discuss the approach first: a page can't wait on a save as it unloads.
 

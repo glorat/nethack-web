@@ -1044,3 +1044,51 @@ test("the Help menu's About box credits NetHack, this version and the painted ti
   await page.waitForTimeout(500);
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
+
+test("Choose Font sets the ASCII map's font and size, switches to ASCII, and is kept", async ({ page }) => {
+  const name = `Font${Date.now() % 100000}`;
+  await startGame(page, name);
+  const canvas = page.locator(".map canvas");
+  const height = async () => Number(await canvas.getAttribute("height"));
+  const tiled = await height();
+  const choose = async () => {
+    await page.getByRole("menubar").getByRole("menuitem", { name: "View" }).click();
+    await page.getByRole("menu", { name: "View" }).getByRole("menuitem", { name: "Choose Font..." }).click();
+    return page.getByRole("dialog", { name: "ASCII map font" });
+  };
+
+  let dialog = await choose();
+  const font = dialog.getByLabel("Font");
+  const family = await font.locator("option").nth(1).textContent();
+  expect(family).toBeTruthy();
+  await font.selectOption(family!);
+  await dialog.getByLabel("Size").selectOption("24");
+  await dialog.getByRole("button", { name: "OK" }).click();
+  await expect(page.getByRole("button", { name: "ASCII" })).toHaveAttribute("aria-pressed", "true");
+  // the font's lines set the rows, not the tiles
+  await expect.poll(height).not.toBe(tiled);
+  const chosen = await height();
+  await page.screenshot({ path: "test-results/ascii-font.png" });
+
+  await page.reload();
+  await page.getByLabel("Who are you?").fill(`${name}b`);
+  await page.getByRole("button", { name: "Play" }).click();
+  await untilPlaying(page);
+  await expect.poll(height).toBe(chosen);
+
+  dialog = await choose();
+  await expect(dialog.getByLabel("Font")).toHaveValue(family!);
+  // Return on Cancel cancels
+  await dialog.getByLabel("Font").selectOption("");
+  await dialog.getByRole("button", { name: "Cancel" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(dialog).toBeHidden();
+  expect(await height()).toBe(chosen);
+
+  dialog = await choose();
+  await dialog.getByLabel("Font").selectOption("");
+  await page.keyboard.press("Enter");
+  await expect(dialog).toBeHidden();
+  await expect.poll(height).toBe(tiled);
+  expect(await page.evaluate(() => localStorage.getItem("nethack.asciiFont"))).toBeNull();
+});

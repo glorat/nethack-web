@@ -3,7 +3,7 @@ import { cursorColor } from "../port/cursor";
 import { tooltipText, wikiTerm, wikiUrl } from "../port/describe";
 import { COLNO, ROWNO, type GameState } from "../port/state";
 import { drawTile, type TileSheet } from "../tiles";
-import { asciiCell, drawSymbol } from "./ascii";
+import { asciiCell, type AsciiFont, drawSymbol } from "./ascii";
 import { drawMarks } from "./marks";
 import { clipAround } from "./scroll";
 import petMarkUrl from "./petmark.png";
@@ -12,7 +12,11 @@ interface Props {
   state: GameState;
   sheet: TileSheet;
   cell: number;
+  /** How far the map is zoomed from its starting size. */
+  scale: number;
   ascii: boolean;
+  /** The player's choice for the ASCII map, else the default. */
+  asciiFont: AsciiFont | null;
   /** Absent until the core has read its options, which would overrule a switch made before. */
   onAscii?(on: boolean): void;
   onClick(x: number, y: number, button: number): void;
@@ -46,7 +50,7 @@ const PINCH_STEP = 15;
 const CLICK_PRIMARY = 1;
 const CLICK_SECONDARY = 2;
 
-export function MapView({ state, sheet, cell, ascii, onAscii, onClick, describe, onZoom, onShowInventory }: Props) {
+export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, onClick, describe, onZoom, onShowInventory }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const pane = useRef<HTMLDivElement>(null);
@@ -71,9 +75,9 @@ export function MapView({ state, sheet, cell, ascii, onAscii, onClick, describe,
   // what was under the mouse may have moved or gone
   useEffect(cancelTooltip, [state.map]);
 
-  const text = ascii ? asciiCell(cell) : null;
+  const text = ascii ? asciiCell(cell, asciiFont, scale) : null;
   const width = text?.width ?? cell;
-  const height = cell;
+  const height = text?.height ?? cell;
   // BL_HP is the polymorphed form's while polymorphed, as Cocoa's u.mh
   const cursorStroke = cursorColor(Number(state.status.BL_HP?.text), Number(state.status.BL_HPMAX?.text));
 

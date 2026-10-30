@@ -196,6 +196,9 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .about-dialog { width: min(480px, 92vw); }
 .about-dialog p { margin: 0; line-height: 1.45; }
 .about-dialog a { color: var(--accent); }
+.font-choice { display: flex; gap: 8px; }
+.font-choice select:first-child { flex: 1; }
+.font-sample { font: bold 18px var(--mono); background: #000; color: #bfbfbf; padding: 10px; border-radius: 6px; white-space: pre; overflow: hidden; }
 .dialog-backdrop.clear { background: none; }
 .direction-dialog { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 0; width: calc(3 * 64px + 2 * 6px + 28px + 2px); }
 .direction-grid { display: grid; grid-template-columns: repeat(3, 64px); gap: 6px; }
