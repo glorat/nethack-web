@@ -35,10 +35,14 @@ export function recordingFileName(text: string): string {
 }
 
 export function downloadRecording(text: string): void {
+  downloadText(text, recordingFileName(text));
+}
+
+export function downloadText(text: string, name: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
   const a = document.createElement("a");
   a.href = url;
-  a.download = recordingFileName(text);
+  a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

@@ -88,6 +88,10 @@ export class Session {
   output: string[] = [];
   /** The recording's lines, as the recorder streamed them out. */
   recorded: string[] = [];
+  /** Those lines as they came, a batch at a time. */
+  batches: { lines: string[]; atPrompt: boolean }[] = [];
+  /** What the recording held before those lines, for a game that came back. */
+  before: string | null = null;
   /** The whole recording, once the game has ended. */
   recording: string | null = null;
   /** /save as it was at the last persist, which is all a closed page would have kept. */
@@ -181,7 +185,11 @@ export class Session {
     return new Recorder(this.liveHost ??= this.host(options), m, {
       options: nethackOptions,
       config,
-      stream: (lines) => this.recorded.push(...lines),
+      stream: (lines, atPrompt) => {
+        this.recorded.push(...lines);
+        this.batches.push({ lines, atPrompt });
+      },
+      before: (text) => (this.before = text),
       finished: (text) => (this.recording = text),
       resume: options.resume ? (text, name) => this.resume(options, text, name) : undefined,
     });

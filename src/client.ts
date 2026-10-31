@@ -4,10 +4,16 @@ import type {
   GameRequest,
   ReplayControl,
   ReplayMessage,
+  ShadowStatus,
   StartOptions,
   UiMessage,
   WorkerMessage,
 } from "./protocol";
+
+export interface DebugFiles {
+  files: Record<string, Uint8Array>;
+  bones: Record<string, Uint8Array>;
+}
 
 export interface ClientHandlers {
   events(events: GameEvent[]): void;
@@ -20,6 +26,7 @@ export class GameClient {
   private readonly worker: Worker;
   private readonly descriptions = new Map<number, (text: string | null) => void>();
   private nextDescribeId = 1;
+  private readonly debugFiles = new Map<number, (files: DebugFiles) => void>();
 
   constructor(handlers: ClientHandlers) {
     this.worker = new Worker(new URL("./worker/worker.ts", import.meta.url), { type: "module" });
@@ -30,7 +37,10 @@ export class GameClient {
       else if (msg.type === "description") {
         this.descriptions.get(msg.id)?.(msg.text);
         this.descriptions.delete(msg.id);
-      } else handlers.replay?.(msg);
+      } else if (msg.type === "debug_files") {
+        this.debugFiles.get(msg.id)?.({ files: msg.files, bones: msg.bones });
+        this.debugFiles.delete(msg.id);
+      } else if (msg.type !== "shadow_status") handlers.replay?.(msg);
     };
     this.worker.onerror = (ev) => handlers.events([{ type: "error", text: ev.message || "worker failed" }]);
   }
@@ -74,5 +84,33 @@ export class GameClient {
     const id = this.nextDescribeId++;
     this.send({ type: "describe", id, x, y });
     return new Promise((resolve) => this.descriptions.set(id, resolve));
+  }
+
+  /** The game's files, and the bones with these hashes, for a debug package. */
+  files(hashes: string[]): Promise<DebugFiles> {
+    const id = this.nextDescribeId++;
+    this.send({ type: "debug_files", id, hashes });
+    return new Promise((resolve) => this.debugFiles.set(id, resolve));
+  }
+}
+
+/** Main-thread handle on a second core, following the game by its recording. */
+export class ShadowClient {
+  private readonly worker = new Worker(new URL("./worker/worker.ts", import.meta.url), { type: "module" });
+
+  constructor(assetBase: string, status: (status: ShadowStatus) => void) {
+    this.worker.onmessage = (ev: MessageEvent<WorkerMessage>) => {
+      if (ev.data.type === "shadow_status") status(ev.data.status);
+    };
+    this.worker.onerror = (ev) => status({ state: "mismatch", turn: 0, message: ev.message || "the shadow's worker failed" });
+    this.worker.postMessage({ type: "shadow", assetBase } satisfies UiMessage);
+  }
+
+  before(text: string): void {
+    this.worker.postMessage({ type: "shadow_before", text } satisfies UiMessage);
+  }
+
+  lines(lines: string[], atPrompt: boolean): void {
+    this.worker.postMessage({ type: "shadow_lines", lines, atPrompt } satisfies UiMessage);
   }
 }

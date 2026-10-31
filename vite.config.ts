@@ -1,4 +1,5 @@
 /// <reference types="vitest/config" />
+import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -52,8 +53,16 @@ function nethackVersion(): string {
   return [level("VERSION_MAJOR"), level("VERSION_MINOR"), level("PATCHLEVEL")].join(".");
 }
 
+function coreCommit(): string {
+  try {
+    return execSync("git -C nethack rev-parse --short HEAD", { cwd: new URL(".", import.meta.url), encoding: "utf8" }).trim();
+  } catch {
+    return "unknown";
+  }
+}
+
 export default defineConfig({
-  define: { __NETHACK_VERSION__: JSON.stringify(nethackVersion()) },
+  define: { __NETHACK_VERSION__: JSON.stringify(nethackVersion()), __CORE_COMMIT__: JSON.stringify(coreCommit()) },
   plugins: [preact(), serviceWorker()],
   worker: { format: "es" },
   build: {

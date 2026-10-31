@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
-import { GameClient } from "../client";
+import { GameClient, ShadowClient } from "../client";
 import { WIKI_URL } from "../port/describe";
 import { commandToRun, listCommands } from "../port/extcmd";
 import { ArrowChords, keyCode, takeLine, type KeyLike } from "../port/keys";
@@ -7,8 +7,10 @@ import { playerName, PLAY_PATH, savedName } from "../port/name";
 import { configFile, OPTIONS_KEY, savedOptions, savedOptionsFile, saveOptions as keepOptions } from "../port/options";
 import { applyEvents, initialState, nextBatch } from "../port/state";
 import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, textSizeFromOptions } from "../port/textsize";
-import type { Answer, GameRequest, ReplayProgress } from "../protocol";
-import { downloadRecording, keepLastGame, lastGame, lastTurn } from "../port/recording";
+import type { Answer, GameRequest, ReplayProgress, ShadowStatus } from "../protocol";
+import { buildDebugPackage, debugPackageName, namedBones } from "../port/debug-package";
+import { downloadRecording, downloadText, keepLastGame, lastGame, lastTurn } from "../port/recording";
+import { shadowWanted } from "../port/shadow";
 import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port/tilesets";
 import { loadTileSheet, type TileSheet } from "../tiles";
 import { beep, wakeBeep } from "./beep";
@@ -32,6 +34,7 @@ import { type BarMenu, MenuBar, type MenuEntry } from "./MenuBar";
 import { COMMAND_MENUS, type CommandItem, GAME_MENU, HELP_MENU, WIZARD_MENU } from "./commands";
 import { MessageView } from "./MessageView";
 import { ReplayBar, REPLAY_SPEEDS } from "./ReplayBar";
+import { ShadowBar } from "./ShadowBar";
 import { StatsView } from "./StatsView";
 
 const TILE_SET_KEY = "nethack.tileSet";
@@ -166,6 +169,11 @@ export function App() {
   const replayLastTurn = useMemo(() => (replay?.text ? lastTurn(replay.text) : 0), [replay]);
   /** The game's recording, once it has ended, and whether the browser kept it for replaying. */
   const [recorded, setRecorded] = useState<{ text: string; kept: boolean } | null>(null);
+  // a developer's option: a second core follows the game by its recording, to catch one that would replay differently
+  const shadow = useRef<ShadowClient | null>(null);
+  const shadowRecording = useRef("");
+  const [shadowStatus, setShadowStatus] = useState<ShadowStatus | null>(null);
+  const [shadowing] = useState(() => !replay && shadowWanted());
   const [sheet, setSheet] = useState<TileSheet | null>(null);
   const [state, setState] = useState(initialState);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -304,6 +312,14 @@ export function App() {
                 localStorage.setItem(OPTIONS_KEY, savedOptionsFile(e.text, BASE_OPTIONS));
               } catch {}
             if (e.type === "recording") setRecorded({ text: e.text, kept: keepLastGame(e.text) });
+            if (e.type === "recorded_before") {
+              shadowRecording.current = e.text;
+              shadow.current?.before(e.text);
+            }
+            if (e.type === "recorded" && shadow.current) {
+              if (e.lines.length) shadowRecording.current += `${e.lines.join("\n")}\n`;
+              shadow.current.lines(e.lines, e.atPrompt);
+            }
           }
         },
         request: (id, request) => {
@@ -505,7 +521,10 @@ export function App() {
     }
     const name = playerName(new URLSearchParams(location.search).get("name") ?? savedName());
     if (!name) location.replace(LANDING_PATH);
-    else if (sheet && !playing) start(name);
+    else if (sheet && !playing) {
+      if (shadowing) shadow.current = new ShadowClient(new URL(import.meta.env.BASE_URL, location.href).href, setShadowStatus);
+      start(name);
+    }
   }, [sheet]);
 
   // replace: Back from the landing page shouldn't start another game
@@ -676,6 +695,17 @@ export function App() {
         ) : null}
         {pending ? <PendingDialog pending={pending} sheet={sheet} answer={answer} passOn={(k) => typeAhead.current.unshift(k)} /> : null}
       </div>
+      {shadowing ? (
+        <ShadowBar
+          status={shadowStatus}
+          onDownload={async () => {
+            const text = recorded?.text ?? shadowRecording.current;
+            const { files, bones } = await client.files(namedBones(text));
+            const made = { recording: text, files, bones, shadow: shadowStatus };
+            downloadText(buildDebugPackage(made), debugPackageName());
+          }}
+        />
+      ) : null}
       {replay?.text ? (
         <ReplayBar
           progress={replayProgress}

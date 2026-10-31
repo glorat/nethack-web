@@ -7,7 +7,7 @@ A recording holds everything a game took from the page: what the player typed, c
 ## Where it's kept
 
 - **While the game lasts:** under `/save/replay/<game>/`, in numbered chunks (`000001`, `000002`, …) of about 64 KB. IndexedDB rewrites a whole file when it changes, so only the last chunk gets rewritten.
-- **As it's written:** each new line is also posted to the page as a `recorded` event, for sending on.
+- **As it's written:** each new line is also posted to the page as a `recorded` event, for sending on. `atPrompt` marks when the core has stopped to wait, so that everything it did since the last wait is there.
 - **When the game ends:** the whole text goes to the page as a `recording` event, which keeps it in localStorage (`nethack.lastGame`), and the chunks are deleted.
 
 ## Lines
@@ -73,3 +73,13 @@ The web build never reads the high score list during play, only to rank a finish
 In the browser, `/play/?replay` plays the last finished game, which each game over replaces, and only the end screen offers a button for it. Recordings aren't versioned: one that no longer plays, as after an upgrade that changed the game, or that's corrupted, is reported only as no longer available. `src/worker/replay-runner.ts` plays it at a chosen number of turns a second, flashing each prompt the player answered at 1× and slower, and seeks by playing again from the start without showing the way.
 
 `tests/headless/golden/` holds long recorded games that every test run replays, so a change that alters how the game plays fails there. `GOLDEN=write pnpm test golden` records them afresh, after a change meant to alter play.
+
+## Shadowing a game
+
+For developers. `/play/?shadow` turns it on for this browser and `?shadow=0` turns it off. A second worker runs its own core, replaying the recording as it's written (`src/worker/shadow.ts`) and checking every mark, so a game that wouldn't replay shows up while it's played. It only reads, and can't affect the game. A bar shows how it's getting on.
+
+The bar's **Download Debug Package** gives a JSON file with the recording so far, the bones it names, both sides' game files if it found a difference, and the build. To replay one on the headless core:
+
+```
+PACKAGE=/path/to/package.json pnpm test debug-package
+```
