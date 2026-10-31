@@ -18,7 +18,7 @@ async function shadowOf(g: Session, tamper: (line: string) => string = (l) => l)
   return statuses;
 }
 
-const options: SessionOptions = { pageSeed: 7, seedsVary: true, options: "time" };
+const options: SessionOptions = { pageSeed: 7, seedsVary: true, options: "time", shadowed: true };
 
 async function quit(g: Session): Promise<void> {
   await g.send("#");
@@ -78,11 +78,11 @@ test("a shadow gets past a session that was cut short, to follow the game recove
 test("a shadow says where the game went differently, with its files", async () => {
   const g = await (await Session.start(options)).skipText();
   await g.send("s".repeat(45));
-  // the second check, past what the shadow starts with
+  // the second one, past what the shadow starts with; nothing else can show a difference this slight
   let checks = 0;
-  const statuses = await shadowOf(g, (l) => (/^\d+ = /.test(l) && ++checks === 2 ? l.replace(/ [0-9a-f]{16} /, ` ${"0".repeat(16)} `) : l));
+  const statuses = await shadowOf(g, (l) => (/^\d+ lv /.test(l) && ++checks === 2 ? l.replace(/ [0-9a-f]{16}$/, ` ${"0".repeat(16)}`) : l));
   const last = statuses.at(-1)!;
   expect(last.state).toBe("mismatch");
-  expect(last.message).toMatch(/^line \d+ \(= /);
+  expect(last.message).toMatch(/^line \d+ \(lv /);
   expect(Object.keys(last.files!)).toContain("0Tester.0");
 });

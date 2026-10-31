@@ -163,6 +163,7 @@ async function start({ assetBase, options, config, shadowed }: StartOptions): Pr
       options: coreOptions,
       config: coreConfig,
       stream: (lines, atPrompt) => send({ type: "events", events: [{ type: "recorded", lines, atPrompt }] }),
+      shadowed,
       before: shadowed ? (text) => send({ type: "events", events: [{ type: "recorded_before", text }] }) : undefined,
       finished: (text) => send({ type: "events", events: [{ type: "recording", text }] }),
       resume,

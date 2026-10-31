@@ -42,6 +42,8 @@ export interface SessionOptions {
   otherTab?: boolean;
   /** How many days ago the files in `saves` were last written. */
   savesAge?: number;
+  /** Record for a shadow on this same build. */
+  shadowed?: boolean;
   /** Bring a game left unfinished back by replaying its recording, as the page does. */
   resume?: boolean;
   /** Keep bones a debug-mode game leaves, which the page doesn't, as dying there is the easy way to get some. */
@@ -190,6 +192,7 @@ export class Session {
         this.batches.push({ lines, atPrompt });
       },
       before: (text) => (this.before = text),
+      shadowed: options.shadowed,
       finished: (text) => (this.recording = text),
       resume: options.resume ? (text, name) => this.resume(options, text, name) : undefined,
     });
