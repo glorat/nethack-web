@@ -100,7 +100,7 @@ export function parseAnswer(request: GameRequest, rest: string): Answer | null {
       return { kind: "ext_cmd", index: command.index };
     }
     case "player": {
-      const [role, race, gender, align] = JSON.parse(rest) as (string | null)[];
+      const [role, race, gender, align] = JSON.parse(rest) as (string | number)[];
       const { roles, races } = request.choices;
       return {
         kind: "player",
@@ -124,9 +124,9 @@ function menuSelection(items: MenuItem[], pick: MenuPick): MenuSelection {
   return { identifier: item.identifier, count };
 }
 
-// a pick left open, for the core to choose
-function pickNumber(names: string[], name: string | null): number {
-  if (name === null) return -1;
+// a number is a pick left to the core, as ROLE_NONE and ROLE_RANDOM are
+function pickNumber(names: string[], name: string | number): number {
+  if (typeof name === "number") return name;
   const at = names.indexOf(name);
   if (at < 0) throw new ReplayError(`there's no choice ${name}`);
   return at;
@@ -339,7 +339,7 @@ export class ReplayHost implements GameHost {
         return true;
       }
       case "lv": {
-        if (!this.hooks.sameBuild) return true;
+        if (!this.hooks.sameBuild || first === "-") return true;
         const hash = levelsHash(this.m);
         if (hash !== first) this.fail(line, `the game's files hash to ${hash}`);
         return true;

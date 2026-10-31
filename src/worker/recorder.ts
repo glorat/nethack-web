@@ -67,9 +67,9 @@ function menuPick(request: GameRequest, { identifier, count }: MenuSelection): [
 export const GENDERS = ["male", "female"];
 export const ALIGNS = ["lawful", "neutral", "chaotic"];
 
-function playerPick(request: GameRequest, { role, race, gender, align }: PlayerPick): (string | null)[] {
+function playerPick(request: GameRequest, { role, race, gender, align }: PlayerPick): (string | number)[] {
   const choices = request.kind === "player" ? request.choices : null;
-  return [choices?.roles[role]?.name, choices?.races[race]?.name, GENDERS[gender], ALIGNS[align]].map((n) => n ?? null);
+  return [choices?.roles[role]?.name ?? role, choices?.races[race]?.name ?? race, GENDERS[gender] ?? gender, ALIGNS[align] ?? align];
 }
 
 export const ANSWER_TAGS: Record<GameRequest["kind"], string> = {

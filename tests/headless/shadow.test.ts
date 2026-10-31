@@ -75,6 +75,17 @@ test("a shadow gets past a session that was cut short, to follow the game recove
   expect(last.turn).toBeGreaterThan(60);
 });
 
+test("a shadow doesn't compare files hashed before it started, perhaps on another build", async () => {
+  const first = await (await Session.start(options)).skipText();
+  await first.send("s".repeat(45));
+  await first.send("S");
+  const g = await (await Session.start({ ...options, saves: first.saves() })).skipText();
+  await g.send("s".repeat(5));
+  expect(g.before).toMatch(/^\d+ lv /m);
+  g.before = g.before!.replace(/^(\d+ lv) \S+$/gm, `$1 ${"0".repeat(16)}`);
+  expect((await shadowOf(g)).at(-1)).toMatchObject({ state: "following" });
+});
+
 test("a shadow says where the game went differently, with its files", async () => {
   const g = await (await Session.start(options)).skipText();
   await g.send("s".repeat(45));

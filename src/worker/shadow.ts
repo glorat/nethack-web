@@ -26,7 +26,8 @@ export class Shadow {
 
   /** What the recording already held, before the lines to come. */
   before(text: string): void {
-    this.beforeText = text;
+    // an earlier build may have written these, and a rebuild moves the pointers they hash
+    this.beforeText = text.replace(/^(\d+ lv) \S+$/gm, "$1 -");
   }
 
   add(lines: string[], atPrompt: boolean): void {
