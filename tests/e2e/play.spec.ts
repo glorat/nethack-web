@@ -1198,7 +1198,8 @@ test("a finished game can be replayed from its end screen or its address, reload
   page.on("pageerror", (e) => errors.push(e.message));
   const name = `Rep${Date.now() % 100000}`;
   await startGame(page, name);
-  for (let i = 0; i < 6; i++) await page.keyboard.press("s");
+  // m: a plain search won't pass time beside a monster, which a random start can be
+  for (let i = 0; i < 6; i++) await page.keyboard.type("ms");
   await page.keyboard.press("#");
   await page.keyboard.type("quit");
   await page.keyboard.press("Enter");
@@ -1278,7 +1279,8 @@ test.describe("shadowing a game", () => {
     await page.addInitScript(() => localStorage.setItem("nethack.shadow", "1"));
     const name = `Sha${Date.now() % 100000}`;
     await startGame(page, name);
-    for (let i = 0; i < 25; i++) await page.keyboard.press("s");
+    // m: a plain search won't pass time beside a monster, which a random start can be
+    for (let i = 0; i < 25; i++) await page.keyboard.type("ms");
     await expect(bar(page)).toContainText("following");
     await expect.poll(() => turnsIn(page), { timeout: 15000 }).toBeGreaterThan(5);
 
