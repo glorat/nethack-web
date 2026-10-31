@@ -41,6 +41,7 @@ pnpm run build           # dist/, a static site that works offline
 ```sh
 pnpm test                # unit tests, plus scenarios played on the real core in Node
 pnpm run test:e2e        # Playwright: play, save/restore, offline
+pnpm run test:e2e:update # Playwright, on demand: a new version taking over
 ```
 
 Scenario tests in `tests/headless` drive the core through `Session` in `tests/headless/harness.ts`. Each step resolves once the core is waiting again, with what it asks for in `session.prompt` and the map, messages, status and inventory in `session.state`.

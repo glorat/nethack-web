@@ -25,6 +25,7 @@
 ## Tests
 
 - `pnpm test`: unit tests and headless scenarios on the real core in Node (about 1s). `pnpm run test:e2e`: Playwright (about 30s). Run both before committing; CI runs both too.
+- `pnpm run test:e2e:update`: how a new version of the service worker takes over (about 45s). Not part of `test:e2e` or CI, so run it after changing the service worker or the update flow.
 - Prefer a headless scenario (`tests/headless`, via `Session` in `harness.ts`) to an e2e test unless the behaviour lives in the UI.
 - Scenarios are deterministic: `seed` sets `NETHACK_SEED`, `date` fakes `Date`, `wizard: true` allows debug-mode commands, and `failPost` makes a window callback throw once.
 - When fixing a bug, check its test fails without the fix.
