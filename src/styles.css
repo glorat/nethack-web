@@ -302,3 +302,9 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .inventory, .inv-resize, .show-inventory { display: none; }
   .top { height: auto; flex-wrap: wrap; }
 }
+
+.replay-bar { display: flex; flex: none; align-items: center; gap: 8px; flex-wrap: wrap; padding: 4px 8px; background: var(--panel-2); border-top: 1px solid var(--border); }
+.replay-bar input[type="range"] { flex: 1 1 160px; min-width: 120px; }
+.replay-turn { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.replay-error { color: #f28b82; }
+.replay-spacer { flex: 1 1 0; }

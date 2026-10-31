@@ -3,11 +3,12 @@ import { GameClient } from "../client";
 import { WIKI_URL } from "../port/describe";
 import { commandToRun, listCommands } from "../port/extcmd";
 import { ArrowChords, keyCode, takeLine, type KeyLike } from "../port/keys";
-import { playerName, savedName } from "../port/name";
+import { playerName, PLAY_PATH, savedName } from "../port/name";
 import { configFile, OPTIONS_KEY, savedOptions, savedOptionsFile, saveOptions as keepOptions } from "../port/options";
 import { applyEvents, initialState, nextBatch } from "../port/state";
 import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, textSizeFromOptions } from "../port/textsize";
-import type { Answer, GameRequest } from "../protocol";
+import type { Answer, GameRequest, ReplayProgress } from "../protocol";
+import { downloadRecording, keepLastGame, lastGame, lastTurn } from "../port/recording";
 import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port/tilesets";
 import { loadTileSheet, type TileSheet } from "../tiles";
 import { beep, wakeBeep } from "./beep";
@@ -30,10 +31,10 @@ import { MapView } from "./MapView";
 import { type BarMenu, MenuBar, type MenuEntry } from "./MenuBar";
 import { COMMAND_MENUS, type CommandItem, GAME_MENU, HELP_MENU, WIZARD_MENU } from "./commands";
 import { MessageView } from "./MessageView";
+import { ReplayBar, REPLAY_SPEEDS } from "./ReplayBar";
 import { StatsView } from "./StatsView";
 
 const TILE_SET_KEY = "nethack.tileSet";
-const LAST_GAME_KEY = "nethack.lastGame";
 
 function savedTileSet(): TileSet {
   try {
@@ -158,6 +159,13 @@ interface Pending {
 }
 
 export function App() {
+  // the address asks for a replay of the last finished game, in place of playing
+  const [replay] = useState(() => (new URLSearchParams(location.search).has("replay") ? { text: lastGame() } : null));
+  const [replayProgress, setReplayProgress] = useState<ReplayProgress>({ turn: 0, playing: true, seeking: false, ended: null });
+  const [replaySpeed, setReplaySpeed] = useState(REPLAY_SPEEDS[0].turnsPerSecond);
+  const replayLastTurn = useMemo(() => (replay?.text ? lastTurn(replay.text) : 0), [replay]);
+  /** The game's recording, once it has ended, and whether the browser kept it for replaying. */
+  const [recorded, setRecorded] = useState<{ text: string; kept: boolean } | null>(null);
   const [sheet, setSheet] = useState<TileSheet | null>(null);
   const [state, setState] = useState(initialState);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -290,15 +298,12 @@ export function App() {
           for (const e of events) {
             if (e.type === "bell") beep();
             if (e.type === "text_size") optionsTextSize.current(e.size, e.atStart);
-            if (e.type === "options_file")
+            // a replayed game's options are its player's, not to be kept as this one's
+            if (e.type === "options_file" && !replay)
               try {
                 localStorage.setItem(OPTIONS_KEY, savedOptionsFile(e.text, BASE_OPTIONS));
               } catch {}
-            // kept for replaying straight away; one too big for the browser to keep is lost
-            if (e.type === "recording")
-              try {
-                localStorage.setItem(LAST_GAME_KEY, e.text);
-              } catch {}
+            if (e.type === "recording") setRecorded({ text: e.text, kept: keepLastGame(e.text) });
           }
         },
         request: (id, request) => {
@@ -342,6 +347,14 @@ export function App() {
             }
           }
           show({ id, request });
+        },
+        replay: (message) => {
+          if (message.type === "replay_prompt") {
+            const r = message.request;
+            show(r && r.kind !== "key" && r.kind !== "poskey" ? { id: 0, request: r } : null);
+          }
+          else if (message.type === "replay_state") setState(message.state);
+          else setReplayProgress(message.progress);
         },
       }),
     [],
@@ -393,7 +406,7 @@ export function App() {
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (!playing || pendingRef.current) return;
+      if (!playing || pendingRef.current || replay) return;
       const k = keyLike(e);
       if (keyCode(k) === null) return;
       e.preventDefault();
@@ -411,7 +424,7 @@ export function App() {
   }, [playing, client]);
 
   useEffect(() => {
-    if (state.asciiMap !== null) saveAscii(state.asciiMap);
+    if (state.asciiMap !== null && !replay) saveAscii(state.asciiMap);
   }, [state.asciiMap]);
 
   // zoom keys, text size keys and Ctrl-Cmd-S work with a dialog open too, as Cocoa's menu shortcuts do: this listener is
@@ -453,7 +466,8 @@ export function App() {
 
   const answer = (a: Answer) => {
     const p = pendingRef.current;
-    if (!p) return;
+    // a replay answers its prompts itself
+    if (!p || replay) return;
     answered.current = p.id;
     client.answer(p.id, a);
     show(null);
@@ -481,6 +495,14 @@ export function App() {
   };
 
   useEffect(() => {
+    if (replay) {
+      if (!replay.text) location.replace(LANDING_PATH);
+      else if (sheet && !playing) {
+        setPlaying(true);
+        client.replay(new URL(import.meta.env.BASE_URL, location.href).href, replay.text, replaySpeed);
+      }
+      return;
+    }
     const name = playerName(new URLSearchParams(location.search).get("name") ?? savedName());
     if (!name) location.replace(LANDING_PATH);
     else if (sheet && !playing) start(name);
@@ -488,11 +510,12 @@ export function App() {
 
   // replace: Back from the landing page shouldn't start another game
   useEffect(() => {
-    if (state.gameOver === SAVED_FAREWELL) location.replace(LANDING_PATH);
+    if (!replay && state.gameOver === SAVED_FAREWELL) location.replace(LANDING_PATH);
   }, [state.gameOver]);
 
-  // absent until the core has read its options, which would overrule a switch made before
-  const toggleAscii = state.status.BL_TITLE
+  // absent until the core has read its options, which would overrule a switch made before; and in a replay,
+  // where the switch is part of the recording
+  const toggleAscii = state.status.BL_TITLE && !replay
     ? (on: boolean) => {
         setState((s) => ({ ...s, asciiMap: on }));
         saveAscii(on);
@@ -516,7 +539,11 @@ export function App() {
         { title: "Edit Options File...", disabled: !!pending || ownDialog, run: () => setEditingOptions(true) },
         ...GAME_MENU.slice(1).map(command),
         null,
-        { title: "New Game", disabled: state.gameOver === null, run: () => location.reload() },
+        {
+          title: "New Game",
+          disabled: !replay && state.gameOver === null,
+          run: () => (replay ? location.assign(PLAY_PATH) : location.reload()),
+        },
       ],
     },
     {
@@ -604,7 +631,7 @@ export function App() {
             onZoom={zoom}
             onShowInventory={showInventory ? undefined : () => setShowInventory(true)}
             onClick={(x, y, button) => {
-              if (pending || state.gameOver !== null) return;
+              if (pending || state.gameOver !== null || replay) return;
               setInventoryKey(0);
               setCommandKey(0);
               setState(nextBatch);
@@ -623,11 +650,13 @@ export function App() {
           />
         ) : null}
         {!state.started ? <div class="overlay-note">Starting…</div> : null}
-        {state.gameOver !== null && state.gameOver !== SAVED_FAREWELL && !ownDialog ? (
+        {!replay && state.gameOver !== null && state.gameOver !== SAVED_FAREWELL && !ownDialog ? (
           <GameOverDialog
             text={state.gameOver}
             onNewGame={() => location.reload()}
             onQuit={() => location.replace(LANDING_PATH)}
+            onReplay={recorded?.kept ? () => location.assign(`${PLAY_PATH}?replay`) : undefined}
+            onDownload={recorded ? () => downloadRecording(recorded.text) : undefined}
           />
         ) : null}
         {optionsDialog}
@@ -647,6 +676,19 @@ export function App() {
         ) : null}
         {pending ? <PendingDialog pending={pending} sheet={sheet} answer={answer} passOn={(k) => typeAhead.current.unshift(k)} /> : null}
       </div>
+      {replay?.text ? (
+        <ReplayBar
+          progress={replayProgress}
+          lastTurn={replayLastTurn}
+          turnsPerSecond={replaySpeed}
+          control={(control) => {
+            if (control.action === "speed") setReplaySpeed(control.turnsPerSecond);
+            client.replayControl(control);
+          }}
+          onDownload={() => downloadRecording(replay.text!)}
+          onExit={() => location.replace(LANDING_PATH)}
+        />
+      ) : null}
     </div>
   );
 }
