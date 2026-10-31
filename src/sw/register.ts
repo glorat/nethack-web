@@ -33,10 +33,16 @@ export function updateWhenIdle(busy: () => boolean) {
   });
   sw.register(SCRIPT)
     .then((registration) => {
+      let checks = 0;
       setInterval(async () => {
-        if (busy()) return;
-        if (reload) location.reload();
-        else if (registration.waiting && !(await gamePageOpen())) registration.waiting.postMessage("activate");
+        if (!busy()) {
+          if (reload) location.reload();
+          else if (registration.waiting && !(await gamePageOpen())) {
+            registration.waiting.postMessage("activate");
+            document.documentElement.dataset.updateAsked = "true";
+          }
+        }
+        document.documentElement.dataset.updateChecks = String(++checks);
       }, RETRY_MS);
     })
     .catch((e) => console.warn("offline support unavailable", e));

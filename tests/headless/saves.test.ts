@@ -312,7 +312,8 @@ test("a recording that goes differently falls back on the checkpoint", async () 
   const logged = vi.spyOn(console, "error");
   const next = await (await Session.start({ ...options, saves, resume: true })).skipText();
   expect(next.resumeFailure).not.toBeNull();
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  // the core going on through a turn gives a failed replay's core its chance to complain
+  await next.send("s");
   expect(logged).not.toHaveBeenCalled();
   logged.mockRestore();
   expect(Number(next.state.status.BL_TIME?.text)).toBeGreaterThanOrEqual(Number(third.state.status.BL_TIME?.text));

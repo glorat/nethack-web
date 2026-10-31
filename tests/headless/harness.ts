@@ -74,6 +74,13 @@ function cursorKeys(d: number, back: string, forward: string): string {
  * for a key with nothing left to type, for an answer to `prompt`, or because
  * the game ended.
  */
+export async function until(check: () => boolean, ms = 10000): Promise<void> {
+  for (const end = Date.now() + ms; !check(); ) {
+    if (Date.now() > end) throw new Error("timed out");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
 export class Session {
   state: GameState = initialState();
   prompt: GameRequest | null = null;

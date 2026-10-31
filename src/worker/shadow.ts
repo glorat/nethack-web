@@ -18,12 +18,18 @@ export class Shadow {
   private turn = 0;
   private core: NetHackModule | null = null;
   private wake: (() => void) | null = null;
+  private finished = false;
 
   constructor(
     private readonly boot: BootCore,
     private readonly bones: (hash: string) => Uint8Array | undefined,
     private readonly status: (status: ShadowStatus) => void,
   ) {}
+
+  /** It has done all it can with the lines it was let have, and is at their end or has stopped. */
+  get idle(): boolean {
+    return !this.started || this.finished || this.wake !== null;
+  }
 
   /** What the recording already held, before the lines to come. */
   before(text: string): void {
@@ -46,6 +52,7 @@ export class Shadow {
     this.sawEnd = first.some((l) => /^\d+ end /.test(l));
     this.lineCount = text.split("\n").length - 1;
     if (/^\d+ session (?:unrecorded|recover) /m.test(text)) {
+      this.finished = true;
       this.status({ state: "unrecorded", turn: 0 });
       return;
     }
@@ -73,19 +80,23 @@ export class Shadow {
       },
       (last) => (this.session = last),
     ).then(
-      () =>
+      () => {
+        this.finished = true;
         this.status(
           this.sawEnd
             ? { state: "ended", turn: this.turn }
             : { state: "mismatch", turn: this.turn, message: "the core stopped where the recording went on" },
-        ),
-      (e: unknown) =>
+        );
+      },
+      (e: unknown) => {
+        this.finished = true;
         this.status({
           state: "mismatch",
           turn: this.turn,
           message: e instanceof Error ? e.message : String(e),
           files: this.core ? Object.fromEntries([...saveFiles(this.core)].filter(([f]) => !/^(record|logfile|xlogfile)$/.test(f))) : undefined,
-        }),
+        });
+      },
     );
   }
 

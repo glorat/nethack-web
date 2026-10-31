@@ -1,10 +1,27 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const SITE = "http://127.0.0.1:5197/";
+// as often as a landing page looks to move to a waiting version
+const CHECK_MS = 3000;
+
+/** Runs a landing page's look at whether to move to a new version, which should hold off. */
+async function holdsOff(page: Page) {
+  const checks = () => page.evaluate(() => Number(document.documentElement.dataset.updateChecks ?? 0));
+  const before = await checks();
+  await expect
+    .poll(async () => {
+      await page.clock.runFor(CHECK_MS);
+      return checks();
+    })
+    .toBeGreaterThan(before);
+  await expect(page.locator("html[data-update-asked]")).toHaveCount(0);
+}
 
 // the reload these tests wait for can land in the middle of a look, which then just looks again
 const cacheNames = (page: Page) => page.evaluate(() => caches.keys()).catch(() => null);
 const waiting = (page: Page) => page.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => !!r?.waiting)).catch(() => null);
+
+test.beforeEach(({ page }) => page.clock.install());
 
 test("a new version waits out a game in progress, then the landing page moves to it", async ({ page, context }) => {
   await page.goto(SITE);
@@ -28,7 +45,7 @@ test("a new version waits out a game in progress, then the landing page moves to
 
   const landing = await context.newPage();
   await landing.goto(SITE);
-  await landing.waitForTimeout(4000);
+  await holdsOff(landing);
   expect(await waiting(landing)).toBe(true);
   expect(await cacheNames(landing)).toContain(oldCache);
 
@@ -49,7 +66,7 @@ test("the landing page holds off while something is being typed", async ({ page 
   await page.request.get(`${SITE}__next-version`);
   await page.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r?.update()));
   await expect.poll(() => waiting(page), { timeout: 15_000 }).toBe(true);
-  await page.waitForTimeout(4000);
+  await holdsOff(page);
   await expect(name).toHaveValue("Typing");
 
   await name.fill("");
@@ -81,7 +98,7 @@ test("a landing tab being typed in isn't reloaded when another moves to a new ve
   await page.request.get(`${SITE}__next-version`);
   await page.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r?.update()));
   await expect.poll(async () => (await cacheNames(page))?.includes(oldCache) ?? true, { timeout: 15_000 }).toBe(false);
-  await other.waitForTimeout(4000);
+  await holdsOff(other);
   await expect(name).toHaveValue("Typing");
 });
 
@@ -103,7 +120,7 @@ test("a second game tab, and one still at its start, hold off a new version", as
   await expect.poll(() => waiting(second), { timeout: 15_000 }).toBe(true);
   const landing = await context.newPage();
   await landing.goto(SITE);
-  await landing.waitForTimeout(4000);
+  await holdsOff(landing);
   expect(await waiting(landing)).toBe(true);
 
   await second.close();

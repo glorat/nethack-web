@@ -1,9 +1,7 @@
 import { expect, test } from "vitest";
 import { Shadow } from "../../src/worker/shadow";
 import type { ShadowStatus } from "../../src/protocol";
-import { headlessBoot, Session, type SessionOptions } from "./harness";
-
-const settled = () => new Promise((resolve) => setTimeout(resolve, 20));
+import { headlessBoot, Session, type SessionOptions, until } from "./harness";
 
 /** A shadow given a game's lines as the page gives them, one batch at a time; two cores can't run at once here. */
 async function shadowOf(g: Session, tamper: (line: string) => string = (l) => l) {
@@ -12,9 +10,8 @@ async function shadowOf(g: Session, tamper: (line: string) => string = (l) => l)
   if (g.before) shadow.before(g.before);
   for (const { lines, atPrompt } of g.batches) {
     shadow.add(lines.map(tamper), atPrompt);
-    await settled();
+    await until(() => shadow.idle);
   }
-  await new Promise((resolve) => setTimeout(resolve, 200));
   return statuses;
 }
 
