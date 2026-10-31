@@ -62,6 +62,7 @@ export class Shadow {
         delay: () => Promise.resolve(),
         checkpoint: () => {},
         bones: this.bones,
+        sameBuild: true,
         more: () => new Promise((resolve) => (this.wake = resolve)),
       },
       (last) => (this.session = last),

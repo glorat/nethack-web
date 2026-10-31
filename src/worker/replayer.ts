@@ -3,13 +3,13 @@
 import type { Answer, GameEvent, GameRequest, MenuItem, MenuSelection } from "../protocol";
 import type { Game, GameHost, Input } from "./game";
 import type { NetHackModule } from "./memory";
-import { ALIGNS, ANSWER_TAGS, checkLine, FORMAT, GENDERS, zoneSeconds } from "./recorder";
+import { ALIGNS, ANSWER_TAGS, checkLine, FORMAT, GENDERS, levelsHash, zoneSeconds } from "./recorder";
 
 export class ReplayError extends Error {}
 
 /** A promise that never settles; a fresh one each time, as one shared would keep every core waiting on it alive. */
 export const never = <T>() => new Promise<T>(() => {});
-const MARKS = new Set(["ckpt", "T", "=", "asc", "back"]);
+const MARKS = new Set(["ckpt", "T", "=", "lv", "asc", "back"]);
 // as long as Game pauses for the core's delay_output
 const DELAY_MS = 50;
 
@@ -152,6 +152,8 @@ export interface ReplayHooks {
   checkpoint(n: number): void;
   /** The bones with this hash, which a recording names rather than holds. */
   bones?(hash: string): Uint8Array | undefined;
+  /** This core is the build that made the recording, so its files can be compared. */
+  sameBuild?: boolean;
   /** For a recording still being written: resolves when there are more lines, in place of ending where they run out. */
   more?(): Promise<void>;
 }
@@ -334,6 +336,12 @@ export class ReplayHost implements GameHost {
       case "=": {
         const check = checkLine(Number(first), this.m, this.status).slice(2);
         if (check !== line.rest) this.fail(line, `the core shows ${check}`);
+        return true;
+      }
+      case "lv": {
+        if (!this.hooks.sameBuild) return true;
+        const hash = levelsHash(this.m);
+        if (hash !== first) this.fail(line, `the game's files hash to ${hash}`);
         return true;
       }
       case "asc":

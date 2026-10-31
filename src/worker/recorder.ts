@@ -115,6 +115,8 @@ export interface RecorderStart {
   config: string;
   /** Gets each line as it's written, to send on as the game is played; `atPrompt` once the core is waiting and all it did is there. */
   stream(lines: string[], atPrompt: boolean): void;
+  /** A shadow is following on this same build, so can check more than a later replay could. */
+  shadowed?: boolean;
   /** Gets what the recording already held, for a game that has come back. */
   before?(text: string): void;
   /** Gets the whole recording when the game ends. */
@@ -362,6 +364,7 @@ export class Recorder implements GameHost {
     if (turn - this.lastCheck >= CHECK_EVERY) {
       this.lastCheck = turn;
       this.write(checkLine(turn, this.m, this.status));
+      if (this.start.shadowed) this.write(`lv ${levelsHash(this.m)}`);
     }
   }
 
@@ -412,21 +415,21 @@ export class Recorder implements GameHost {
   }
 }
 
-/**
- * Where the hero is, the state of the core's random generator, a hash of the
- * game's level files and everything the status line shows, which a replay must match.
- */
+/** Where the hero is, the state of the core's random generator and everything the status line shows, which a replay must match. */
 export function checkLine(turn: number, m: NetHackModule, status: Record<string, string>): string {
   const fields = Object.fromEntries(
     Object.keys(status)
       .sort()
       .map((k) => [k.replace(/^BL_/, ""), status[k].trim()]),
   );
-  return `= ${turn} @${m._nhweb_hero_x()},${m._nhweb_hero_y()} ${m._nhweb_rng_fingerprint()} ${levelsHash(m)} ${JSON.stringify(fields)}`;
+  return `= ${turn} @${m._nhweb_hero_x()},${m._nhweb_hero_y()} ${m._nhweb_rng_fingerprint()} ${JSON.stringify(fields)}`;
 }
 
-/** The game's files as the checkpoint before this left them. */
-function levelsHash(m: NetHackModule): string {
+/**
+ * A hash of the game's files as the checkpoint before this left them. They hold
+ * raw pointers, so it only matches on the build that wrote it.
+ */
+export function levelsHash(m: NetHackModule): string {
   const name = m.UTF8ToString(m._nhweb_game_name()).replace(/\.\d+$/, "");
   const files = (m.FS.readdir("/save") as string[]).filter((f) => f.startsWith(`${name}.`)).sort();
   const parts = files.map((f) => `${f} ${sha256(m.FS.readFile(`/save/${f}`))}`);
