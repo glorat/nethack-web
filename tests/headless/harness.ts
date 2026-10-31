@@ -7,7 +7,7 @@ import { applyEvents, cellAt, initialState, type GameState } from "../../src/por
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
 import { BonesDb } from "../../src/worker/bones";
 import { Recorder } from "../../src/worker/recorder";
-import { type BootCore, never, replay, ReplayError, writeSaveFiles } from "../../src/worker/replayer";
+import { type BootCore, never, replay, ReplayError, saveFiles, writeSaveFiles } from "../../src/worker/replayer";
 import { placeGameFiles, resumedHost, resumeGame } from "../../src/worker/resume";
 import { describeSquare, type EmscriptenFS, type NetHackModule } from "../../src/worker/memory";
 
@@ -148,7 +148,7 @@ export class Session {
           mod.ENV.NETHACKOPTIONS = nethackOptions;
           if (options.pageSeed === undefined) mod.ENV.NETHACK_SEED = String(options.seed ?? 1);
           // Emscripten's HOME, which it creates
-          if (config !== undefined) mod.FS.writeFile(CONFIG_FILE, new TextEncoder().encode(config));
+          mod.FS.writeFile(CONFIG_FILE, new TextEncoder().encode(config ?? ""));
           mod.FS.mkdir("/save");
           for (const [file, data] of saves ?? []) {
             const parts = file.split("/");
@@ -474,6 +474,28 @@ export async function headlessBoot(): Promise<(current: () => boolean) => BootCo
       }
     };
   };
+}
+
+/** Plays a recording that stops mid-game to its end, and gives back the last core's /save. */
+export async function replayCore(text: string): Promise<{ files: Map<string, Uint8Array>; error: ReplayError | null }> {
+  let core!: NetHackModule;
+  const boot = (await headlessBoot())(() => true);
+  let error: ReplayError | null = null;
+  try {
+    await replay(
+      text,
+      (session, files, makeHost) =>
+        boot(session, files, (m) => {
+          core = m;
+          return makeHost(m);
+        }),
+      { post: () => {}, pace: () => Promise.resolve(), delay: () => Promise.resolve(), checkpoint: () => {} },
+    );
+  } catch (e) {
+    if (!(e instanceof ReplayError)) throw e;
+    error = e;
+  }
+  return { files: saveFiles(core), error };
 }
 
 /** Plays a recording again on the real core, as fast as it goes. */
