@@ -1,6 +1,6 @@
 // Records everything a game takes from the page, one line at a time, so the
 // game can be played again exactly. See docs/recording.md for the format.
-import type { Answer, GameEvent, GameRequest } from "../protocol";
+import type { Answer, GameEvent, GameRequest, MenuSelection, PlayerPick } from "../protocol";
 import { type GameHost, type Input, OLD_GAME } from "./game";
 import type { NetHackModule } from "./memory";
 import { sha256 } from "./sha256";
@@ -29,7 +29,11 @@ export function zoneSeconds(text: string): number | null {
   return (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 3600 + Number(m[3]) * 60);
 }
 
-/** The line, without its sequence number, that records an answer to `request`. */
+/**
+ * The line, without its sequence number, that records an answer to `request`.
+ * It names what was chosen rather than the core's number for it: a position in
+ * a table moves as the table grows, and a menu item's number may be an address.
+ */
 export function answerLine(request: GameRequest, answer: Answer | null): string {
   const tag = ANSWER_TAGS[request.kind];
   if (!answer) return `${tag} -`;
@@ -39,16 +43,33 @@ export function answerLine(request: GameRequest, answer: Answer | null): string 
     case "getlin":
       return `${tag} ${answer.text === null ? "-" : JSON.stringify(answer.text)}`;
     case "menu":
-      return answer.selection === null
-        ? `${tag} -`
-        : [tag, ...answer.selection.map((s) => `${s.identifier}:${s.count}`)].join(" ");
+      return answer.selection === null ? `${tag} -` : `${tag} ${JSON.stringify(answer.selection.map((s) => menuPick(request, s)))}`;
     case "text":
       return tag;
-    case "ext_cmd":
-      return `${tag} ${answer.index}`;
+    case "ext_cmd": {
+      const command = request.kind === "ext_cmd" ? request.commands.find((c) => c.index === answer.index) : undefined;
+      return `${tag} ${command ? JSON.stringify(command.name) : "-"}`;
+    }
     case "player":
-      return `${tag} ${answer.role} ${answer.race} ${answer.gender} ${answer.align}`;
+      return `${tag} ${JSON.stringify(playerPick(request, answer))}`;
   }
+}
+
+/** The item's text, which of the items with that text it is, and the count; for a choice no item lists, its number. */
+function menuPick(request: GameRequest, { identifier, count }: MenuSelection): [string, number, number] | [number, number] {
+  const items = request.kind === "menu" ? request.items.filter((i) => i.identifier !== 0) : [];
+  const item = items.find((i) => i.identifier === identifier);
+  if (!item) return [identifier, count];
+  return [item.text, items.filter((i) => i.text === item.text).findIndex((i) => i.identifier === identifier), count];
+}
+
+/** The core's order for these, which PlayerChoices doesn't list as there's no more of them to come. */
+export const GENDERS = ["male", "female"];
+export const ALIGNS = ["lawful", "neutral", "chaotic"];
+
+function playerPick(request: GameRequest, { role, race, gender, align }: PlayerPick): (string | null)[] {
+  const choices = request.kind === "player" ? request.choices : null;
+  return [choices?.roles[role]?.name, choices?.races[race]?.name, GENDERS[gender], ALIGNS[align]].map((n) => n ?? null);
 }
 
 export const ANSWER_TAGS: Record<GameRequest["kind"], string> = {

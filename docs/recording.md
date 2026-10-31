@@ -33,15 +33,17 @@ Each line is `<seq> <tag> [args]`. `seq` counts from 1 within each session. Text
 | `c` | x y button | A click on the map |
 | `y` | JSON key [count] | An answer to a yes/no question, including the one about an old game left unfinished, whether the player or the page answered it; a new game started by destroying the old one leaves that answer out |
 | `l` | JSON text | A line typed at a prompt |
-| `m` | identifier:count … | Menu items chosen |
+| `m` | JSON list | Menu items chosen, each `[text, which, count]`, `which` counting the items with that text; or `[number, count]` for a choice the menu doesn't list |
 | `w` | | A text window dismissed |
-| `x` | index | An extended command chosen |
-| `p` | role race gender align | A character chosen |
+| `x` | JSON name | An extended command chosen |
+| `p` | JSON list | A character chosen: the names of its role, race, gender and alignment, `null` for one left open |
 | `asc` | `0` or `1` | The ASCII map switched from outside the game |
 | `ckpt` | n | The core has written its `n`th checkpoint of this session, before a command or at a level change |
 | `T` | turn time | The turn has just moved on, before its first command; `time` is the player's clock, ISO 8601 UTC |
 | `=` | turn `@`x,y rng levels JSON | A check, every 20 turns: where the hero was, a fingerprint of the core's random generator, a hash of the game's level files, and every field the status line showed, by name |
 | `end` | `save` or `over` | The session ended by saving, or the game ended; written before the last persist, as the page may go straight after it |
+
+Answers name what was chosen rather than the core's number for it. A position in a table moves when something is added to it, and a menu item's number can be a memory address. A replay finds the choice in the prompt it's answering, and stops at that line if it's gone.
 
 All times are the player's clock and are recorded as they were, even if that clock jumps.
 
