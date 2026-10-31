@@ -1,9 +1,9 @@
 // Plays a recorded game again: each session runs the core afresh, answered
 // from the recording instead of the player. See docs/recording.md.
-import type { Answer, GameEvent, GameRequest } from "../protocol";
+import type { Answer, GameEvent, GameRequest, MenuItem, MenuSelection } from "../protocol";
 import type { Game, GameHost, Input } from "./game";
 import type { NetHackModule } from "./memory";
-import { ANSWER_TAGS, checkLine, FORMAT, zoneSeconds } from "./recorder";
+import { ALIGNS, ANSWER_TAGS, checkLine, FORMAT, GENDERS, zoneSeconds } from "./recorder";
 
 export class ReplayError extends Error {}
 
@@ -78,36 +78,58 @@ export function parseRecording(text: string): Recording {
 
 const JSON_TEXT = /^("(?:[^"\\]|\\.)*")(?: (-?\d+))?$/;
 
-export function parseAnswer(kind: GameRequest["kind"], rest: string): Answer | null {
+/** The answer a line records, in the numbers `request` goes by; throws if what it names isn't there. */
+export function parseAnswer(request: GameRequest, rest: string): Answer | null {
   if (rest === "-") return null;
-  switch (kind) {
+  switch (request.kind) {
     case "yn": {
       const m = JSON_TEXT.exec(rest);
       if (!m) break;
-      return m[2] === undefined ? { kind, key: JSON.parse(m[1]) } : { kind, key: JSON.parse(m[1]), count: Number(m[2]) };
+      return m[2] === undefined ? { kind: "yn", key: JSON.parse(m[1]) } : { kind: "yn", key: JSON.parse(m[1]), count: Number(m[2]) };
     }
     case "getlin":
-      return { kind, text: JSON.parse(rest) };
+      return { kind: "getlin", text: JSON.parse(rest) };
     case "menu":
-      return {
-        kind,
-        selection: rest
-          ? rest.split(" ").map((pick) => {
-              const at = pick.lastIndexOf(":");
-              return { identifier: Number(pick.slice(0, at)), count: Number(pick.slice(at + 1)) };
-            })
-          : [],
-      };
+      return { kind: "menu", selection: (JSON.parse(rest) as MenuPick[]).map((pick) => menuSelection(request.items, pick)) };
     case "text":
-      return { kind };
-    case "ext_cmd":
-      return { kind, index: Number(rest) };
+      return { kind: "text" };
+    case "ext_cmd": {
+      const name: string = JSON.parse(rest);
+      const command = request.commands.find((c) => c.name === name);
+      if (!command) throw new ReplayError(`there's no command ${name}`);
+      return { kind: "ext_cmd", index: command.index };
+    }
     case "player": {
-      const [role, race, gender, align] = rest.split(" ").map(Number);
-      return { kind, role, race, gender, align };
+      const [role, race, gender, align] = JSON.parse(rest) as (string | null)[];
+      const { roles, races } = request.choices;
+      return {
+        kind: "player",
+        role: pickNumber(roles.map((r) => r.name), role),
+        race: pickNumber(races.map((r) => r.name), race),
+        gender: pickNumber(GENDERS, gender),
+        align: pickNumber(ALIGNS, align),
+      };
     }
   }
-  throw new ReplayError(`unreadable ${kind} answer: ${rest}`);
+  throw new ReplayError(`unreadable ${request.kind} answer: ${rest}`);
+}
+
+type MenuPick = [string, number, number] | [number, number];
+
+function menuSelection(items: MenuItem[], pick: MenuPick): MenuSelection {
+  if (typeof pick[0] === "number") return { identifier: pick[0], count: pick[1] as number };
+  const [text, which, count] = pick as [string, number, number];
+  const item = items.filter((i) => i.identifier !== 0 && i.text === text)[which];
+  if (!item) throw new ReplayError(`the menu has no item ${JSON.stringify(text)}`);
+  return { identifier: item.identifier, count };
+}
+
+// a pick left open, for the core to choose
+function pickNumber(names: string[], name: string | null): number {
+  if (name === null) return -1;
+  const at = names.indexOf(name);
+  if (at < 0) throw new ReplayError(`there's no choice ${name}`);
+  return at;
 }
 
 export function parseInput(line: Line): Input {
@@ -177,7 +199,7 @@ export class ReplayHost implements GameHost {
   async request(request: GameRequest): Promise<Answer | null> {
     const line = await this.next([ANSWER_TAGS[request.kind]], request);
     // a null inside the array is a cancelled prompt; guard's own null means it couldn't be read
-    const parsed = this.guard(() => [parseAnswer(request.kind, line.rest)], line);
+    const parsed = this.guard(() => [parseAnswer(request, line.rest)], line);
     return parsed ? parsed[0] : never();
   }
 

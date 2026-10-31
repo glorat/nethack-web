@@ -161,3 +161,22 @@ test("hovering over the map during a game leaves the replay byte for byte the sa
   const game = [...g.persisted.keys()].filter((k) => k.startsWith("0Tester"));
   expect(game.filter((k) => Buffer.compare(Buffer.from(g.persisted.get(k)!), Buffer.from(files.get(k) ?? new Uint8Array())) !== 0)).toEqual([]);
 });
+
+test("items picked from a menu by address replay by name, and one that's gone stops the replay there", async () => {
+  const g = await (await Session.start({ pageSeed: 7, options: "time" })).skipText();
+  await g.send("D");
+  await g.pick(/all types|^A /i);
+  while (g.prompt?.kind === "menu" && !g.prompt.items.some((i) => /food ration/.test(i.text))) await g.pick(/all types|food/i);
+  const picked = g.prompt?.kind === "menu" ? g.prompt.items.find((i) => /food ration/.test(i.text))! : null;
+  expect(picked!.identifier).toBeGreaterThan(1000);
+  await g.pick(/food ration/);
+  while (g.prompt && g.prompt.kind !== "poskey") await g.dismiss();
+  await g.send("s");
+  await quit(g);
+  const line = g.recording!.split("\n").find((l) => / m .*food ration/.test(l))!;
+  expect(line).not.toContain(String(picked!.identifier));
+
+  expect((await replayRecording(g.recording!)).error).toBeNull();
+  const gone = await replayRecording(g.recording!.replace(line, line.replace(/food ration/g, "food rations")));
+  expect(gone.error?.message).toMatch(/^line \d+ \(m .*no item/);
+});
