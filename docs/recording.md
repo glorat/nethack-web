@@ -48,3 +48,7 @@ All times are the player's clock and are recorded as they were, even if that clo
 `src/worker/replayer.ts` plays a recording again. Each session runs on a fresh core whose host answers from the recording, checking each `ckpt`, `T`, `=` and `end` against the core. A restore starts from the files the replay itself saved; a recovery from the files as the replay had them at the checkpoint named. The replay stops with the line where the game went differently.
 
 The checks see the turn, the checkpoint count, the hero's position and the status line, so a game that differs only in something none of those show (what an unidentified item is, say) replays without complaint until it does.
+
+In the browser, a finished game's recording is kept in localStorage, and its end screen and the landing page offer to replay it at `/play/?replay`. `src/worker/replay-runner.ts` plays it at a chosen number of turns a second, flashing each prompt the player answered at 1× and slower, and seeks by playing again from the start without showing the way.
+
+`tests/headless/golden/` holds long recorded games that every test run replays, so a change that alters how the game plays fails there. `GOLDEN=write pnpm test golden` records them afresh, after a change meant to alter play.
