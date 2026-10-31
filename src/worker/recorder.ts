@@ -279,7 +279,7 @@ export class Recorder implements GameHost {
     this.write(`T ${turn} ${new Date(this.wallClock()).toISOString()}`);
     if (turn - this.lastCheck >= CHECK_EVERY) {
       this.lastCheck = turn;
-      this.write(checkLine(turn, this.status));
+      this.write(checkLine(turn, this.m, this.status));
     }
   }
 
@@ -328,6 +328,12 @@ export class Recorder implements GameHost {
   }
 }
 
-export function checkLine(turn: number, status: Record<string, string>): string {
-  return `= ${turn} hp=${status.BL_HP ?? "?"}/${status.BL_HPMAX ?? "?"} lvl=${JSON.stringify((status.BL_LEVELDESC ?? "").trim())}`;
+/** Where the hero is and everything the status line shows, which a replay must match. */
+export function checkLine(turn: number, m: NetHackModule, status: Record<string, string>): string {
+  const fields = Object.fromEntries(
+    Object.keys(status)
+      .sort()
+      .map((k) => [k.replace(/^BL_/, ""), status[k].trim()]),
+  );
+  return `= ${turn} @${m._nhweb_hero_x()},${m._nhweb_hero_y()} ${JSON.stringify(fields)}`;
 }

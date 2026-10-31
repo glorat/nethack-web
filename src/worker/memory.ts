@@ -40,6 +40,8 @@ export interface NetHackModule {
   _nhweb_checkpoint_count(): number;
   _nhweb_game_name(): number;
   _nhweb_rng_fingerprint(): number;
+  _nhweb_hero_x(): number;
+  _nhweb_hero_y(): number;
   _nhweb_moves(): number;
   _nhweb_condition_mask(i: number): number;
   _nhweb_invent_letters(): number;

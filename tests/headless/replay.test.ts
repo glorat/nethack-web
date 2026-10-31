@@ -28,7 +28,7 @@ test("a finished game replays to its end, every check matching", async () => {
   const g = await (await Session.start({ pageSeed: 7, options: "time" })).skipText();
   await play(g);
   await quit(g);
-  expect(g.recording).toMatch(/ = \d+ hp=/);
+  expect(g.recording).toMatch(/ = \d+ @\d+,\d+ \{/);
 
   const replayed = await replayRecording(g.recording!);
   expect(replayed.error).toBeNull();
@@ -85,4 +85,17 @@ test("a line lost from the middle of a recording is caught", async () => {
   const lines = g.recording!.split("\n");
   lines.splice(10, 1);
   expect((await replayRecording(lines.join("\n"))).error?.message).toBe("line 11 is missing");
+});
+
+test("a game that differs only in the hero's starting attributes is caught", async () => {
+  const g = await (await Session.start({ pageSeed: 7, options: "time" })).skipText();
+  await play(g);
+  await quit(g);
+  // the fifth seed, taken once the first level is made, decides the hero's attributes and starting kit
+  let n = 0;
+  const tampered = g.recording!.replace(/^(\d+) seed 7$/gm, (line, seq) => (++n === 5 ? `${seq} seed 8` : line));
+  expect(n).toBeGreaterThanOrEqual(5);
+
+  const replayed = await replayRecording(tampered);
+  expect(replayed.error?.message).toMatch(/^line \d+ \(= /);
 });
