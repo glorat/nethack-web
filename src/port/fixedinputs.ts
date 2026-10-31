@@ -1,10 +1,9 @@
-import type { FixedInputs } from "../protocol";
+import type { AuthorityChoice, FixedInputs } from "../protocol";
 
 const KEY = "nethack.fixedInputs";
 
-/** What the tests have asked a game to take in place of the machine's own; never in a production build. */
-export function fixedInputs(): FixedInputs | undefined {
-  if (!import.meta.env.DEV || typeof document === "undefined") return undefined;
-  const saved = localStorage.getItem(KEY);
-  return saved ? (JSON.parse(saved) as FixedInputs) : undefined;
+/** The browser's own answers, unless the tests have set their own; never in a production build. */
+export function gameAuthority(): AuthorityChoice {
+  const saved = import.meta.env.DEV ? localStorage.getItem(KEY) : null;
+  return saved ? { kind: "fixed", inputs: JSON.parse(saved) as FixedInputs } : { kind: "browser" };
 }

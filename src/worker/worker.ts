@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 import type { Answer, GameEvent, GameRequest, StartOptions, UiMessage, WorkerMessage } from "../protocol";
+import { createAuthority } from "./authority";
 import { ReplayRunner } from "./replay-runner";
 import { type BootCore, never, saveFiles, writeSaveFiles } from "./replayer";
 import { Shadow } from "./shadow";
@@ -65,18 +66,6 @@ function persist(): Promise<void> {
   return persisting;
 }
 
-/** Whether this is the only tab playing; if so, it stays that until this worker ends. */
-function soleTab(): Promise<boolean> {
-  return new Promise((resolve) => {
-    // absent outside https and localhost, where the game in progress is asked about as before
-    if (!navigator.locks) return resolve(false);
-    void navigator.locks.request("nethack-game", { ifAvailable: true }, (lock) => {
-      resolve(lock !== null);
-      return lock ? new Promise<void>(() => {}) : undefined;
-    });
-  });
-}
-
 /** The files of the game being played, of all the games /save may hold. */
 function gameFiles(m: NetHackModule): Record<string, Uint8Array> {
   const name = m.UTF8ToString(m._nhweb_game_name()).replace(/\.\d+$/, "");
@@ -89,15 +78,6 @@ function failedRecording(m: NetHackModule): string | null {
   return name && m.FS.analyzePath(path).exists ? m.FS.readFile(path, { encoding: "utf8" }) : null;
 }
 
-/** A version 4 UUID; crypto.randomUUID is missing outside https and localhost. */
-function uuid(): string {
-  const b = crypto.getRandomValues(new Uint8Array(16));
-  b[6] = (b[6] & 0x0f) | 0x40;
-  b[8] = (b[8] & 0x3f) | 0x80;
-  const hex = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
 type CreateModule = (config: object) => Promise<NetHackModule>;
 
 async function loadCore(assetBase: string): Promise<CreateModule> {
@@ -105,13 +85,11 @@ async function loadCore(assetBase: string): Promise<CreateModule> {
   return ((await import(/* @vite-ignore */ url)) as { default: CreateModule }).default;
 }
 
-async function start({ assetBase, options, config, shadowed, fixed }: StartOptions): Promise<void> {
+async function start({ assetBase, options, config, shadowed, authority }: StartOptions): Promise<void> {
   const createModule = await loadCore(assetBase);
 
-  // taken once, so a game doesn't change zone as daylight saving starts or ends
-  const utcOffset = -new Date().getTimezoneOffset() * 60;
-  let nextSeed = fixed?.seed ?? 0;
   const host = {
+    ...(await createAuthority(authority, () => module!.FS)),
     post(events: GameEvent[]) {
       send({ type: "events", events });
     },
@@ -129,15 +107,6 @@ async function start({ assetBase, options, config, shadowed, fixed }: StartOptio
       return new Promise((resolve) => (inputWaiter = resolve));
     },
     persist,
-    alone: await soleTab(),
-    now: () => fixed?.now ?? Math.floor(Date.now() / 1000),
-    utcOffset: () => utcOffset,
-    randomSeed: () => (fixed ? nextSeed++ : crypto.getRandomValues(new Uint32Array(1))[0]),
-    uuid: () => fixed?.uuid ?? uuid(),
-    bonesWanted: async (name: string) => new BonesDb(module!.FS).take(name),
-    bonesLeft(name: string, data: Uint8Array, wizard: boolean) {
-      if (!wizard) new BonesDb(module!.FS).keep(name, data);
-    },
   };
 
   const loadSaved = async (coreOptions: string, coreConfig: string, stopped?: (why: string) => void) => {

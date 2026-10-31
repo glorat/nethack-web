@@ -186,8 +186,13 @@ export interface FixedInputs {
   seed: number;
   /** Seconds since 1970, for every time the core reads. */
   now: number;
+  /** Seconds east of UTC. */
+  utcOffset: number;
   uuid: string;
 }
+
+/** Who answers for what decides a game's outcome. */
+export type AuthorityChoice = { kind: "browser" } | { kind: "fixed"; inputs: FixedInputs };
 
 export interface StartOptions {
   /** Base URL that nethack.js and nethack.wasm are served from. */
@@ -198,7 +203,7 @@ export interface StartOptions {
   config: string;
   /** A shadow is following, and needs what a game that comes back had already recorded. */
   shadowed?: boolean;
-  fixed?: FixedInputs;
+  authority: AuthorityChoice;
 }
 
 export type UiMessage =

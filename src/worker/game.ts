@@ -1,3 +1,4 @@
+import type { Authority } from "./authority";
 import type {
   Answer,
   GameEvent,
@@ -53,7 +54,7 @@ interface Window {
 
 export type Input = { key: number } | { click: { x: number; y: number; button: number } };
 
-export interface GameHost {
+export interface GameHost extends Authority {
   post(events: GameEvent[]): void;
   request(request: GameRequest): Promise<Answer | null>;
   /** Resolves with the next key or click the player makes. */
@@ -69,20 +70,6 @@ export interface GameHost {
   decided?(request: GameRequest, answer: Answer | null): void;
   /** The core's pause in an animation; a short wait if not given. */
   delayOutput?(): Promise<void>;
-  /** No other tab is playing, so a game left unfinished can't be one still going on there. */
-  readonly alone: boolean;
-  /** Seconds since 1970, for every time the core reads. */
-  now(): number;
-  /** Seconds east of UTC, for the game's local time. */
-  utcOffset(): number;
-  /** An unguessable 32-bit seed, asked for at the start and at each level change. */
-  randomSeed(): number;
-  /** A new game's id, kept in its save and in any bones it leaves. */
-  uuid(): string;
-  /** The bones the core may load for a level it's making, if any; `name` says which level. */
-  bonesWanted(name: string): Promise<Uint8Array | null>;
-  /** Bones the core has left for a level, for the host to keep or not. */
-  bonesLeft(name: string, data: Uint8Array, wizard: boolean): void;
 }
 
 /** "FOODPOIS" style names of the bits set in a BL_CONDITION mask, in `order`. */
