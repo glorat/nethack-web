@@ -11,8 +11,6 @@ const DELAY_MS = 50;
 // at full speed the core never gives the worker back otherwise, so controls would wait for the session's end
 const YIELD_EVERY_MS = 30;
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
 export interface RunnerPage {
   events(events: GameEvent[]): void;
   replay(message: ReplayMessage): void;
@@ -30,6 +28,7 @@ export class ReplayRunner {
   /** Paces waiting for play to go on, woken by any control, each checking whether it's still wanted. */
   private waiting: (() => void)[] = [];
   private yielded = 0;
+  private sleeping = 0;
 
   constructor(
     private readonly text: string,
@@ -43,6 +42,11 @@ export class ReplayRunner {
     private turnsPerSecond: number,
     private readonly bones?: (hash: string) => Uint8Array | undefined,
   ) {}
+
+  /** Nothing more will happen until a control comes: no timer is running, and a pace is waiting for play to go on. */
+  get idle(): boolean {
+    return this.sleeping === 0 && this.waiting.length > 0;
+  }
 
   start(): void {
     this.begin();
@@ -117,7 +121,7 @@ export class ReplayRunner {
   }
 
   private async delay(run: number): Promise<void> {
-    if (this.seekTo === null && this.turnsPerSecond <= FLASH_UP_TO) await sleep(DELAY_MS);
+    if (this.seekTo === null && this.turnsPerSecond <= FLASH_UP_TO) await this.sleep(DELAY_MS);
     else await this.breathe();
     if (run !== this.run) return never();
   }
@@ -138,13 +142,13 @@ export class ReplayRunner {
       if (run !== this.run) return never();
       if (this.seekTo !== null) return;
     } else if (at.turn !== undefined) {
-      await sleep(1000 / this.turnsPerSecond);
+      await this.sleep(1000 / this.turnsPerSecond);
       if (run !== this.run) return never();
     }
     await this.untilPlaying(run);
     if (at.request && this.turnsPerSecond <= FLASH_UP_TO) {
       this.page.replay({ type: "replay_prompt", request: at.request });
-      await sleep(FLASH_MS);
+      await this.sleep(FLASH_MS);
       if (run !== this.run) return never();
       this.page.replay({ type: "replay_prompt", request: null });
       // a pause during the flash holds the answer back
@@ -162,8 +166,14 @@ export class ReplayRunner {
   /** Lets the worker see the page's messages now and then while the core runs flat out. */
   private async breathe(): Promise<void> {
     if (Date.now() - this.yielded < YIELD_EVERY_MS) return;
-    await sleep(0);
+    await this.sleep(0);
     this.yielded = Date.now();
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    this.sleeping++;
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    this.sleeping--;
   }
 
   /** A seek has reached its turn: show all it skipped, and wait there. */

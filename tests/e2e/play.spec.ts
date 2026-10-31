@@ -38,6 +38,37 @@ async function untilPlaying(page: Page) {
   }
 }
 
+/** Every key so far has been dealt with: keys typed ahead go to the core before it asks for another command. */
+const untilCommand = (page: Page) => page.locator(".app[data-commanding]").waitFor({ state: "attached" });
+
+/** Answers what the core asks on the way out of a game that's being quit, until the game over dialog is up. */
+async function untilGameOver(page: Page) {
+  const dialog = page.getByRole("dialog");
+  for (;;) {
+    await dialog.first().waitFor();
+    if (await page.getByRole("dialog", { name: "The game is over" }).isVisible()) return;
+    const shown = await dialog.innerText();
+    // the y for this can be typed ahead of it, and Escape would take back the quit
+    if (!/really quit/i.test(shown)) await page.keyboard.press("Escape");
+    await page.waitForFunction((shown) => document.querySelector<HTMLElement>('[role="dialog"]')?.innerText !== shown, shown, { polling: "raf" });
+  }
+}
+
+/** The game's recording as it's kept: what a reload would find. */
+const recording = (page: Page, name: string) =>
+  page.evaluate(
+    (key) =>
+      new Promise<string>((resolve, reject) => {
+        const open = indexedDB.open("/save");
+        open.onerror = reject;
+        open.onsuccess = () => {
+          const get = open.result.transaction("FILE_DATA").objectStore("FILE_DATA").get(key);
+          get.onsuccess = () => resolve(get.result ? new TextDecoder().decode(get.result.contents) : "");
+        };
+      }),
+    `/save/replay/0${name}/000001`,
+  );
+
 /** Starts a game as the role picked in the character picker. */
 async function startAs(page: Page, name: string, role: RegExp) {
   await enterGame(page, name);
@@ -63,8 +94,8 @@ test("start a game, move, and see status and inventory", async ({ page }) => {
 
   for (const key of ["l", "l", "j", "h", "k"]) {
     await page.keyboard.press(key);
-    await page.waitForTimeout(100);
   }
+  await page.getByRole("dialog").or(page.locator(".app[data-commanding]")).first().waitFor({ state: "attached" });
   await page.screenshot({ path: "test-results/play.png" });
   expect(errors).toEqual([]);
 });
@@ -136,7 +167,7 @@ test("a game in progress comes back after a reload without asking", async ({ pag
   await startGame(page, name);
   const title = await page.locator(".stats-title").innerText();
   await page.keyboard.press("l");
-  await page.waitForTimeout(500);
+  await expect.poll(() => recording(page, name)).toMatch(/^\d+ k 108\b/m);
 
   await page.reload();
   // replayed, it never left the game it was in, so the core has nothing to welcome it back to
@@ -146,25 +177,11 @@ test("a game in progress comes back after a reload without asking", async ({ pag
 
   // the player has it from there, and that lasts through another reload
   await page.keyboard.press("l");
-  await page.waitForTimeout(500);
-  const recording = () =>
-    page.evaluate(
-      (dir) =>
-        new Promise<string>((resolve, reject) => {
-          const open = indexedDB.open("/save");
-          open.onerror = reject;
-          open.onsuccess = () => {
-            const get = open.result.transaction("FILE_DATA").objectStore("FILE_DATA").get(`/save/replay/${dir}/000001`);
-            get.onsuccess = () => resolve(new TextDecoder().decode(get.result.contents));
-          };
-        }),
-      `0${name}`,
-    );
-  expect(await recording()).toMatch(/^\d+ back \S+Z$/m);
+  await expect.poll(() => recording(page, name)).toMatch(/^\d+ back \S+Z\n(.*\n)*\d+ k 108\b/m);
   await page.reload();
   await expect(page.locator(".stats-title")).toHaveText(title, { timeout: 15_000 });
   await expect(page.locator(".messages")).not.toContainText(/old game in progress|welcome back/i);
-  expect((await recording()).match(/^\d+ back /gm)).toHaveLength(2);
+  await expect.poll(async () => (await recording(page, name)).match(/^\d+ back /gm)).toHaveLength(2);
 });
 
 test("a game whose replay goes differently comes back from its checkpoint", async ({ page }) => {
@@ -172,9 +189,8 @@ test("a game whose replay goes differently comes back from its checkpoint", asyn
   await startGame(page, name);
   const title = await page.locator(".stats-title").innerText();
   await page.keyboard.press("l");
-  await page.waitForTimeout(500);
   await page.keyboard.press("s");
-  await page.waitForTimeout(500);
+  await expect.poll(() => recording(page, name)).toMatch(/^\d+ k 115\b/m);
 
   await page.evaluate(
     (key) =>
@@ -231,11 +247,11 @@ test("an inventory click inside a prompt is ignored", async ({ page }) => {
   await expect(page.getByRole("dialog")).toBeHidden();
   await expect(page.locator(".messages")).toContainText(/where do you want to travel/i);
   await page.locator(".inv-item").first().click();
-  await page.waitForTimeout(500);
+  await page.keyboard.press("Escape");
+  await untilCommand(page);
   await expect(page.getByRole("dialog")).toBeHidden();
   await expect(page.locator(".messages")).not.toContainText(/unknown direction/i);
 
-  await page.keyboard.press("Escape");
   await page.locator(".inv-item").first().click();
   await expect(page.getByRole("dialog")).toContainText(/Do what with/i);
 });
@@ -311,7 +327,7 @@ test("keys typed into an open window stay there", async ({ page }) => {
   await expect(dialog).toBeVisible();
   await page.keyboard.press(" ");
   await expect(dialog).toBeHidden();
-  await page.waitForTimeout(300);
+  await untilCommand(page);
   await expect(page.locator(".messages")).not.toContainText(/unknown command/i);
   expect(await turn()).toBe(before);
 });
@@ -779,7 +795,7 @@ test("a key typed before a text window opened doesn't close it unseen", async ({
   });
   const dialog = page.getByRole("dialog");
   await expect(dialog.locator(".text-body")).toBeVisible();
-  await page.waitForTimeout(300);
+  await settle(page);
   await expect(dialog.locator(".text-body")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
@@ -1013,10 +1029,7 @@ test("when the game ends, a dialog offers a new game under the same name, or the
     await page.keyboard.type("quit");
     await page.keyboard.press("Enter");
     await page.keyboard.press("y");
-    for (let i = 0; i < 40 && !(await over.isVisible()); i++) {
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(150);
-    }
+    await untilGameOver(page);
     await expect(over).toContainText("Start a new game, or quit to the home page.");
   };
   await quitGame();
@@ -1139,9 +1152,10 @@ test("the Help menu's About box credits NetHack, this version, the painted tiles
   await expect(about).toContainText("Cocoa interface by Bryce Cogswell and Dirk Zimmermann");
   // the game doesn't hear keys while it's open
   await page.keyboard.press("i");
+  // a key reaching the game would have taken this away until its menu was answered
+  await expect(page.locator(".app[data-commanding]")).toBeAttached();
   await page.keyboard.press("Escape");
   await expect(about).toBeHidden();
-  await page.waitForTimeout(500);
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
@@ -1202,11 +1216,8 @@ test("a finished game can be replayed from its end screen or its address, reload
   await page.keyboard.type("quit");
   await page.keyboard.press("Enter");
   await page.keyboard.press("y");
+  await untilGameOver(page);
   const over = page.getByRole("dialog", { name: "The game is over" });
-  for (let i = 0; i < 40 && !(await over.isVisible()); i++) {
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(150);
-  }
 
   const download = page.waitForEvent("download");
   await over.getByRole("button", { name: "Download Recording" }).click();
@@ -1300,11 +1311,7 @@ test.describe("shadowing a game", () => {
     await page.keyboard.type("quit");
     await page.keyboard.press("Enter");
     await page.keyboard.press("y");
-    const over = page.getByRole("dialog", { name: "The game is over" });
-    for (let i = 0; i < 40 && !(await over.isVisible()); i++) {
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(150);
-    }
+    await untilGameOver(page);
     await expect(bar(page)).toContainText("matched to the end", { timeout: 15000 });
     expect(errors).toEqual([]);
   });
