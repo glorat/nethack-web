@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
     "build:wasm": "scripts/build-wasm.sh",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

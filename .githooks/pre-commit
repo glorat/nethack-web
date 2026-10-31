@@ -1,0 +1,8 @@
+#!/bin/sh
+# A commit that moves the nethack/ pointer moves nothing else, so the core's
+# updates and the front end's changes can be read, reverted and reviewed apart.
+staged=$(git diff --cached --name-only)
+if echo "$staged" | grep -qx nethack && [ "$(echo "$staged" | wc -l)" -gt 1 ]; then
+  echo "pre-commit: commit the nethack/ pointer on its own, apart from the front end's changes" >&2
+  exit 1
+fi

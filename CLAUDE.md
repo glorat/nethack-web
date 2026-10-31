@@ -4,6 +4,8 @@
 
 - `nethack/` is a submodule on the `glorat/NetHack` fork, branch `web`. Commit and push core changes there first, then commit the submodule pointer here, so the pointer never names a commit GitHub lacks.
 - Keep each fork commit small and self-contained, so it could be offered upstream on its own.
+- Here, a commit that moves the `nethack/` pointer ("Update the core to …") contains nothing else; the front end's changes go in their own commit after it. `.githooks/pre-commit` refuses a mix; `pnpm install` turns it on.
+- Core changes go straight to the fork's `web` branch and are pushed; changes here go on a branch for a pull request.
 - Commit messages follow `CONTRIBUTING.md` in both repos: subject only, no body. Check `git log` before writing one; don't invent a style.
 - Before changing a core file or adding software that ships to players, follow the Licences section of `CONTRIBUTING.md`.
 
