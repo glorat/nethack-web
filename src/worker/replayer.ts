@@ -413,6 +413,8 @@ export async function replay(
       core = m;
       host = new ReplayHost(session, m, utcOffset, {
         ...hooks,
+        // an earlier session is as long as it will ever be
+        more: next ? undefined : hooks.more,
         checkpoint(n) {
           hooks.checkpoint(n);
           // as the closed page left /save, for the recovery that follows

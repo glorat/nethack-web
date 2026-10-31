@@ -187,6 +187,8 @@ export interface StartOptions {
   options: string;
   /** The .nethackrc the game reads, before NETHACKOPTIONS. */
   config: string;
+  /** A shadow is following, and needs what a game that comes back had already recorded. */
+  shadowed?: boolean;
 }
 
 export type UiMessage =

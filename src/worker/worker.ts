@@ -77,9 +77,10 @@ function soleTab(): Promise<boolean> {
   });
 }
 
-/** What's kept of the games in /save, without the recordings and bones kept beside them. */
+/** The files of the game being played, of all the games /save may hold. */
 function gameFiles(m: NetHackModule): Record<string, Uint8Array> {
-  return Object.fromEntries([...saveFiles(m)].filter(([f]) => !/^(replay|bones)\//.test(f)));
+  const name = m.UTF8ToString(m._nhweb_game_name()).replace(/\.\d+$/, "");
+  return Object.fromEntries([...saveFiles(m)].filter(([f]) => f === name || f.startsWith(`${name}.`)));
 }
 
 /** A version 4 UUID; crypto.randomUUID is missing outside https and localhost. */
@@ -98,7 +99,7 @@ async function loadCore(assetBase: string): Promise<CreateModule> {
   return ((await import(/* @vite-ignore */ url)) as { default: CreateModule }).default;
 }
 
-async function start({ assetBase, options, config }: StartOptions): Promise<void> {
+async function start({ assetBase, options, config, shadowed }: StartOptions): Promise<void> {
   const createModule = await loadCore(assetBase);
 
   // taken once, so a game doesn't change zone as daylight saving starts or ends
@@ -162,7 +163,7 @@ async function start({ assetBase, options, config }: StartOptions): Promise<void
       options: coreOptions,
       config: coreConfig,
       stream: (lines, atPrompt) => send({ type: "events", events: [{ type: "recorded", lines, atPrompt }] }),
-      before: (text) => send({ type: "events", events: [{ type: "recorded_before", text }] }),
+      before: shadowed ? (text) => send({ type: "events", events: [{ type: "recorded_before", text }] }) : undefined,
       finished: (text) => send({ type: "events", events: [{ type: "recording", text }] }),
       resume,
     });

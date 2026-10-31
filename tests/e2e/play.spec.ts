@@ -1294,7 +1294,7 @@ test.describe("shadowing a game", () => {
     const held = JSON.parse(await readFile((await (await during).path())!, "utf8"));
     expect(held.recording).toMatch(/^\d+ back /m);
     expect(held.core).toMatch(/^[0-9a-f]+$/);
-    expect(Object.keys(held.files)).toContain(`0${name}.0`);
+    expect(held.files).toBeNull();
 
     await page.keyboard.press("#");
     await page.keyboard.type("quit");
@@ -1337,5 +1337,12 @@ test.describe("shadowing a game", () => {
     await expect(bar(page)).toContainText("went differently", { timeout: 15000 });
     await expect(bar(page)).toContainText("expected now");
     await page.keyboard.press("s");
+
+    const download = page.waitForEvent("download");
+    await bar(page).getByRole("button", { name: "Download Debug Package" }).click();
+    const { readFile } = await import("node:fs/promises");
+    const held = JSON.parse(await readFile((await (await download).path())!, "utf8"));
+    expect(Object.keys(held.files).length).toBeGreaterThan(0);
+    expect(Object.keys(held.files).every((f) => f === `0${name}` || f.startsWith(`0${name}.`))).toBe(true);
   });
 });

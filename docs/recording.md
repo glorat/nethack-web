@@ -78,7 +78,7 @@ In the browser, `/play/?replay` plays the last finished game, which each game ov
 
 For developers. `/play/?shadow` turns it on for this browser and `?shadow=0` turns it off. A second worker runs its own core, replaying the recording as it's written (`src/worker/shadow.ts`) and checking every mark, so a game that wouldn't replay shows up while it's played. It only reads, and can't affect the game. A bar shows how it's getting on.
 
-The bar's **Download Debug Package** gives a JSON file with the recording so far, the bones it names, both sides' game files if it found a difference, and the build. To replay one on the headless core:
+The bar's **Download Debug Package** gives a JSON file with the recording so far, the bones it names, the build, and both sides' files of this game if it found a difference. It holds the character's name and options and all that was typed, and is only ever shared by hand. To replay one on the headless core:
 
 ```
 PACKAGE=/path/to/package.json pnpm test debug-package
