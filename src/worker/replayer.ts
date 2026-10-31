@@ -242,7 +242,7 @@ export class ReplayHost implements GameHost {
         return true;
       }
       case "=": {
-        const check = checkLine(Number(first), this.status).slice(2);
+        const check = checkLine(Number(first), this.m, this.status).slice(2);
         if (check !== line.rest) this.fail(line, `the core shows ${check}`);
         return true;
       }
