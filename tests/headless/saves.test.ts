@@ -80,10 +80,9 @@ test("a game comes back with the start time it had, in the page's time zone", as
   const left = await (await Session.start({ seed: 3, date, utcOffset })).skipText();
   await left.send("h,");
 
-  // the xlogfile is locked before it's written, which needs it to exist
-  const saves = new Map([...left.saves(), ["logfile", new Uint8Array()], ["xlogfile", new Uint8Array()]]);
-  const next = await (await Session.start({ saves, seed: 3, date, utcOffset })).skipText();
+  const next = await (await Session.start({ saves: left.saves(), seed: 3, date, utcOffset })).skipText();
   await quit(next);
+  expect(next.messages.filter((t) => /Cannot open/.test(t))).toEqual([]);
   const xlog = new TextDecoder().decode(next.saves().get("xlogfile"));
   expect(xlog).toContain(`starttime=${Date.parse(date) / 1000}\t`);
 });
