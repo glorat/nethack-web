@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { Session } from "./harness";
+import { PAGE_UUID, Session } from "./harness";
 
 const tiles = (g: Session) => g.state.map.map((c) => c?.tile ?? null);
 
@@ -23,6 +23,14 @@ test("the page's clock is the game's", async () => {
     (await (await Session.start({ date })).skipText()).messages.some((t) => /full moon tonight/i.test(t));
   expect(await moon("2024-01-25T12:00:00Z")).toBe(true);
   expect(await moon()).toBe(false);
+});
+
+test("the page names the game", async () => {
+  const g = await (await Session.start({ wizard: true })).skipText();
+  await g.send("#");
+  if (g.prompt?.kind !== "ext_cmd") throw new Error("no extended command prompt");
+  await g.answer({ kind: "ext_cmd", index: g.prompt.commands.find((c) => c.name === "wizshownhuuid")!.index });
+  expect(g.messages).toContain(`The NHUUID for this game is { ${PAGE_UUID} }.`);
 });
 
 test("debug mode lets a test wish for an item", async () => {

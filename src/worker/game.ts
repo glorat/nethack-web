@@ -63,6 +63,8 @@ export interface GameHost {
   now(): number;
   /** An unguessable 32-bit seed, asked for at the start and at each level change. */
   randomSeed(): number;
+  /** A new game's id, kept in its save and in any bones it leaves. */
+  uuid(): string;
 }
 
 /** "FOODPOIS" style names of the bits set in a BL_CONDITION mask, in `order`. */
@@ -284,6 +286,9 @@ export class Game {
         return this.host.now();
       case "shim_random_seed":
         return this.host.randomSeed();
+      case "shim_nhuuid":
+        this.m.stringToUTF8(this.host.uuid(), a[0], a[1]);
+        return 0;
       case "shim_doprev_message":
         return 0;
       case "shim_exit_nhwindows":

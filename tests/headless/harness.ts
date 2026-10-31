@@ -11,6 +11,7 @@ const ROOT = resolve(__dirname, "../..");
 
 // a Monday at first quarter, so no full or new moon and no Friday the 13th change luck
 const DEFAULT_DATE = "2026-01-26T12:00:00Z";
+export const PAGE_UUID = "00000000-0000-4000-8000-000000000001";
 
 export interface SessionOptions {
   name?: string;
@@ -262,6 +263,7 @@ export class Session {
       alone: !options.otherTab,
       now: () => now,
       randomSeed: () => options.pageSeed ?? 0,
+      uuid: () => PAGE_UUID,
     };
   }
 
