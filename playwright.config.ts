@@ -1,7 +1,11 @@
 import { defineConfig } from "@playwright/test";
 
+const update = !!process.env.E2E_UPDATE;
+
 export default defineConfig({
   testDir: "tests/e2e",
+  // slow, and only at risk from changes to the service worker: run with pnpm run test:e2e:update
+  testIgnore: update ? undefined : "update.spec.ts",
   timeout: 60_000,
   use: {
     baseURL: "http://127.0.0.1:5199/",
@@ -19,11 +23,15 @@ export default defineConfig({
       url: "http://127.0.0.1:5198/",
       reuseExistingServer: !process.env.CI,
     },
-    {
-      // reads dist/, which the preview server above has built by the time the tests start
-      command: "node scripts/serve-update-test.mjs 5197",
-      url: "http://127.0.0.1:5197/__next-version",
-      reuseExistingServer: !process.env.CI,
-    },
+    ...(update
+      ? [
+          {
+            // reads dist/, which the preview server above has built by the time the tests start
+            command: "node scripts/serve-update-test.mjs 5197",
+            url: "http://127.0.0.1:5197/__next-version",
+            reuseExistingServer: !process.env.CI,
+          },
+        ]
+      : []),
   ],
 });
