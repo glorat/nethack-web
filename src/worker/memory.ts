@@ -36,8 +36,6 @@ export interface NetHackModule {
   _nhweb_game_over(): number;
   _nhweb_resumed(): number;
   _nhweb_restoring(): number;
-  _nhweb_checkpointed(): number;
-  _nhweb_checkpoint_count(): number;
   _nhweb_game_name(): number;
   _nhweb_rng_fingerprint(): number;
   _nhweb_hero_x(): number;

@@ -3,26 +3,51 @@
 import type { Answer, GameEvent, GameRequest, MenuItem, MenuSelection } from "../protocol";
 import type { Game, GameHost, Input } from "./game";
 import type { NetHackModule } from "./memory";
-import { ALIGNS, ANSWER_TAGS, checkLine, FORMAT, GENDERS, levelsHash, zoneSeconds } from "./recorder";
+import { ALIGNS, ANSWER_TAGS, checkLine, FORMAT, GENDERS, levelsHash, turnSum, zoneSeconds } from "./recorder";
 
-export class ReplayError extends Error {}
+export class ReplayError extends Error {
+  /** The recording's last line known good when it went differently, counting from 1; 0 if none. */
+  lastGood = 0;
+}
+
+/** How far a replay's checks have passed, by line. */
+interface Passed {
+  /** The last `=`, the only check of what's on the status line. */
+  full: number;
+  /** The last check of any kind. */
+  any: number;
+}
+
+// what the status line shows of the game itself, in figures a change of wording leaves alone
+const GAME_FIELDS = ["AC", "CH", "CO", "DX", "ENE", "ENEMAX", "GOLD", "HD", "HP", "HPMAX", "IN", "STR", "TIME", "WI", "XP"];
+
+/** Gold is shown with its glyph's number, which moves as glyphs are added. */
+const gameValue = (field: string, text: string) => (field === "GOLD" ? text.replace(/^.*:/, "") : text);
+
+/** Whether a `=` line's rest, written by this build or another, says the same of the game. */
+export function sameCheck(a: string, b: string): boolean {
+  const parts = (rest: string) => /^(\S+ \S+ \S+) (\{.*\})$/.exec(rest);
+  const [x, y] = [parts(a), parts(b)];
+  if (!x || !y || x[1] !== y[1]) return false;
+  const [xs, ys] = [JSON.parse(x[2]) as Record<string, string>, JSON.parse(y[2]) as Record<string, string>];
+  return GAME_FIELDS.every((f) => xs[f] === undefined || ys[f] === undefined || gameValue(f, xs[f]) === gameValue(f, ys[f]));
+}
 
 /** A promise that never settles; a fresh one each time, as one shared would keep every core waiting on it alive. */
 export const never = <T>() => new Promise<T>(() => {});
-const MARKS = new Set(["ckpt", "T", "=", "lv", "asc", "back"]);
+const MARKS = new Set(["ckpt", "T", "=", "lv", "asc", "back", "now"]);
 // as long as Game pauses for the core's delay_output
 const DELAY_MS = 50;
 
 export interface Line {
-  seq: number;
+  /** Its place in the recording, counting from 1. */
+  at: number;
   tag: string;
   rest: string;
 }
 
 export interface RecordedSession {
-  kind: "new" | "restore" | "recover" | "unrecorded";
-  /** For a recovery: the checkpoint of the session before that the game came back from. */
-  checkpoint: number;
+  kind: "new" | "restore" | "unrecorded";
   options: string;
   config: string;
   lines: Line[];
@@ -35,35 +60,31 @@ export interface Recording {
 }
 
 /** A line's parts; throws if it can't be read. */
-export function parseLine(raw: string): Line {
+export function parseLine(raw: string, at: number): Line {
   // [\s\S], as JSON leaves U+2028 and U+2029 in strings, which . doesn't match
   const m = /^(\d+) (\S+)(?: ([\s\S]*))?$/.exec(raw.replace(/\r$/, ""));
   if (!m) throw new ReplayError(`unreadable line: ${raw}`);
-  return { seq: Number(m[1]), tag: m[2], rest: m[3] ?? "" };
+  return { at, tag: m[2], rest: m[3] ?? "" };
 }
 
 export function parseRecording(text: string): Recording {
   const sessions: RecordedSession[] = [];
   let utcOffset: number | null = null;
-  let seq = 0;
-  for (const raw of text.split("\n")) {
+  for (const [i, raw] of text.split("\n").entries()) {
     if (!raw) continue;
-    const line = parseLine(raw);
-    // each session numbers its lines from 1, so a line lost from the middle shows
-    if (line.seq !== (line.seq === 1 ? 1 : seq + 1)) throw new ReplayError(`line ${seq + 1} is missing`);
-    seq = line.seq;
+    const line = parseLine(raw, i + 1);
     const session = sessions[sessions.length - 1];
     if (line.tag === "nhrec") {
       if (Number(line.rest) !== FORMAT) throw new ReplayError(`recording format ${line.rest}, not ${FORMAT}`);
     } else if (line.tag === "session") {
-      const [kind, ...args] = line.rest.split(" ");
-      if (kind !== "new" && kind !== "restore" && kind !== "recover" && kind !== "unrecorded")
+      const [kind] = line.rest.split(" ");
+      if (kind !== "new" && kind !== "restore" && kind !== "unrecorded")
         throw new ReplayError(`unknown session: ${line.rest}`);
       const tz = /tz=(\S+)/.exec(line.rest)?.[1];
       if (tz && utcOffset === null) utcOffset = zoneSeconds(tz);
-      sessions.push({ kind, checkpoint: kind === "recover" ? Number(args[0]) : 0, options: "", config: "", lines: [] });
+      sessions.push({ kind, options: "", config: "", lines: [] });
     } else if (!session) {
-      throw new ReplayError(`line ${line.seq} comes before any session`);
+      throw new ReplayError(`line ${line.at} comes before any session`);
     } else if (line.tag === "opt") {
       session.options = JSON.parse(line.rest);
     } else if (line.tag === "rc") {
@@ -114,12 +135,14 @@ export function parseAnswer(request: GameRequest, rest: string): Answer | null {
   throw new ReplayError(`unreadable ${request.kind} answer: ${rest}`);
 }
 
-type MenuPick = [string, number, number] | [number, number];
+type MenuPick = [string, number, number, string?] | [number, number];
 
 function menuSelection(items: MenuItem[], pick: MenuPick): MenuSelection {
   if (typeof pick[0] === "number") return { identifier: pick[0], count: pick[1] as number };
-  const [text, which, count] = pick as [string, number, number];
-  const item = items.filter((i) => i.identifier !== 0 && i.text === text)[which];
+  const [text, which, count, letter] = pick as [string, number, number, string?];
+  const selectable = items.filter((i) => i.identifier !== 0);
+  const lettered = letter ? selectable.filter((i) => i.accelerator === letter) : [];
+  const item = selectable.filter((i) => i.text === text)[which] ?? (lettered.length === 1 ? lettered[0] : undefined);
   if (!item) throw new ReplayError(`the menu has no item ${JSON.stringify(text)}`);
   return { identifier: item.identifier, count };
 }
@@ -148,8 +171,6 @@ export interface ReplayHooks {
   pace(at: { turn?: number; request?: GameRequest }): Promise<void>;
   /** The core's pause in an animation, such as a zap; it plays at its own pace without this. */
   delay?(): Promise<void>;
-  /** The core has reached checkpoint `n` of this session. */
-  checkpoint(n: number): void;
   /** The bones with this hash, which a recording names rather than holds. */
   bones?(hash: string): Uint8Array | undefined;
   /** This core is the build that made the recording, so its files can be compared. */
@@ -180,12 +201,14 @@ export class ReplayHost implements GameHost {
   private done = false;
   /** Went differently from the recording, or the core stopped before its end. */
   diverged = false;
+  private clock: number | null = null;
 
   constructor(
     private readonly session: RecordedSession,
     private readonly m: NetHackModule,
     private readonly offset: number,
     private readonly hooks: ReplayHooks,
+    private readonly passed: Passed = { full: 0, any: 0 },
   ) {
     void this.failure.catch(() => {});
   }
@@ -225,7 +248,9 @@ export class ReplayHost implements GameHost {
   stopped(why: string): void {
     if (this.done) return;
     this.diverged = true;
-    this.failed?.(new ReplayError(why));
+    const error = new ReplayError(why);
+    error.lastGood = this.passed.any;
+    this.failed?.(error);
     this.stopWith("out");
   }
 
@@ -234,8 +259,15 @@ export class ReplayHost implements GameHost {
     this.stopWith("out");
   }
 
+  /** The next recorded time; as the core's reads of the clock aren't the game, one with none left to take gets the last. */
   now(): number {
-    return Number(this.take("now")?.rest ?? 0);
+    let ahead = this.at;
+    while (this.session.lines[ahead] && this.session.lines[ahead].tag !== "now" && MARKS.has(this.session.lines[ahead].tag)) ahead++;
+    if (this.session.lines[ahead]?.tag === "now") {
+      const line = this.take("now");
+      if (line) this.clock = Number(line.rest);
+    }
+    return this.clock ?? Number(this.session.lines.find((l) => l.tag === "now")?.rest ?? 0);
   }
 
   randomSeed(): number {
@@ -322,20 +354,24 @@ export class ReplayHost implements GameHost {
   private mark(line: Line): boolean {
     const [first] = line.rest.split(" ");
     switch (line.tag) {
-      case "ckpt": {
-        const count = this.m._nhweb_checkpoint_count();
-        if (count !== Number(first)) this.fail(line, `the core is at checkpoint ${count}`);
-        else this.guard(() => this.hooks.checkpoint(count), line);
+      case "ckpt":
         return true;
-      }
+      case "now":
+        this.clock = Number(first);
+        return true;
       case "T": {
-        const turn = this.m._nhweb_checkpointed();
+        const turn = this.m._nhweb_moves();
+        // older recordings have a time there, or nothing
+        const sum = /^[0-9a-f]{4}$/.exec(line.rest.split(" ")[1] ?? "")?.[0];
         if (turn !== Number(first)) this.fail(line, `the core is at turn ${turn}`);
+        else if (sum && sum !== turnSum(this.m)) this.fail(line, `the core's sum is ${turnSum(this.m)}`);
+        else if (sum) this.passed.any = line.at;
         return true;
       }
       case "=": {
         const check = checkLine(Number(first), this.m, this.status).slice(2);
-        if (check !== line.rest) this.fail(line, `the core shows ${check}`);
+        if (!sameCheck(check, line.rest)) this.fail(line, `the core shows ${check}`);
+        else this.passed.full = this.passed.any = line.at;
         return true;
       }
       case "lv": {
@@ -358,7 +394,10 @@ export class ReplayHost implements GameHost {
   private fail(line: Line, why: string): void {
     if (this.done) return;
     this.diverged = true;
-    this.failed?.(new ReplayError(`line ${line.seq} (${line.tag} ${line.rest}): ${why}`));
+    const error = new ReplayError(`line ${line.at} (${line.tag} ${line.rest}): ${why}`);
+    // sums pass whatever the status line shows, so one that went wrong may have passed many
+    error.lastGood = line.tag === "=" ? this.passed.full : this.passed.any;
+    this.failed?.(error);
     this.stopWith("out");
   }
 
@@ -431,26 +470,27 @@ export async function replay(
   const { utcOffset, sessions } = parseRecording(text);
   follow?.(sessions[sessions.length - 1]);
   let files = new Map<string, Uint8Array>();
+  const passed: Passed = { full: 0, any: 0 };
   for (let i = 0; i < sessions.length; i++) {
     const session = sessions[i];
     const next = sessions[i + 1];
     if (session.kind === "unrecorded") throw new ReplayError("the game's start wasn't recorded");
     if (session.kind === "new") files = new Map();
-    let kept: Map<string, Uint8Array> | null = null;
     let core!: NetHackModule;
     let host!: ReplayHost;
     await boot(session, files, (m) => {
       core = m;
-      host = new ReplayHost(session, m, utcOffset, {
-        ...hooks,
-        // an earlier session is as long as it will ever be
-        more: next ? undefined : hooks.more,
-        checkpoint(n) {
-          hooks.checkpoint(n);
-          // as the closed page left /save, for the recovery that follows
-          if (next?.kind === "recover" && next.checkpoint === n) kept = saveFiles(m);
+      host = new ReplayHost(
+        session,
+        m,
+        utcOffset,
+        {
+          ...hooks,
+          // an earlier session is as long as it will ever be
+          more: next ? undefined : hooks.more,
         },
-      });
+        passed,
+      );
       return host;
     });
     // a failure also finishes the session, so it must win when both are settled
@@ -459,9 +499,6 @@ export async function replay(
     if (next.kind === "restore") {
       if (end !== "end") throw new ReplayError(`session ${i + 1} wasn't saved, yet the next restores it`);
       files = saveFiles(core);
-    } else if (next.kind === "recover") {
-      if (!kept) throw new ReplayError(`session ${i + 1} never reached checkpoint ${next.checkpoint}`);
-      files = kept;
     }
   }
 }

@@ -8,7 +8,7 @@ import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
 import { BonesDb } from "../../src/worker/bones";
 import { Recorder } from "../../src/worker/recorder";
 import { type BootCore, never, replay, ReplayError, saveFiles, writeSaveFiles } from "../../src/worker/replayer";
-import { placeGameFiles, resumedHost, resumeGame } from "../../src/worker/resume";
+import { placeGameFiles, resumedHost, resumeGame, resumeToLastGood } from "../../src/worker/resume";
 import { describeSquare, type EmscriptenFS, type NetHackModule } from "../../src/worker/memory";
 
 const ROOT = resolve(__dirname, "../..");
@@ -222,7 +222,7 @@ export class Session {
     let shown: GameEvent[] = [];
     const db = new BonesDb(this.m.FS);
     try {
-      await resumeGame(
+      await resumeToLastGood(text, async (text) => resumeGame(
         text,
         {
           bones: (hash) => db.get(hash),
@@ -240,7 +240,7 @@ export class Session {
           },
         },
         (events) => shown.push(...events),
-      );
+      ));
     } catch (e) {
       this.resumeFailure = e instanceof Error ? e.message : String(e);
       await this.playLive(options, this.persisted);
@@ -500,7 +500,7 @@ export async function replayCore(text: string): Promise<{ files: Map<string, Uin
           core = m;
           return makeHost(m);
         }),
-      { post: () => {}, pace: () => Promise.resolve(), delay: () => Promise.resolve(), checkpoint: () => {} },
+      { post: () => {}, pace: () => Promise.resolve(), delay: () => Promise.resolve() },
     );
   } catch (e) {
     if (!(e instanceof ReplayError)) throw e;
@@ -518,7 +518,6 @@ export async function replayRecording(text: string, saves?: Map<string, Uint8Arr
       post: (events) => (state = applyEvents(state, events)),
       pace: () => Promise.resolve(),
       delay: () => Promise.resolve(),
-      checkpoint: () => {},
       bones: (hash) => saves?.get(`bones/${hash}`),
     });
     return { state, error: null };

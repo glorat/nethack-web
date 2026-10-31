@@ -5,8 +5,8 @@ import { type BootCore, never, saveFiles, writeSaveFiles } from "./replayer";
 import { Shadow } from "./shadow";
 import { CONFIG_FILE, Game, type Input } from "./game";
 import { BonesDb } from "./bones";
-import { Recorder } from "./recorder";
-import { placeGameFiles, resumedHost, resumeGame } from "./resume";
+import { FAILED_FILE, Recorder, RECORDING_DIR } from "./recorder";
+import { placeGameFiles, resumedHost, resumeGame, resumeToLastGood } from "./resume";
 import { describeSquare, type NetHackModule } from "./memory";
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -81,6 +81,12 @@ function soleTab(): Promise<boolean> {
 function gameFiles(m: NetHackModule): Record<string, Uint8Array> {
   const name = m.UTF8ToString(m._nhweb_game_name()).replace(/\.\d+$/, "");
   return Object.fromEntries([...saveFiles(m)].filter(([f]) => f === name || f.startsWith(`${name}.`)));
+}
+
+function failedRecording(m: NetHackModule): string | null {
+  const name = m.UTF8ToString(m._nhweb_game_name()).replace(/\.\d+$/, "");
+  const path = `${RECORDING_DIR}/${name}/${FAILED_FILE}`;
+  return name && m.FS.analyzePath(path).exists ? m.FS.readFile(path, { encoding: "utf8" }) : null;
 }
 
 /** A version 4 UUID; crypto.randomUUID is missing outside https and localhost. */
@@ -192,7 +198,7 @@ async function start({ assetBase, options, config, shadowed }: StartOptions): Pr
     let shown: GameEvent[] = [];
     const db = new BonesDb(module!.FS);
     try {
-      await resumeGame(
+      await resumeToLastGood(text, (text) => resumeGame(
         text,
         {
           bones: (hash) => db.get(hash),
@@ -217,7 +223,7 @@ async function start({ assetBase, options, config, shadowed }: StartOptions): Pr
           },
         },
         (events) => shown.push(...events),
-      );
+      ));
     } catch (e) {
       // what's kept is as the page left it, so the game can still come back from its checkpoint
       console.warn("couldn't replay the game", e);
@@ -372,7 +378,7 @@ self.onmessage = (ev: MessageEvent<UiMessage>) => {
         const data = db?.get(h);
         return data ? [[h, data]] : [];
       }));
-      send({ type: "debug_files", id: msg.id, files: module ? gameFiles(module) : {}, bones });
+      send({ type: "debug_files", id: msg.id, files: module ? gameFiles(module) : {}, bones, failed: module ? failedRecording(module) : null });
       break;
     }
     case "key":

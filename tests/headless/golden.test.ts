@@ -61,7 +61,7 @@ async function quit(g: Session): Promise<void> {
 }
 
 /**
- * A game played over three sessions, saved, restored, left open, recovered
+ * A game played over three sessions, saved, restored, left open, brought back
  * and quit; or as far as it got, if the hero died on the way.
  */
 async function record(options: SessionOptions, seed: number): Promise<string> {
@@ -74,7 +74,7 @@ async function record(options: SessionOptions, seed: number): Promise<string> {
   const second = await (await Session.start({ ...options, saves: first.saves() })).skipText();
   await explore(second, 150, state);
   if (second.recording) return second.recording;
-  const third = await (await Session.start({ ...options, saves: second.persisted })).skipText();
+  const third = await (await Session.start({ ...options, saves: second.persisted, resume: true })).skipText();
   await explore(third, 150, state);
   await quit(third);
   return third.recording!;

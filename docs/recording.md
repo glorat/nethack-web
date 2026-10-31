@@ -12,16 +12,15 @@ A recording holds everything a game took from the page: what the player typed, c
 
 ## Lines
 
-Each line is `<seq> <tag> [args]`. `seq` counts from 1 within each session. Text that could hold anything is a JSON string literal. `-` stands for an answer the page gave none to, such as a cancelled prompt.
+Each line is `<time> <tag> [args]`. `time` is the player's clock when it was written, in seconds since 1970; a replay doesn't use it. Text that could hold anything is a JSON string literal. `-` stands for an answer the page gave none to, such as a cancelled prompt.
 
 | Tag | Arguments | Meaning |
 |---|---|---|
 | `nhrec` | format | First line of a recording; the format is 1 |
 | `session` | `new <time> tz=<±hh:mm>` | A new game started; its time zone holds for the whole game |
 | `session` | `restore <time>` | The game was restored from its save |
-| `session` | `recover <ckpt> <turn> <time>` | The page was closed mid-game, and the game came back from checkpoint `ckpt` of the session before, at that turn; lines after that checkpoint's mark were lost to the game |
-| `back` | time | The page was closed mid-game, and the game came back by replaying everything above; the session and its numbering carry on, with nothing lost |
-| `session` | `unrecorded <time> tz=…` | A game restored with no recording of its start |
+| `back` | time | The page was closed mid-game, and the game came back by replaying everything above; the session carries on, with nothing lost |
+| `session` | `unrecorded <time> tz=…` | A game restored from its files with no whole recording behind it: its start was never recorded, or it came back from a checkpoint, which loses the lines after it; never replays |
 | `opt` | JSON | NETHACKOPTIONS, at the start of every session, as they can change between sessions |
 | `rc` | JSON | The `.nethackrc`, likewise |
 | `alone` | `0` or `1` | No other tab was playing |
@@ -31,28 +30,31 @@ Each line is `<seq> <tag> [args]`. `seq` counts from 1 within each session. Text
 | `bones` | name hash | What the host answered when the core looked for bones for a level: the SHA-256 of the file, or `-` for none |
 | `k` | key code | A key |
 | `c` | x y button | A click on the map |
-| `y` | JSON key [count] | An answer to a yes/no question, including the one about an old game left unfinished, whether the player or the page answered it; a new game started by destroying the old one leaves that answer out |
+| `y` | JSON key [count] | An answer to a yes/no question, including the one about an old game left unfinished, whether the player or the page answered it; a new game started by destroying the old one, or a game back from its checkpoint, leaves that answer out |
 | `l` | JSON text | A line typed at a prompt |
-| `m` | JSON list | Menu items chosen, each `[text, which, count]`, `which` counting the items with that text; or `[number, count]` for a choice the menu doesn't list; a count of -1 means no count was given |
+| `m` | JSON list | Menu items chosen, each `[text, which, count, letter]`, `which` counting the items with that text and `letter` being empty for an item without one; or `[number, count]` for a choice the menu doesn't list; a count of -1 means no count was given |
 | `w` | | A text window dismissed |
 | `x` | JSON name | An extended command chosen |
 | `p` | JSON list | A character chosen: the names of its role, race, gender and alignment, or the core's negative number for one left to it |
 | `asc` | `0` or `1` | The ASCII map switched from outside the game |
-| `ckpt` | n | The core has written its `n`th checkpoint of this session, before a command or at a level change |
-| `T` | turn time | The turn has just moved on, before its first command; `time` is the player's clock, ISO 8601 UTC |
-| `=` | turn `@`x,y rng JSON | A check, every 20 turns: where the hero was, a fingerprint of the core's random generator, and every field the status line showed, by name |
-| `lv` | hash | Only while shadowed, after each `=`: a hash of the game's files, which hold raw pointers and so only match on the same build |
+| `T` | turn sum | The turn has just moved on, before the next command; `sum` is four hex digits for the core's main random generator and the hero's position |
+| `=` | turn `@`x,y rng JSON | A check, every 100 turns: where the hero was, a fingerprint of the core's random generator, and every field the status line showed, by name |
+| `lv` | hash | Only while shadowed, every 20 turns: a hash of the game's files, which hold raw pointers and so only match on the same build |
 | `end` | `save` or `over` | The session ended by saving, or the game ended; written before the last persist, as the page may go straight after it |
 
-Answers name what was chosen rather than the core's number for it. A position in a table moves when something is added to it, and a menu item's number can be a memory address. A replay finds the choice in the prompt it's answering, and stops at that line if it's gone.
+Answers name what was chosen rather than the core's number for it. A position in a table moves when something is added to it, and a menu item's number can be a memory address. A replay finds the choice in the prompt it's answering, a menu item by its text and otherwise by a letter only one item has, and stops at that line if neither is there. A letter can then mean another item, which the checks below catch if it changes the game.
+
+A recording from before these rules may number its lines and hold `ckpt` lines and a time on `T`, which a replay ignores, and picks without a letter; one holding `session recover` is refused.
+
+The core's reads of the clock needn't match the `now` lines one for one, as they aren't the game: a read with no line left gets the last time, and a line no read takes is skipped.
 
 All times are the player's clock and are recorded as they were, even if that clock jumps.
 
 ## Replaying
 
-`src/worker/replayer.ts` plays a recording again. Each session runs on a fresh core whose host answers from the recording, checking each `ckpt`, `T`, `=` and `end` against the core. A restore starts from the files the replay itself saved; a recovery from the files as the replay had them at the checkpoint named. The replay stops with the line where the game went differently.
+`src/worker/replayer.ts` plays a recording again. Each session runs on a fresh core whose host answers from the recording, checking each `T`, `=` and `end` against the core. A restore starts from the files the replay itself saved. The replay stops with the line where the game went differently.
 
-The checks see the turn, the checkpoint count, the hero's position, the status line and the random generator, so a game that goes differently is nearly always stopped within 20 turns. Something that differs without touching any of those, such as a stored value no roll has yet depended on, replays without complaint until it does. They hold across a rebuild that doesn't change how the game plays, such as adding an extended command. A shadow also compares the bytes of the game's files through `lv`, but only for lines written while it follows, since earlier ones may be from another build. A game whose files an earlier build wrote can still show a difference there that isn't one: after a rebuild, trust a shadow's `lv` result only on a new game.
+The sum on each `T` covers the main random generator and the hero's position, so a game that goes differently is nearly always stopped within a turn or so. A `=` also compares the figures on the status line (HP, AC, attributes, gold, turn and so on), leaving out wording and glyph numbers, and ignoring a field either side lacks. Something that differs without touching any of those, such as a stored value no roll has yet depended on, replays without complaint until it does. Only a change to the dice the game rolls or where the hero stands should stop a replay. They hold across a rebuild that doesn't change how the game plays, such as adding an extended command. A shadow also compares the bytes of the game's files through `lv`, but only for lines written while it follows, since earlier ones may be from another build. A game whose files an earlier build wrote can still show a difference there that isn't one: after a rebuild, trust a shadow's `lv` result only on a new game.
 
 ## Bones
 
@@ -67,7 +69,9 @@ A recording holds only the hash, so a replay needs a database that has those bon
 
 A game left unfinished comes back by replay when it can. When the core finds the game's lock and asks about the old game, `src/worker/resume.ts` plays the recording on new cores without showing it, the last session on a core reading the real `/save`. When the lines run out, the recorder takes over on that same core and the page is shown the last session's events. Nothing reaches IndexedDB until then.
 
-If the replay goes differently, or the recording lacks the game's start, the game comes back from its checkpoint instead, as a `session recover`. So does a game whose last replay never reached play, which `/save/resuming` marks, in case the replay itself crashes the page.
+If the replay goes differently, the recording is cut back to its last line known good, and the game comes back from there and says so; what was recorded before each cut stays in `failed` beside the chunks until the game ends, for the debug package. An ASCII map switched in the part cut off stays as the page has it, while the core goes back to how it was, until it's next switched. A failed `=` goes back to the `=` before it, as sums take no account of the status line; anything else goes back to the last sum or `=` that passed.
+
+If no check had passed, the second replay fails too, or the recording lacks the game's start, the game comes back from its checkpoint instead, and its recording starts again as `session unrecorded`, as it no longer holds the whole game. So does a game whose last replay never reached play, which `/save/resuming` marks, in case the replay itself crashes the page.
 
 The web build never reads the high score list during play, only to rank a finished game, so what's on it can't make a replay go differently. Corpses, statues and doppelgangers that would take a past player's role and name get a random role and no name, as on a new install.
 

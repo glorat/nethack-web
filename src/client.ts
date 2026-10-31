@@ -13,6 +13,7 @@ import type {
 export interface DebugFiles {
   files: Record<string, Uint8Array>;
   bones: Record<string, Uint8Array>;
+  failed: string | null;
 }
 
 export interface ClientHandlers {
@@ -38,7 +39,7 @@ export class GameClient {
         this.descriptions.get(msg.id)?.(msg.text);
         this.descriptions.delete(msg.id);
       } else if (msg.type === "debug_files") {
-        this.debugFiles.get(msg.id)?.({ files: msg.files, bones: msg.bones });
+        this.debugFiles.get(msg.id)?.({ files: msg.files, bones: msg.bones, failed: msg.failed });
         this.debugFiles.delete(msg.id);
       } else if (msg.type !== "shadow_status") handlers.replay?.(msg);
     };

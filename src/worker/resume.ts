@@ -4,7 +4,7 @@ import type { Answer, GameEvent, GameRequest } from "../protocol";
 import { type GameHost, type Input, RESUMING } from "./game";
 import type { NetHackModule } from "./memory";
 import type { Recorder } from "./recorder";
-import { type BootCore, never, parseRecording, type RecordedSession, replay, type ReplayHost, writeSaveFiles } from "./replayer";
+import { type BootCore, never, parseRecording, type RecordedSession, replay, ReplayError, type ReplayHost, writeSaveFiles } from "./replayer";
 
 const OUT: unique symbol = Symbol("out");
 // as long as Game pauses for the core's delay_output
@@ -124,7 +124,21 @@ export function resumeGame(text: string, cores: ResumeCores, post: (events: Game
   const last = sessions.length - 1;
   let at = 0;
   const boot: BootCore = (session: RecordedSession, files, host) => (at++ === last ? cores.bootLast : cores.boot)(session, files, host);
-  return replay(text, boot, { post, pace: () => Promise.resolve(), delay: () => Promise.resolve(), checkpoint: () => {}, bones: cores.bones });
+  return replay(text, boot, { post, pace: () => Promise.resolve(), delay: () => Promise.resolve(), bones: cores.bones });
+}
+
+/**
+ * Plays `text` through `play`, and if it goes differently, once more up to the
+ * last line known good. Rejects if there's no such line or that fails too.
+ */
+export async function resumeToLastGood(text: string, play: (text: string) => Promise<void>): Promise<void> {
+  try {
+    await play(text);
+  } catch (e) {
+    if (!(e instanceof ReplayError) || !e.lastGood) throw e;
+    console.warn("went back to the last good point of the game", e);
+    await play(`${text.split("\n").slice(0, e.lastGood).join("\n")}\n`);
+  }
 }
 
 /** The host for the core that carries on: hides the replay, then shows the player where it got to. */
@@ -135,8 +149,9 @@ export function resumedHost(
   flush: () => void,
 ): ResumedHost {
   return new ResumedHost(replayed, () => {
-    recorder.carryOn(text, replayed.status);
+    const cut = recorder.carryOn(text, replayed.status);
     flush();
+    if (cut) recorder.post([{ type: "message", text: "Your game has come back from the last point that could be checked.", attr: 0 }]);
     return recorder;
   });
 }

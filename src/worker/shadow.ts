@@ -13,6 +13,7 @@ export class Shadow {
   private held: string[] = [];
   private session: RecordedSession | null = null;
   private started = false;
+  private lineCount = 0;
   private sawEnd = false;
   private turn = 0;
   private core: NetHackModule | null = null;
@@ -43,6 +44,11 @@ export class Shadow {
     this.started = true;
     const text = this.beforeText + first.map((l) => `${l}\n`).join("");
     this.sawEnd = first.some((l) => /^\d+ end /.test(l));
+    this.lineCount = text.split("\n").length - 1;
+    if (/^\d+ session (?:unrecorded|recover) /m.test(text)) {
+      this.status({ state: "unrecorded", turn: 0 });
+      return;
+    }
     const boot: BootCore = (session, files, host) =>
       this.boot(session, files, (m) => {
         this.core = m;
@@ -61,7 +67,6 @@ export class Shadow {
           return Promise.resolve();
         },
         delay: () => Promise.resolve(),
-        checkpoint: () => {},
         bones: this.bones,
         sameBuild: true,
         more: () => new Promise((resolve) => (this.wake = resolve)),
@@ -86,7 +91,7 @@ export class Shadow {
 
   private release(lines: string[]): void {
     for (const raw of lines) {
-      const line = parseLine(raw);
+      const line = parseLine(raw, ++this.lineCount);
       if (line.tag === "end") this.sawEnd = true;
       if (!SKIPPED.has(line.tag)) this.session?.lines.push(line);
     }
