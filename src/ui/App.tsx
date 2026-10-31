@@ -10,6 +10,7 @@ import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, te
 import type { Answer, GameRequest, ReplayProgress, ShadowStatus } from "../protocol";
 import { buildDebugPackage, debugPackageName, namedBones } from "../port/debug-package";
 import { downloadRecording, downloadText, keepLastGame, lastGame, lastTurn } from "../port/recording";
+import { fixedInputs } from "../port/fixedinputs";
 import { shadowWanted } from "../port/shadow";
 import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port/tilesets";
 import { loadTileSheet, type TileSheet } from "../tiles";
@@ -508,6 +509,7 @@ export function App() {
       options: `name:${name}`,
       config: configFile(`${BASE_OPTIONS}${ascii ? ",ascii_map" : ""}`, savedOptions()),
       shadowed: shadowing,
+      fixed: fixedInputs(),
     });
   };
 

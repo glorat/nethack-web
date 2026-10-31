@@ -78,6 +78,25 @@ async function startAs(page: Page, name: string, role: RegExp) {
   await untilPlaying(page);
 }
 
+test("the same inputs make the same game, whatever its name", async ({ browser }) => {
+  const turns = async (name: string) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await startGame(page, name);
+    // m: a plain search won't pass time beside a monster
+    for (let i = 0; i < 30; i++) await page.keyboard.type("ms");
+    await untilCommand(page);
+    await expect.poll(async () => (await recording(page, name)).match(/^\d+ k 115\b/gm)?.length).toBe(30);
+    const text = await recording(page, name);
+    await context.close();
+    // past the clock each line was written at
+    return text.split("\n").flatMap((l) => l.match(/^\d+ (T .*)$/)?.[1] ?? []);
+  };
+  const first = await turns("Same");
+  expect(first.length).toBeGreaterThan(10);
+  expect(await turns("Other")).toEqual(first);
+});
+
 test("start a game, move, and see status and inventory", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));

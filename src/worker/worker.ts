@@ -105,11 +105,12 @@ async function loadCore(assetBase: string): Promise<CreateModule> {
   return ((await import(/* @vite-ignore */ url)) as { default: CreateModule }).default;
 }
 
-async function start({ assetBase, options, config, shadowed }: StartOptions): Promise<void> {
+async function start({ assetBase, options, config, shadowed, fixed }: StartOptions): Promise<void> {
   const createModule = await loadCore(assetBase);
 
   // taken once, so a game doesn't change zone as daylight saving starts or ends
   const utcOffset = -new Date().getTimezoneOffset() * 60;
+  let nextSeed = fixed?.seed ?? 0;
   const host = {
     post(events: GameEvent[]) {
       send({ type: "events", events });
@@ -129,10 +130,10 @@ async function start({ assetBase, options, config, shadowed }: StartOptions): Pr
     },
     persist,
     alone: await soleTab(),
-    now: () => Math.floor(Date.now() / 1000),
+    now: () => fixed?.now ?? Math.floor(Date.now() / 1000),
     utcOffset: () => utcOffset,
-    randomSeed: () => crypto.getRandomValues(new Uint32Array(1))[0],
-    uuid,
+    randomSeed: () => (fixed ? nextSeed++ : crypto.getRandomValues(new Uint32Array(1))[0]),
+    uuid: () => fixed?.uuid ?? uuid(),
     bonesWanted: async (name: string) => new BonesDb(module!.FS).take(name),
     bonesLeft(name: string, data: Uint8Array, wizard: boolean) {
       if (!wizard) new BonesDb(module!.FS).keep(name, data);
