@@ -77,7 +77,7 @@ export class Shadow {
           state: "mismatch",
           turn: this.turn,
           message: e instanceof Error ? e.message : String(e),
-          files: this.core ? Object.fromEntries([...saveFiles(this.core)]) : undefined,
+          files: this.core ? Object.fromEntries([...saveFiles(this.core)].filter(([f]) => !/^(record|logfile|xlogfile)$/.test(f))) : undefined,
         }),
     );
   }
@@ -86,7 +86,7 @@ export class Shadow {
     for (const raw of lines) {
       const line = parseLine(raw);
       if (line.tag === "end") this.sawEnd = true;
-      if (!SKIPPED.has(line.tag)) this.session!.lines.push(line);
+      if (!SKIPPED.has(line.tag)) this.session?.lines.push(line);
     }
     const wake = this.wake;
     this.wake = null;

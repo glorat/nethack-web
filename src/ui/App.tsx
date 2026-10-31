@@ -507,6 +507,7 @@ export function App() {
       assetBase: new URL(import.meta.env.BASE_URL, location.href).href,
       options: `name:${name}`,
       config: configFile(`${BASE_OPTIONS}${ascii ? ",ascii_map" : ""}`, savedOptions()),
+      shadowed: shadowing,
     });
   };
 

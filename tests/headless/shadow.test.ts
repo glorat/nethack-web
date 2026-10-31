@@ -14,6 +14,7 @@ async function shadowOf(g: Session, tamper: (line: string) => string = (l) => l)
     shadow.add(lines.map(tamper), atPrompt);
     await settled();
   }
+  await new Promise((resolve) => setTimeout(resolve, 200));
   return statuses;
 }
 
@@ -60,6 +61,18 @@ test("a shadow follows a game that came back, from what its recording held", asy
   await back.send("s".repeat(5));
   expect(back.batches.flatMap((b) => b.lines).some((l) => / back /.test(l))).toBe(true);
   expect((await shadowOf(back)).at(-1)).toMatchObject({ state: "following" });
+});
+
+test("a shadow gets past a session that was cut short, to follow the game recovered from it", async () => {
+  const first = await (await Session.start(options)).skipText();
+  await first.send("s".repeat(45));
+  const g = await (await Session.start({ ...options, saves: first.persisted })).skipText();
+  await g.send("s".repeat(30));
+  expect(g.before).not.toBeNull();
+  expect(g.recorded.some((l) => / session recover /.test(l))).toBe(true);
+  const last = (await shadowOf(g)).at(-1)!;
+  expect(last.state).toBe("following");
+  expect(last.turn).toBeGreaterThan(60);
 });
 
 test("a shadow says where the game went differently, with its files", async () => {

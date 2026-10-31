@@ -31,6 +31,7 @@ export function buildDebugPackage(made: {
   shadow: ShadowStatus | null;
 }): string {
   const { files: shadowFiles, ...shadow } = made.shadow ?? { state: null };
+  const compared = made.shadow?.state === "mismatch";
   return JSON.stringify({
     version: __NETHACK_VERSION__,
     core: __CORE_COMMIT__,
@@ -38,8 +39,8 @@ export function buildDebugPackage(made: {
     shadow,
     recording: made.recording,
     bones: encoded(made.bones),
-    files: encoded(made.files),
-    shadowFiles: shadowFiles ? encoded(shadowFiles) : null,
+    files: compared ? encoded(made.files) : null,
+    shadowFiles: compared && shadowFiles ? encoded(shadowFiles) : null,
   });
 }
 

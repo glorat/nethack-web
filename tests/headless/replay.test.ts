@@ -146,3 +146,18 @@ test("a replay leaves the game's files byte for byte as the game did", async () 
   const differing = game.filter((k) => Buffer.compare(Buffer.from(g.persisted.get(k)!), Buffer.from(files.get(k) ?? new Uint8Array())) !== 0);
   expect(differing).toEqual([]);
 });
+
+test("hovering over the map during a game leaves the replay byte for byte the same", async () => {
+  const g = await (await Session.start({ pageSeed: 7, seedsVary: true, options: "time" })).skipText();
+  await play(g);
+  for (let x = 1; x < 79; x += 3) for (let y = 1; y < 20; y += 3) g.describe(x, y);
+  await g.send("s".repeat(25));
+  for (let x = 2; x < 79; x += 5) g.describe(x, 5);
+  await g.send("s".repeat(25));
+  const text = [...g.persisted].filter(([k]) => k.startsWith("replay/")).map(([, v]) => new TextDecoder().decode(v)).join("");
+
+  const { files, error } = await replayCore(text);
+  expect(error).toBeNull();
+  const game = [...g.persisted.keys()].filter((k) => k.startsWith("0Tester"));
+  expect(game.filter((k) => Buffer.compare(Buffer.from(g.persisted.get(k)!), Buffer.from(files.get(k) ?? new Uint8Array())) !== 0)).toEqual([]);
+});
