@@ -359,11 +359,9 @@ export interface Replayed {
 }
 
 /** Boots a fresh real core for each session of a replay, in Node. */
-export async function headlessBoot(): Promise<() => BootCore> {
+export async function headlessBoot(): Promise<(current: () => boolean) => BootCore> {
   const { default: createModule } = await import(pathToFileURL(resolve(ROOT, "public/nethack.js")).href);
-  let latest = 0;
-  return () => {
-    const run = ++latest;
+  return (current) => {
     return async (session, files, makeHost) => {
       let host: ReturnType<typeof makeHost> | null = null;
       const printed: string[] = [];
@@ -384,8 +382,8 @@ export async function headlessBoot(): Promise<() => BootCore> {
           },
         ],
       });
-      // as the worker does: a core for a playing-through a seek has replaced must not start, or it takes over the shim's helpers
-      if (run !== latest) return never();
+      // as the worker does: a core for a playing-through a seek or stop has replaced must not start, or it takes over the shim's helpers
+      if (!current()) return never();
       const shared = (globalThis as { nethackGlobal?: { shimFunctionRunning?: unknown } }).nethackGlobal;
       if (shared) shared.shimFunctionRunning = null;
       host = makeHost(m);
@@ -393,6 +391,7 @@ export async function headlessBoot(): Promise<() => BootCore> {
       host.game = game;
       const callback = `nethackCallback${++sessions}`;
       (globalThis as Record<string, unknown>)[callback] = (name: string, ...args: unknown[]) => game.callback(name, args);
+      void host.finished.then(() => delete (globalThis as Record<string, unknown>)[callback]);
       m.ccall("shim_graphics_set_callback", null, ["string"], [callback]);
       try {
         m._main(0, 0);
@@ -406,7 +405,7 @@ export async function headlessBoot(): Promise<() => BootCore> {
 /** Plays a recording again on the real core, as fast as it goes. */
 export async function replayRecording(text: string): Promise<Replayed> {
   let state = initialState();
-  const boot = (await headlessBoot())();
+  const boot = (await headlessBoot())(() => true);
   try {
     await replay(text, boot, {
       post: (events) => (state = applyEvents(state, events)),
