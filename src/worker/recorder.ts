@@ -383,12 +383,23 @@ export class Recorder implements GameHost {
   }
 }
 
-/** Where the hero is and everything the status line shows, which a replay must match. */
+/**
+ * Where the hero is, the state of the core's random generator, a hash of the
+ * game's level files and everything the status line shows, which a replay must match.
+ */
 export function checkLine(turn: number, m: NetHackModule, status: Record<string, string>): string {
   const fields = Object.fromEntries(
     Object.keys(status)
       .sort()
       .map((k) => [k.replace(/^BL_/, ""), status[k].trim()]),
   );
-  return `= ${turn} @${m._nhweb_hero_x()},${m._nhweb_hero_y()} ${JSON.stringify(fields)}`;
+  return `= ${turn} @${m._nhweb_hero_x()},${m._nhweb_hero_y()} ${m._nhweb_rng_fingerprint()} ${levelsHash(m)} ${JSON.stringify(fields)}`;
+}
+
+/** The game's files as the checkpoint before this left them. */
+function levelsHash(m: NetHackModule): string {
+  const name = m.UTF8ToString(m._nhweb_game_name()).replace(/\.\d+$/, "");
+  const files = (m.FS.readdir("/save") as string[]).filter((f) => f.startsWith(`${name}.`)).sort();
+  const parts = files.map((f) => `${f} ${sha256(m.FS.readFile(`/save/${f}`))}`);
+  return sha256(new TextEncoder().encode(parts.join("\n"))).slice(0, 16);
 }
