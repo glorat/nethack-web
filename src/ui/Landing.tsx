@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { WIKI_URL } from "../port/describe";
 import { playerName, PLAY_PATH, savedName, saveName } from "../port/name";
-import { lastGame } from "../port/recording";
 import { saveOptions, savedOptions } from "../port/options";
 import { updateWhenIdle } from "../sw/register";
 import { AboutDialog } from "./dialogs/AboutDialog";
@@ -14,7 +13,6 @@ export function Landing() {
   const [editingOptions, setEditingOptions] = useState(false);
   const [about, setAbout] = useState(false);
   const [offlineReady, setOfflineReady] = useState(false);
-  const [replayable] = useState(() => lastGame() !== null);
   // a reload would lose what's being typed
   const busy = useRef(false);
   busy.current = editingOptions || name !== remembered;
@@ -60,11 +58,6 @@ export function Landing() {
             <button type="button" onClick={() => setEditingOptions(true)}>
               Edit Options File...
             </button>
-            {replayable ? (
-              <button type="button" onClick={() => location.assign(`${PLAY_PATH}?replay`)}>
-                Replay Last Game
-              </button>
-            ) : null}
             {offlineReady ? <p class="landing-ready">✓ Ready to play offline</p> : null}
           </form>
           <img class="landing-shot" src={`${import.meta.env.BASE_URL}screenshot.jpg`} alt="A NetHack game: the dungeon map in painted tiles, with stats, equipment, messages and inventory around it" />

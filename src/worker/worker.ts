@@ -3,7 +3,9 @@ import type { Answer, GameEvent, GameRequest, StartOptions, UiMessage, WorkerMes
 import { ReplayRunner } from "./replay-runner";
 import { type BootCore, never, writeSaveFiles } from "./replayer";
 import { CONFIG_FILE, Game, type Input } from "./game";
+import { BonesDb } from "./bones";
 import { Recorder } from "./recorder";
+import { placeGameFiles, resumedHost, resumeGame } from "./resume";
 import { describeSquare, type NetHackModule } from "./memory";
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -117,41 +119,105 @@ async function start({ assetBase, options, config }: StartOptions): Promise<void
     utcOffset: () => utcOffset,
     randomSeed: () => crypto.getRandomValues(new Uint32Array(1))[0],
     uuid,
+    bonesWanted: async (name: string) => new BonesDb(module!.FS).take(name),
+    bonesLeft(name: string, data: Uint8Array, wizard: boolean) {
+      if (!wizard) new BonesDb(module!.FS).keep(name, data);
+    },
   };
 
-  module = await createModule({
-    noInitialRun: true,
-    locateFile: (path: string) => new URL(path, assetBase).href,
-    print: (s: string) => console.log(s),
-    printErr: (s: string) => console.warn(s),
-    preRun: [
-      (m: NetHackModule) => {
-        m.ENV.USER = "player";
-        m.ENV.NETHACKOPTIONS = options;
-        m.FS.writeFile(CONFIG_FILE, config);
-        m.FS.mkdir(SAVE_DIR);
-        m.FS.mount(m.IDBFS, {}, SAVE_DIR);
-      },
-    ],
-  });
-  await syncfs(true);
+  const loadSaved = async (coreOptions: string, coreConfig: string, stopped?: (why: string) => void) => {
+    module = await createModule({
+      noInitialRun: true,
+      locateFile: (path: string) => new URL(path, assetBase).href,
+      print: (s: string) => console.log(s),
+      printErr: (s: string) => console.warn(s),
+      onExit: () => stopped?.("the core exited before the session's end"),
+      onAbort: (what: unknown) => stopped?.(`the core aborted: ${String(what)}`),
+      preRun: [
+        (m: NetHackModule) => {
+          m.ENV.USER = "player";
+          m.ENV.NETHACKOPTIONS = coreOptions;
+          m.FS.writeFile(CONFIG_FILE, coreConfig);
+          m.FS.mkdir(SAVE_DIR);
+          m.FS.mount(m.IDBFS, {}, SAVE_DIR);
+        },
+      ],
+    });
+    await syncfs(true);
+    // a core before this one is left waiting in a callback for good
+    const shared = (globalThis as { nethackGlobal?: { shimFunctionRunning?: unknown } }).nethackGlobal;
+    if (shared) shared.shimFunctionRunning = null;
+    return module;
+  };
 
-  recorder = new Recorder(host, module, {
-    options,
-    config,
-    stream: (lines) => send({ type: "events", events: [{ type: "recorded", lines }] }),
-    finished: (text) => send({ type: "events", events: [{ type: "recording", text }] }),
-  });
-  game = new Game(module, recorder);
-  (globalThis as Record<string, unknown>).nethackCallback = (name: string, ...args: unknown[]) =>
-    game!.callback(name, args);
-  module.ccall("shim_graphics_set_callback", null, ["string"], ["nethackCallback"]);
-  send({ type: "events", events: [{ type: "ready" }] });
-  try {
-    module._main(0, 0);
-  } catch (e) {
-    if ((e as { name?: string })?.name !== "ExitStatus") throw e;
+  const startRecorder = (m: NetHackModule, coreOptions: string, coreConfig: string) =>
+    new Recorder(host, m, {
+      options: coreOptions,
+      config: coreConfig,
+      stream: (lines) => send({ type: "events", events: [{ type: "recorded", lines }] }),
+      finished: (text) => send({ type: "events", events: [{ type: "recording", text }] }),
+      resume,
+    });
+
+  let cores = 0;
+  const runCore = (m: NetHackModule, playing: Game) => {
+    game = playing;
+    const callback = `nethackCallback${cores++}`;
+    (globalThis as Record<string, unknown>)[callback] = (name: string, ...args: unknown[]) => playing.callback(name, args);
+    m.ccall("shim_graphics_set_callback", null, ["string"], [callback]);
+    try {
+      m._main(0, 0);
+    } catch (e) {
+      if ((e as { name?: string })?.name !== "ExitStatus") throw e;
+    }
+  };
+
+  const playLive = async () => {
+    const m = await loadSaved(options, config);
+    recorder = startRecorder(m, options, config);
+    runCore(m, new Game(m, recorder));
+  };
+
+  async function resume(text: string, name: string): Promise<boolean> {
+    let shown: GameEvent[] = [];
+    const db = new BonesDb(module!.FS);
+    try {
+      await resumeGame(
+        text,
+        {
+          bones: (hash) => db.get(hash),
+          boot: replayBoot(createModule, assetBase, () => true),
+          bootLast: async (session, files, makeHost) => {
+            shown = [];
+            let replayed: ReturnType<typeof makeHost> | null = null;
+            const m = await loadSaved(session.options, session.config, (why) => replayed?.stopped(why));
+            placeGameFiles(m, name, files);
+            replayed = makeHost(m);
+            recorder = startRecorder(m, session.options, session.config);
+            const carrying = new Game(
+              m,
+              resumedHost(replayed, text, recorder, () => {
+                // typed without seeing the map
+                inputs.length = 0;
+                send({ type: "events", events: shown });
+              }),
+            );
+            replayed.game = carrying;
+            runCore(m, carrying);
+          },
+        },
+        (events) => shown.push(...events),
+      );
+    } catch (e) {
+      // what's kept is as the page left it, so the game can still come back from its checkpoint
+      console.warn("couldn't replay the game", e);
+      await playLive();
+    }
+    return true;
   }
+
+  send({ type: "events", events: [{ type: "ready" }] });
+  await playLive();
 }
 
 /** The callbacks of the replay's cores, which hold the cores; dropped to let them go. */
@@ -210,12 +276,26 @@ function replayBoot(createModule: CreateModule, assetBase: string, current: () =
 
 async function startReplay(assetBase: string, text: string, turnsPerSecond: number): Promise<void> {
   const createModule = await loadCore(assetBase);
+  // only for reading the bones this browser keeps; it never runs
+  module = await createModule({
+    noInitialRun: true,
+    locateFile: (path: string) => new URL(path, assetBase).href,
+    preRun: [
+      (m: NetHackModule) => {
+        m.FS.mkdir(SAVE_DIR);
+        m.FS.mount(m.IDBFS, {}, SAVE_DIR);
+      },
+    ],
+  });
+  await syncfs(true);
+  const db = new BonesDb(module.FS);
   send({ type: "events", events: [{ type: "ready" }] });
   runner = new ReplayRunner(
     text,
     (current) => replayBoot(createModule, assetBase, current),
     { events: (events) => send({ type: "events", events }), replay: (message) => send(message) },
     turnsPerSecond,
+    (hash) => db.get(hash),
   );
   runner.start();
 }

@@ -5,8 +5,10 @@ import { pathToFileURL } from "node:url";
 import type { Answer, GameEvent, GameRequest, MapCell } from "../../src/protocol";
 import { applyEvents, cellAt, initialState, type GameState } from "../../src/port/state";
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
+import { BonesDb } from "../../src/worker/bones";
 import { Recorder } from "../../src/worker/recorder";
 import { type BootCore, never, replay, ReplayError, writeSaveFiles } from "../../src/worker/replayer";
+import { placeGameFiles, resumedHost, resumeGame } from "../../src/worker/resume";
 import { describeSquare, type EmscriptenFS, type NetHackModule } from "../../src/worker/memory";
 
 const ROOT = resolve(__dirname, "../..");
@@ -40,6 +42,10 @@ export interface SessionOptions {
   otherTab?: boolean;
   /** How many days ago the files in `saves` were last written. */
   savesAge?: number;
+  /** Bring a game left unfinished back by replaying its recording, as the page does. */
+  resume?: boolean;
+  /** Keep bones a debug-mode game leaves, which the page doesn't, as dying there is the easy way to get some. */
+  keepWizardBones?: boolean;
 }
 
 type Module = NetHackModule & {
@@ -87,6 +93,10 @@ export class Session {
   /** /save as it was at the last persist, which is all a closed page would have kept. */
   persisted: Map<string, Uint8Array> = new Map();
 
+  /** Why the replay of a game left unfinished failed, if it did and the game came back from its checkpoint. */
+  resumeFailure: string | null = null;
+
+  private liveHost: ReturnType<Session["host"]> | null = null;
   private queue: Input[] = [];
   private giveInput: ((input: Input) => void) | null = null;
   private giveAnswer: ((answer: Answer | null) => void) | null = null;
@@ -94,34 +104,53 @@ export class Session {
 
   private game!: Game;
 
-  private constructor(private readonly m: Module) {}
+  private m!: Module;
+
+  private constructor() {}
 
   static async start(options: SessionOptions = {}): Promise<Session> {
-    const { default: createModule } = await import(pathToFileURL(resolve(ROOT, "public/nethack.js")).href);
-    const nethackOptions = [
+    const session = new Session();
+    const ready = session.untilSettled();
+    await session.playLive(options);
+    await ready;
+    return session;
+  }
+
+  private nethackOptions(options: SessionOptions): string {
+    return [
       `name:${options.name ?? "Tester"}`,
       options.character ?? "role:Valkyrie,race:human,gender:female,align:neutral",
       "!autopickup,!tutorial,!tips,perm_invent",
       options.wizard ? "playmode:debug" : "",
       options.options ?? "",
     ].filter(Boolean).join(",");
-    let session!: Session;
+  }
+
+  /** A core with `saves` in /save, ready to run. */
+  private async load(
+    options: SessionOptions,
+    nethackOptions: string,
+    config: string | undefined,
+    saves: Map<string, Uint8Array> | undefined,
+    stopped?: (why: string) => void,
+  ): Promise<Module> {
+    const { default: createModule } = await import(pathToFileURL(resolve(ROOT, "public/nethack.js")).href);
     const m: Module = await createModule({
       noInitialRun: true,
       wasmBinary: readFileSync(resolve(ROOT, "public/nethack.wasm")),
-      print: (line: string) => session?.output.push(line),
-      printErr: (line: string) => session?.output.push(line),
-      onExit: () => session?.end(),
-      onAbort: (what: unknown) => session?.settled?.reject(new Error(`core aborted: ${String(what)}`)),
+      print: (line: string) => this.output.push(line),
+      printErr: (line: string) => this.output.push(line),
+      onExit: () => (stopped ? stopped("the core exited before the session's end") : this.end()),
+      onAbort: (what: unknown) => (stopped ? stopped(`the core aborted: ${String(what)}`) : this.settled?.reject(new Error(`core aborted: ${String(what)}`))),
       preRun: [
         (mod: Module) => {
           mod.ENV.USER = "player";
           mod.ENV.NETHACKOPTIONS = nethackOptions;
           if (options.pageSeed === undefined) mod.ENV.NETHACK_SEED = String(options.seed ?? 1);
           // Emscripten's HOME, which it creates
-          if (options.config !== undefined) mod.FS.writeFile(CONFIG_FILE, new TextEncoder().encode(options.config));
+          if (config !== undefined) mod.FS.writeFile(CONFIG_FILE, new TextEncoder().encode(config));
           mod.FS.mkdir("/save");
-          for (const [file, data] of options.saves ?? []) {
+          for (const [file, data] of saves ?? []) {
             const parts = file.split("/");
             for (let i = 1; i < parts.length; i++) {
               const dir = `/save/${parts.slice(0, i).join("/")}`;
@@ -144,27 +173,68 @@ export class Session {
     // a session from an earlier test is left suspended inside a callback, and the shim's reentry check is global
     const shared = (globalThis as { nethackGlobal?: { shimFunctionRunning?: unknown } }).nethackGlobal;
     if (shared) shared.shimFunctionRunning = null;
-    session = new Session(m);
-    const recorder = new Recorder(session.host(options), m, {
+    this.m = m;
+    return m;
+  }
+
+  private recorder(options: SessionOptions, m: Module, nethackOptions: string, config: string): Recorder {
+    return new Recorder(this.liveHost ??= this.host(options), m, {
       options: nethackOptions,
-      config: options.config ?? "",
-      stream: (lines) => session.recorded.push(...lines),
-      finished: (text) => (session.recording = text),
+      config,
+      stream: (lines) => this.recorded.push(...lines),
+      finished: (text) => (this.recording = text),
+      resume: options.resume ? (text, name) => this.resume(options, text, name) : undefined,
     });
-    const game = new Game(m, recorder);
-    session.game = game;
+  }
+
+  private run(m: Module, game: Game): void {
+    this.game = game;
     // one callback name per session, so sessions don't share one global
     const callback = `nethackCallback${++sessions}`;
     (globalThis as Record<string, unknown>)[callback] = (name: string, ...args: unknown[]) => game.callback(name, args);
     m.ccall("shim_graphics_set_callback", null, ["string"], [callback]);
-    const ready = session.untilSettled();
     try {
       m._main(0, 0);
     } catch (e) {
       if ((e as { name?: string }).name !== "ExitStatus") throw e;
     }
-    await ready;
-    return session;
+  }
+
+  /** `saves`: where to start from, if not what the options say. */
+  private async playLive(options: SessionOptions, saves = options.saves): Promise<void> {
+    const nethackOptions = this.nethackOptions(options);
+    const m = await this.load(options, nethackOptions, options.config, saves);
+    this.run(m, new Game(m, this.recorder(options, m, nethackOptions, options.config ?? "")));
+  }
+
+  private async resume(options: SessionOptions, text: string, name: string): Promise<boolean> {
+    let shown: GameEvent[] = [];
+    const db = new BonesDb(this.m.FS);
+    try {
+      await resumeGame(
+        text,
+        {
+          bones: (hash) => db.get(hash),
+          boot: (await headlessBoot())(() => true),
+          bootLast: async (session, files, makeHost) => {
+            shown = [];
+            let replayed: ReturnType<typeof makeHost> | null = null;
+            const m = await this.load(options, session.options, session.config, this.persisted, (why) => replayed?.stopped(why));
+            placeGameFiles(m, name, files);
+            replayed = makeHost(m);
+            const host = resumedHost(replayed, text, this.recorder(options, m, session.options, session.config), () => this.liveHost!.post(shown));
+            const game = new Game(m, host);
+            replayed.game = game;
+            this.run(m, game);
+          },
+        },
+        (events) => shown.push(...events),
+      );
+    } catch (e) {
+      this.resumeFailure = e instanceof Error ? e.message : String(e);
+      await this.playLive(options, this.persisted);
+    }
+    return true;
   }
 
   /** Switches ascii_map as the map's ASCII button does. */
@@ -321,6 +391,10 @@ export class Session {
       utcOffset: () => options.utcOffset ?? 0,
       randomSeed: () => (options.pageSeed ?? 0) + (options.seedsVary ? seeds++ : 0),
       uuid: () => PAGE_UUID,
+      bonesWanted: async (name: string) => new BonesDb(this.m.FS).take(name),
+      bonesLeft: (name: string, data: Uint8Array, wizard: boolean) => {
+        if (!wizard || options.keepWizardBones) new BonesDb(this.m.FS).keep(name, data);
+      },
     };
   }
 
@@ -403,7 +477,7 @@ export async function headlessBoot(): Promise<(current: () => boolean) => BootCo
 }
 
 /** Plays a recording again on the real core, as fast as it goes. */
-export async function replayRecording(text: string): Promise<Replayed> {
+export async function replayRecording(text: string, saves?: Map<string, Uint8Array>): Promise<Replayed> {
   let state = initialState();
   const boot = (await headlessBoot())(() => true);
   try {
@@ -412,6 +486,7 @@ export async function replayRecording(text: string): Promise<Replayed> {
       pace: () => Promise.resolve(),
       delay: () => Promise.resolve(),
       checkpoint: () => {},
+      bones: (hash) => saves?.get(`bones/${hash}`),
     });
     return { state, error: null };
   } catch (e) {

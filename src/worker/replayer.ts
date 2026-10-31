@@ -9,7 +9,7 @@ export class ReplayError extends Error {}
 
 /** A promise that never settles; a fresh one each time, as one shared would keep every core waiting on it alive. */
 export const never = <T>() => new Promise<T>(() => {});
-const MARKS = new Set(["ckpt", "T", "=", "asc"]);
+const MARKS = new Set(["ckpt", "T", "=", "asc", "back"]);
 // as long as Game pauses for the core's delay_output
 const DELAY_MS = 50;
 
@@ -123,6 +123,8 @@ export interface ReplayHooks {
   delay?(): Promise<void>;
   /** The core has reached checkpoint `n` of this session. */
   checkpoint(n: number): void;
+  /** The bones with this hash, which a recording names rather than holds. */
+  bones?(hash: string): Uint8Array | undefined;
 }
 
 /** How a session's replay stopped: at its recorded end, or where its recording ran out. */
@@ -137,13 +139,16 @@ export class ReplayHost implements GameHost {
   readonly alone = false;
   game: Game | null = null;
   private at = 0;
-  private status: Record<string, string> = {};
+  /** What the status line shows, as far as the replay has gone. */
+  status: Record<string, string> = {};
   private finish!: (end: SessionEnd) => void;
   readonly finished = new Promise<SessionEnd>((resolve) => (this.finish = resolve));
   private failed: ((e: ReplayError) => void) | null = null;
   readonly failure = new Promise<never>((_, reject) => (this.failed = reject));
   /** Past the session's end, or stopped: the core is never answered again. */
   private done = false;
+  /** Went differently from the recording, or the core stopped before its end. */
+  diverged = false;
 
   constructor(
     private readonly session: RecordedSession,
@@ -164,7 +169,9 @@ export class ReplayHost implements GameHost {
   // what goes wrong in here is the replay's to report: Game would answer the core ESC and carry on
   async request(request: GameRequest): Promise<Answer | null> {
     const line = await this.next([ANSWER_TAGS[request.kind]], request);
-    return this.guard(() => parseAnswer(request.kind, line.rest), line) ?? never();
+    // a null inside the array is a cancelled prompt; guard's own null means it couldn't be read
+    const parsed = this.guard(() => [parseAnswer(request.kind, line.rest)], line);
+    return parsed ? parsed[0] : never();
   }
 
   async nextInput(): Promise<Input> {
@@ -186,6 +193,7 @@ export class ReplayHost implements GameHost {
   /** The core stopped on its own: fine after the session's end, a failure before it. */
   stopped(why: string): void {
     if (this.done) return;
+    this.diverged = true;
     this.failed?.(new ReplayError(why));
     this.stopWith("out");
   }
@@ -210,6 +218,25 @@ export class ReplayHost implements GameHost {
   utcOffset(): number {
     return this.offset;
   }
+
+  async bonesWanted(name: string): Promise<Uint8Array | null> {
+    const line = this.take("bones");
+    if (!line) return never();
+    const [recorded, hash] = line.rest.split(" ");
+    if (recorded !== name) {
+      this.fail(line, `the core wants bones for ${name}`);
+      return never();
+    }
+    if (hash === "-") return null;
+    const data = this.hooks.bones?.(hash);
+    if (!data) {
+      this.fail(line, "these bones aren't kept here");
+      return never();
+    }
+    return data;
+  }
+
+  bonesLeft(): void {}
 
   delayOutput(): Promise<void> {
     return this.hooks.delay?.() ?? new Promise((resolve) => setTimeout(resolve, DELAY_MS));
@@ -279,6 +306,8 @@ export class ReplayHost implements GameHost {
       case "asc":
         this.game?.setAsciiMap(first === "1");
         return true;
+      case "back":
+        return true;
       default:
         return false;
     }
@@ -287,6 +316,7 @@ export class ReplayHost implements GameHost {
   /** Stops the session where it went differently; the core is left waiting, never answered again. */
   private fail(line: Line, why: string): void {
     if (this.done) return;
+    this.diverged = true;
     this.failed?.(new ReplayError(`line ${line.seq} (${line.tag} ${line.rest}): ${why}`));
     this.stopWith("out");
   }

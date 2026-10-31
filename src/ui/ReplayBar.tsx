@@ -47,7 +47,7 @@ export function ReplayBar({ progress, lastTurn, turnsPerSecond, control, onDownl
       <span class="replay-turn">
         {seeking ? "Going to turn…" : `Turn ${turn} of ${lastTurn}`}
       </span>
-      {ended?.error ? <span class="replay-error">Stopped: the game went differently from its recording ({ended.error})</span> : null}
+      {ended?.error ? <span class="replay-error">This replay is no longer available.</span> : null}
       {ended && !ended.error ? <span class="replay-done">End of the recording</span> : null}
       <span class="replay-spacer" />
       <button onClick={onDownload}>Download</button>

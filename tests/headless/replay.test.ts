@@ -101,3 +101,19 @@ test("a game whose hero starts with other attributes is caught by them", async (
   const [was, is] = [JSON.parse(recorded), JSON.parse(shown)];
   expect(["ST", "DX", "CO", "IN", "WI", "CH"].some((a) => was[a] !== is[a])).toBe(true);
 });
+
+test("prompts the player cancelled replay as cancelled", async () => {
+  const g = await (await Session.start({ pageSeed: 7, options: "time" })).skipText();
+  await g.send("i");
+  await g.dismiss();
+  await g.send("#");
+  await g.answer({ kind: "ext_cmd", index: g.prompt!.kind === "ext_cmd" ? g.prompt.commands.find((c) => c.name === "name")!.index : -1 });
+  if (g.prompt?.kind === "menu") await g.dismiss();
+  await g.send("s");
+  await quit(g);
+  expect(g.recording).toMatch(/^\d+ m -$/m);
+
+  const replayed = await replayRecording(g.recording!);
+  expect(replayed.error).toBeNull();
+  expect(replayed.state.status).toEqual(g.state.status);
+});

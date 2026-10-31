@@ -3,6 +3,7 @@
 import type { Answer, GameEvent, GameRequest } from "../protocol";
 import { type GameHost, type Input, OLD_GAME } from "./game";
 import type { NetHackModule } from "./memory";
+import { sha256 } from "./sha256";
 
 export const RECORDING_DIR = "/save/replay";
 // what nhweb_resumed() says of a game brought back from the files a closed page left
@@ -65,6 +66,15 @@ export function inputLine(input: Input): string {
   return "key" in input ? `k ${input.key}` : `c ${input.click.x} ${input.click.y} ${input.click.button}`;
 }
 
+/** Whether a recording holds a whole game that stopped mid-session, so that replaying it brings the game back. */
+export function resumable(text: string): boolean {
+  return /^\d+ session new /m.test(text) && !/^\d+ session unrecorded /m.test(text) && !/^\d+ end /.test(lastLine(text));
+}
+
+function lastLine(text: string): string {
+  return text.slice(text.lastIndexOf("\n", text.length - 2) + 1);
+}
+
 /** The files a game's recording is kept in, in order. */
 export function chunkNames(fs: FS, dir: string): string[] {
   if (!fs.analyzePath(dir).exists) return [];
@@ -86,6 +96,8 @@ export interface RecorderStart {
   stream(lines: string[]): void;
   /** Gets the whole recording when the game ends. */
   finished(text: string): void;
+  /** Replays this game's unfinished recording and carries on from its end; true if this core has been replaced. */
+  resume?(text: string, name: string): Promise<boolean>;
   /** The wall clock for turn times; the core's own clock comes from the page's host. */
   wallClock?: () => number;
 }
@@ -182,6 +194,39 @@ export class Recorder implements GameHost {
     return uuid;
   }
 
+  /** Offers the unfinished recording of the game the core has found left behind, if it can be replayed. */
+  async resume(): Promise<boolean> {
+    const dir = this.gameDir();
+    if (!this.start.resume || !dir) return false;
+    const text = readRecording(this.fs, dir);
+    if (!resumable(text)) return false;
+    return this.start.resume(text, dir.slice(RECORDING_DIR.length + 1));
+  }
+
+  /**
+   * Takes over from a replay that has played `text` on this core, carrying on
+   * the session it stopped in.
+   */
+  carryOn(text: string, status: Record<string, string>): void {
+    const dir = this.gameDir()!;
+    const chunks = chunkNames(this.fs, dir);
+    const last = chunks[chunks.length - 1];
+    const lastText = this.fs.readFile(`${dir}/${last}`, { encoding: "utf8" });
+    const full = lastText.length >= CHUNK_SIZE;
+    this.chunk = Number(last) + (full ? 1 : 0);
+    this.chunkText = full ? "" : lastText;
+    this.dir = dir;
+    this.seq = parseInt(lastLine(text), 10);
+    this.status = { ...status };
+    this.lastCheckpoint = this.m._nhweb_checkpoint_count();
+    this.lastTurn = this.m._nhweb_checkpointed();
+    this.lastCheck = Number([...text.matchAll(/^\d+ = (\d+) /gm)].at(-1)?.[1] ?? -Infinity);
+    this.offset = zoneSeconds(/^\d+ session new \S+ tz=(\S+)/m.exec(text)?.[1] ?? "") ?? this.inner.utcOffset();
+    this.append(`back ${new Date(this.wallClock()).toISOString()}`);
+    for (const line of this.early) this.append(line);
+    this.early = [];
+  }
+
   /** A game keeps the time zone it started in, which its recording holds. */
   utcOffset(): number {
     if (this.offset !== null) return this.offset;
@@ -189,6 +234,16 @@ export class Recorder implements GameHost {
     // fixed once the game is under way; nothing before that is kept
     if (this.m._nhweb_in_play()) return (this.offset = this.inner.utcOffset());
     return this.inner.utcOffset();
+  }
+
+  async bonesWanted(name: string): Promise<Uint8Array | null> {
+    const data = await this.inner.bonesWanted(name);
+    this.write(`bones ${name} ${data ? sha256(data) : "-"}`);
+    return data;
+  }
+
+  bonesLeft(name: string, data: Uint8Array, wizard: boolean): void {
+    this.inner.bonesLeft(name, data, wizard);
   }
 
   /** The ascii_map option, switched from outside the core. */

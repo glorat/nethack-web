@@ -42,6 +42,8 @@ const ALWAYS_YES = ["Really save?", "Overwrite the old file?"];
 export const OLD_GAME = "Old game in progress. Destroy [y], Recover [r], or Cancel [n]?";
 // left behind by a recovery that never reached play, so the next start asks instead of failing again
 const RECOVERING = "/save/recovering";
+// left behind by a replay that never reached play, so the next start falls back on the checkpoint
+export const RESUMING = "/save/resuming";
 
 interface Window {
   kind: number;
@@ -58,6 +60,11 @@ export interface GameHost {
   nextInput(request: Extract<GameRequest, { kind: "poskey" }>): Promise<Input>;
   /** Keeps /save; `exiting` when the core is about to end, after which the page may go at any moment. */
   persist(exiting?: boolean): Promise<void>;
+  /**
+   * Brings the game left unfinished back some other way than recovery; true
+   * if this core has been replaced, and is never to go on.
+   */
+  resume?(): Promise<boolean>;
   /** An answer Game gave the core itself, going by something outside it. */
   decided?(request: GameRequest, answer: Answer | null): void;
   /** The core's pause in an animation; a short wait if not given. */
@@ -72,6 +79,10 @@ export interface GameHost {
   randomSeed(): number;
   /** A new game's id, kept in its save and in any bones it leaves. */
   uuid(): string;
+  /** The bones the core may load for a level it's making, if any; `name` says which level. */
+  bonesWanted(name: string): Promise<Uint8Array | null>;
+  /** Bones the core has left for a level, for the host to keep or not. */
+  bonesLeft(name: string, data: Uint8Array, wizard: boolean): void;
 }
 
 /** "FOODPOIS" style names of the bits set in a BL_CONDITION mask, in `order`. */
@@ -94,6 +105,8 @@ const CHANGE_TURNS = 3;
 
 // Emscripten's HOME, where the worker puts the options file and #saveoptions writes it
 export const CONFIG_FILE = "/home/web_user/.nethackrc";
+
+const baseName = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 
 /** Implements the shim window port on top of the WASM core. */
 export class Game {
@@ -298,6 +311,21 @@ export class Game {
       case "shim_nhuuid":
         this.m.stringToUTF8(this.host.uuid(), a[0], a[1]);
         return 0;
+      case "shim_bones_wanted": {
+        // it would use up bones meant for a real game, even in declining them
+        if (this.m._nhweb_wizard()) return 0;
+        const path = args[0] as string;
+        const data = await this.host.bonesWanted(baseName(path));
+        if (!data) return 0;
+        this.m.FS.writeFile(path, data);
+        return 1;
+      }
+      case "shim_bones_saved": {
+        const path = args[0] as string;
+        this.host.bonesLeft(baseName(path), this.m.FS.readFile(path), !!this.m._nhweb_wizard());
+        this.m.FS.unlink(path);
+        return 0;
+      }
       case "shim_doprev_message":
         return 0;
       case "shim_exit_nhwindows":
@@ -533,6 +561,13 @@ export class Game {
     }
     // a game left unfinished comes back, as Cocoa brings back the game it was quit in
     if (query === OLD_GAME && this.host.alone) {
+      if (this.host.resume && !this.m.FS.analyzePath(RESUMING).exists) {
+        this.m.FS.writeFile(RESUMING, "");
+        // saved before replaying, in case the replay crashes the page
+        await this.host.persist();
+        if (await this.host.resume()) return new Promise<number>(() => {});
+      }
+      if (this.m.FS.analyzePath(RESUMING).exists) this.m.FS.unlink(RESUMING);
       if (!this.m.FS.analyzePath(RECOVERING).exists) {
         this.m.FS.writeFile(RECOVERING, "");
         // saved before recovering, in case the recovery crashes the core

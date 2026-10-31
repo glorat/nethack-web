@@ -1,4 +1,4 @@
-// The last finished game's recording, kept for replaying straight away.
+// The last finished game's recording, which /play/?replay plays.
 
 const LAST_GAME_KEY = "nethack.lastGame";
 
