@@ -9,6 +9,7 @@ function summary(status: ShadowStatus | null): string {
   if (!status) return "Shadow: starting";
   if (status.state === "following") return `Shadow: following, turn ${status.turn}`;
   if (status.state === "ended") return `Shadow: matched to the end, turn ${status.turn}`;
+  if (status.state === "unrecorded") return "Shadow: not following, as this game has no whole recording";
   return `Shadow: went differently at turn ${status.turn}: ${status.message}`;
 }
 

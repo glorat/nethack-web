@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import { replayCore, replayRecording, Session } from "./harness";
+import { sameCheck } from "../../src/worker/replayer";
 
 async function quit(g: Session): Promise<void> {
   await g.send("#");
@@ -36,7 +37,7 @@ test("a finished game replays to its end, every check matching", async () => {
   expect(replayed.state.status).toEqual(g.state.status);
 });
 
-test("a game saved, restored, left open and recovered replays through all of it", async () => {
+test("a game saved, restored, left open and brought back replays through all of it", async () => {
   const first = await (await Session.start({ pageSeed: 7, options: "time" })).skipText();
   await play(first);
   await first.send("S");
@@ -44,12 +45,12 @@ test("a game saved, restored, left open and recovered replays through all of it"
   const second = await (await Session.start({ saves: first.saves(), pageSeed: 7, options: "time" })).skipText();
   await play(second);
 
-  const third = await (await Session.start({ saves: second.persisted, pageSeed: 7, options: "time" })).skipText();
+  const third = await (await Session.start({ saves: second.persisted, pageSeed: 7, options: "time", resume: true })).skipText();
   await play(third);
   await quit(third);
   const text = third.recording!;
   expect(text).toMatch(/ session restore /);
-  expect(text).toMatch(/ session recover /);
+  expect(text).toMatch(/ back /);
 
   const replayed = await replayRecording(text);
   expect(replayed.error).toBeNull();
@@ -75,16 +76,16 @@ test("an answer that can't be read is reported at its own line", async () => {
   await quit(g);
   const line = g.recording!.split("\n").find((l) => / y "y"$/.test(l))!;
   const replayed = await replayRecording(g.recording!.replace(line, line.replace(/y "y"$/, "y zz")));
-  expect(replayed.error?.message).toMatch(new RegExp(`^line ${line.split(" ")[0]} \\(y zz\\)`));
+  expect(replayed.error?.message).toMatch(new RegExp(`^line ${g.recording!.split("\n").indexOf(line) + 1} \\(y zz\\)`));
 });
 
-test("a line lost from the middle of a recording is caught", async () => {
+test("an answer lost from the middle of a recording is caught", async () => {
   const g = await (await Session.start({ pageSeed: 7 })).skipText();
   await g.send("s");
   await quit(g);
   const lines = g.recording!.split("\n");
-  lines.splice(10, 1);
-  expect((await replayRecording(lines.join("\n"))).error?.message).toBe("line 11 is missing");
+  lines.splice(lines.findIndex((l) => / uuid /.test(l)), 1);
+  expect((await replayRecording(lines.join("\n"))).error?.message).toMatch(/expected uuid/);
 });
 
 test("a game whose hero starts with other attributes is caught by them", async () => {
@@ -93,7 +94,7 @@ test("a game whose hero starts with other attributes is caught by them", async (
   await quit(g);
   // the fifth seed, taken once the first level is made, decides the hero's attributes and starting kit
   let n = 0;
-  const tampered = g.recording!.replace(/^(\d+) seed 7$/gm, (line, seq) => (++n === 5 ? `${seq} seed 8` : line));
+  const tampered = g.recording!.replace(/^(\d+) seed 7$/gm, (line, seq) => (++n === 5 ? `${seq} seed 8` : line)).replace(/^(\d+ T \d+) \w{4}$/gm, "$1");
   expect(n).toBeGreaterThanOrEqual(5);
 
   const replayed = await replayRecording(tampered);
@@ -166,7 +167,7 @@ test("hovering over the map during a game leaves the replay byte for byte the sa
   expect(game.filter((k) => Buffer.compare(Buffer.from(g.persisted.get(k)!), Buffer.from(files.get(k) ?? new Uint8Array())) !== 0)).toEqual([]);
 });
 
-test("items picked from a menu by address replay by name, and one that's gone stops the replay there", async () => {
+test("items picked from a menu by address replay by name or else letter, and one that's gone stops the replay there", async () => {
   const g = await (await Session.start({ pageSeed: 7, options: "time" })).skipText();
   await g.send("D");
   await g.pick(/all types|^A /i);
@@ -181,6 +182,45 @@ test("items picked from a menu by address replay by name, and one that's gone st
   expect(line).not.toContain(String(picked!.identifier));
 
   expect((await replayRecording(g.recording!)).error).toBeNull();
-  const gone = await replayRecording(g.recording!.replace(line, line.replace(/food ration/g, "food rations")));
+  const reworded = line.replace(/food ration/g, "food rations");
+  expect((await replayRecording(g.recording!.replace(line, reworded))).error).toBeNull();
+  const gone = await replayRecording(g.recording!.replace(line, reworded.replace(/,"\S"\]\]$/, ',"?"]]')));
   expect(gone.error?.message).toMatch(/^line \d+ \(m .*no item/);
+});
+
+test("a recording from in the older form still replays, and one with a recovery is refused", async () => {
+  const g = await (await Session.start({ pageSeed: 7, options: "time" })).skipText();
+  await g.send("sss");
+  await g.send("D");
+  await g.pick(/all types|^A /i);
+  await g.answer({ kind: "menu", selection: [] });
+  await quit(g);
+  const lines = g.recording!.split("\n").filter(Boolean);
+  const old = lines.flatMap((l, i) => {
+    const pick = l.replace(/^(\d+ m \[\[.*),"\S*"\]\]$/, "$1]]");
+    return / T \d+ \w{4}$/.test(l) ? [`${i + 1} ckpt 99`, `${i + 1} ${l.split(" ").slice(1, 3).join(" ")} 2026-01-01T00:00:00.000Z`] : [pick];
+  });
+  expect((await replayRecording(`${old.join("\n")}\n`)).error).toBeNull();
+  const recovered = await replayRecording(`${lines.join("\n")}\n1 session recover 3 10 2026-01-01T00:00:00.000Z\n`);
+  expect(recovered.error?.message).toMatch(/unknown session/);
+});
+
+test("a change of wording, a new field or gold's glyph number doesn't count as the game going differently", () => {
+  const was = '1 @2,3 44 {"GOLD":"\\\\G0EEC0F2E:5","HP":"16","TITLE":"Tester the Stripling"}';
+  expect(sameCheck(was, '1 @2,3 44 {"GOLD":"\\\\G0EEC0F2F:5","HP":"16","TITLE":"Tester the Fledgling","NEW":"1"}')).toBe(true);
+  expect(sameCheck(was, '1 @2,3 44 {"GOLD":"\\\\G0EEC0F2E:6","HP":"16"}')).toBe(false);
+  expect(sameCheck(was, '1 @2,3 44 {"GOLD":"\\\\G0EEC0F2E:5","HP":"15"}')).toBe(false);
+  expect(sameCheck(was, '1 @2,4 44 {"GOLD":"\\\\G0EEC0F2E:5","HP":"16"}')).toBe(false);
+});
+
+test("the core reading the clock more or less often than it did doesn't stop a replay", async () => {
+  const g = await (await Session.start({ pageSeed: 7, options: "time" })).skipText();
+  await g.send("sss");
+  await quit(g);
+  const lines = g.recording!.split("\n");
+  // each later line after the first is a read the core will find gone
+  const fewer = lines.filter((l, i) => !/ now /.test(l) || i < lines.findIndex((x) => / T /.test(x)));
+  expect((await replayRecording(fewer.join("\n"))).error).toBeNull();
+  const more = lines.flatMap((l) => (/ now /.test(l) ? [l, l] : [l]));
+  expect((await replayRecording(more.join("\n"))).error).toBeNull();
 });

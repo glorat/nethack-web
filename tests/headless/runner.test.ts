@@ -8,7 +8,7 @@ import { headlessBoot } from "./harness";
 const TEXT = readFileSync(resolve(__dirname, "golden/valkyrie.txt"), "utf8");
 // the last turn of the recording's first session, where a pause would take hold if the core never let go
 const FIRST_SESSION_END = Math.max(
-  ...[...TEXT.slice(0, TEXT.indexOf(" end save")).matchAll(/^\d+ T (\d+) /gm)].map((m) => Number(m[1])),
+  ...[...TEXT.slice(0, TEXT.indexOf(" end save")).matchAll(/^\d+ T (\d+)\b/gm)].map((m) => Number(m[1])),
 );
 
 // a runner left going would boot cores that take over the shim's shared helpers from the next test's

@@ -10,8 +10,9 @@ export function lastGame(): string | null {
   }
 }
 
-/** False if the browser wouldn't keep it, as it won't one too big. */
+/** False if the browser wouldn't keep it, as it won't one too big, or it couldn't replay, which leaves the last game that can. */
 export function keepLastGame(text: string): boolean {
+  if (/^\d+ session (?:unrecorded|recover) /m.test(text)) return false;
   try {
     localStorage.setItem(LAST_GAME_KEY, text);
     return true;
@@ -23,14 +24,14 @@ export function keepLastGame(text: string): boolean {
 /** The last turn the recording reached. */
 export function lastTurn(text: string): number {
   let last = 0;
-  for (const m of text.matchAll(/^\d+ T (\d+) /gm)) last = Math.max(last, Number(m[1]));
+  for (const m of text.matchAll(/^\d+ T (\d+)\b/gm)) last = Math.max(last, Number(m[1]));
   return last;
 }
 
 /** A file name for the recording: the hero's name and when the game started. */
 export function recordingFileName(text: string): string {
   const name = /^\d+ opt ".*?\bname:([^,"]*)/m.exec(text)?.[1] || "game";
-  const started = /^\d+ session new (\d{4}-\d\d-\d\d)/m.exec(text)?.[1] ?? "";
+  const started = /^\d+ session (?:new|unrecorded) (\d{4}-\d\d-\d\d)/m.exec(text)?.[1] ?? "";
   return `nethack-${name}${started ? `-${started}` : ""}.txt`;
 }
 

@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { Session } from "./harness";
 
-/** The lines without their sequence numbers. */
+/** The lines without their times. */
 const bare = (lines: string[]) => lines.map((l) => l.replace(/^\d+ /, ""));
 const file = (g: Session) => new TextDecoder().decode(g.saves().get("replay/0Tester/000001"));
 
@@ -17,7 +17,7 @@ async function quit(g: Session): Promise<void> {
   }
 }
 
-test("a new game is recorded from its start, numbered line by line, and kept next to the game", async () => {
+test("a new game is recorded from its start, each line with its time, and kept next to the game", async () => {
   const g = await (await Session.start({ pageSeed: 5, utcOffset: 11 * 3600 })).skipText();
   await g.send("s");
 
@@ -29,9 +29,10 @@ test("a new game is recorded from its start, numbered line by line, and kept nex
   expect(lines.some((l) => /^now \d+$/.test(l))).toBe(true);
   expect(lines.some((l) => /^uuid [\w-]{36}$/.test(l))).toBe(true);
   expect(lines).toContain(`k ${"s".charCodeAt(0)}`);
-  expect(lines.some((l) => /^T \d+ \d{4}-\d\d-\d\dT[\d:.]+Z$/.test(l))).toBe(true);
+  expect(lines.some((l) => /^T \d+ [0-9a-f]{4}$/.test(l))).toBe(true);
   expect(lines.some((l) => /^= \d+ @\d+,\d+ -?\d+ \{.*"HP":"\d+".*"LEVELDESC":"Dlvl:1".*\}$/.test(l))).toBe(true);
-  expect(g.recorded.map((l) => Number(l.split(" ")[0]))).toEqual(g.recorded.map((_, i) => i + 1));
+  const now = Date.now() / 1000;
+  expect(g.recorded.every((l) => Math.abs(Number(l.split(" ")[0]) - now) < 60)).toBe(true);
   expect(file(g)).toBe(g.recorded.map((l) => `${l}\n`).join(""));
 });
 
@@ -54,32 +55,26 @@ test("a saved game's recording carries on when it's restored", async () => {
 
   const next = await (await Session.start({ saves: g.saves() })).skipText();
   expect(bare(next.recorded)[0]).toMatch(/^session restore \S+Z$/);
-  expect(next.recorded[0]).toMatch(/^1 /);
   expect(file(next)).toBe([...g.recorded, ...next.recorded].map((l) => `${l}\n`).join(""));
 });
 
-test("a game left unfinished is recorded as recovered, at the checkpoint and turn it came back to", async () => {
+test("a game back from its checkpoint starts a new recording, as the lines after that checkpoint were lost to it", async () => {
   const left = await (await Session.start({ options: "time" })).skipText();
   await left.send("sss");
-  const checkpoint = bare(left.recorded).filter((l) => l.startsWith("ckpt ")).at(-1);
   const turn = bare(left.recorded).filter((l) => l.startsWith("T ")).at(-1)!.split(" ")[1];
 
   const next = await (await Session.start({ saves: left.persisted, options: "time" })).skipText();
-  expect(bare(next.recorded)[0]).toMatch(new RegExp(`^session recover ${checkpoint!.split(" ")[1]} ${turn} \\S+Z$`));
+  expect(bare(next.recorded).slice(0, 2)).toEqual(["nhrec 1", expect.stringMatching(/^session unrecorded \S+Z tz=/)]);
   expect(next.state.status.BL_TIME?.text).toBe(turn);
-  // the answer that brought it back, which Game gave itself
-  expect(bare(next.recorded)).toContain(`y "r"`);
+  expect(file(next)).toBe(next.recorded.map((l) => `${l}\n`).join(""));
 });
 
-test("a checkpoint at a level change is marked, so a recovery can come back to it", async () => {
-  const g = await (await Session.start({ wizard: true })).skipText();
-  await g.send(">");
-  const before = bare(g.recorded).filter((l) => l.startsWith("ckpt ")).length;
-  await g.send("\x16");
-  if (g.prompt?.kind === "getlin") await g.getlin("2");
-  while (g.prompt && g.prompt.kind !== "poskey") await (g.prompt.kind === "text" ? g.dismiss() : g.yn("n"));
-  const marks = bare(g.recorded).filter((l) => l.startsWith("ckpt "));
-  expect(marks.length).toBeGreaterThan(before);
+test("marks turns from the core's own count, with no line for a checkpoint", async () => {
+  const g = await (await Session.start({ options: "time" })).skipText();
+  await g.send("sss>");
+  const turns = bare(g.recorded).filter((l) => l.startsWith("T ")).map((l) => l.split(" ")[1]);
+  expect(turns.at(-1)).toBe(g.state.status.BL_TIME?.text);
+  expect(bare(g.recorded).filter((l) => l.startsWith("ckpt"))).toEqual([]);
 });
 
 test("each session records the options it started with", async () => {

@@ -701,8 +701,8 @@ export function App() {
           status={shadowStatus}
           onDownload={async () => {
             const text = recorded?.text ?? shadowRecording.current;
-            const { files, bones } = await client.files(namedBones(text));
-            const made = { recording: text, files, bones, shadow: shadowStatus };
+            const { files, bones, failed } = await client.files(namedBones(text));
+            const made = { recording: text, files, bones, failed, shadow: shadowStatus };
             downloadText(buildDebugPackage(made), debugPackageName());
           }}
         />

@@ -6,12 +6,15 @@ import type { NetHackModule } from "./memory";
 import { sha256 } from "./sha256";
 
 export const RECORDING_DIR = "/save/replay";
-// what nhweb_resumed() says of a game brought back from the files a closed page left
-const RECOVERED = 2;
+// what nhweb_resumed() says of a game restored from its save
+const RESTORED = 1;
 export const FORMAT = 1;
 // a chunk is rewritten whole each time it grows, so keep each one small
 const CHUNK_SIZE = 64 * 1024;
-const CHECK_EVERY = 20;
+const CHECK_EVERY = 100;
+const FILES_EVERY = 20;
+// what was recorded of a game cut back to a point before a replay failed, for working out why
+export const FAILED_FILE = "failed";
 
 type FS = NetHackModule["FS"];
 
@@ -30,7 +33,7 @@ export function zoneSeconds(text: string): number | null {
 }
 
 /**
- * The line, without its sequence number, that records an answer to `request`.
+ * The line, without its time, that records an answer to `request`.
  * It names what was chosen rather than the core's number for it: a position in
  * a table moves as the table grows, and a menu item's number may be an address.
  */
@@ -55,12 +58,12 @@ export function answerLine(request: GameRequest, answer: Answer | null): string 
   }
 }
 
-/** The item's text, which of the items with that text it is, and the count; for a choice no item lists, its number. */
-function menuPick(request: GameRequest, { identifier, count }: MenuSelection): [string, number, number] | [number, number] {
+/** The item's text, which of the items with that text it is, the count and its letter; for a choice no item lists, its number. */
+function menuPick(request: GameRequest, { identifier, count }: MenuSelection): [string, number, number, string] | [number, number] {
   const items = request.kind === "menu" ? request.items.filter((i) => i.identifier !== 0) : [];
   const item = items.find((i) => i.identifier === identifier);
   if (!item) return [identifier, count];
-  return [item.text, items.filter((i) => i.text === item.text).findIndex((i) => i.identifier === identifier), count];
+  return [item.text, items.filter((i) => i.text === item.text).findIndex((i) => i.identifier === identifier), count, item.accelerator];
 }
 
 /** The core's order for these, which PlayerChoices doesn't list as there's no more of them to come. */
@@ -89,7 +92,7 @@ export function inputLine(input: Input): string {
 
 /** Whether a recording holds a whole game that stopped mid-session, so that replaying it brings the game back. */
 export function resumable(text: string): boolean {
-  return /^\d+ session new /m.test(text) && !/^\d+ session unrecorded /m.test(text) && !/^\d+ end /.test(lastLine(text));
+  return /^\d+ session new /m.test(text) && !/^\d+ session (?:unrecorded|recover) /m.test(text) && !/^\d+ end /.test(lastLine(text));
 }
 
 function lastLine(text: string): string {
@@ -139,7 +142,6 @@ export class Recorder implements GameHost {
   /** Answers in `early` about an old game left unfinished, which a new game has no use for. */
   private oldGame = new Set<number>();
   private dir: string | null = null;
-  private seq = 0;
   private chunk = 1;
   private chunkText = "";
   private dirty = false;
@@ -148,8 +150,8 @@ export class Recorder implements GameHost {
   private midway = false;
   private offset: number | null = null;
   private lastTurn = -1;
-  private lastCheckpoint = 0;
   private lastCheck = -Infinity;
+  private lastFiles = -Infinity;
   private status: Record<string, string> = {};
   private ended = false;
 
@@ -225,6 +227,7 @@ export class Recorder implements GameHost {
   async resume(): Promise<boolean> {
     const dir = this.gameDir();
     if (!this.start.resume || !dir) return false;
+    if (chunkNames(this.fs, dir).some((f, i) => Number(f) !== i + 1)) return false;
     const text = readRecording(this.fs, dir);
     if (!resumable(text)) return false;
     return this.start.resume(text, dir.slice(RECORDING_DIR.length + 1));
@@ -232,10 +235,19 @@ export class Recorder implements GameHost {
 
   /**
    * Takes over from a replay that has played `text` on this core, carrying on
-   * the session it stopped in.
+   * the session it stopped in. True if `text` stops short of what was recorded,
+   * which is then cut back to it.
    */
-  carryOn(text: string, status: Record<string, string>): void {
+  carryOn(text: string, status: Record<string, string>): boolean {
     const dir = this.gameDir()!;
+    const held = readRecording(this.fs, dir);
+    const cut = held !== text;
+    if (cut) {
+      const path = `${dir}/${FAILED_FILE}`;
+      const before = this.fs.analyzePath(path).exists ? this.fs.readFile(path, { encoding: "utf8" }) : "";
+      this.fs.writeFile(path, before + held);
+      this.rewrite(dir, text);
+    }
     const chunks = chunkNames(this.fs, dir);
     const last = chunks[chunks.length - 1];
     const lastText = this.fs.readFile(`${dir}/${last}`, { encoding: "utf8" });
@@ -243,16 +255,29 @@ export class Recorder implements GameHost {
     this.chunk = Number(last) + (full ? 1 : 0);
     this.chunkText = full ? "" : lastText;
     this.dir = dir;
-    this.seq = parseInt(lastLine(text), 10);
     this.status = { ...status };
-    this.lastCheckpoint = this.m._nhweb_checkpoint_count();
-    this.lastTurn = this.m._nhweb_checkpointed();
+    this.lastTurn = this.m._nhweb_moves();
     this.lastCheck = Number([...text.matchAll(/^\d+ = (\d+) /gm)].at(-1)?.[1] ?? -Infinity);
     this.offset = zoneSeconds(/^\d+ session new \S+ tz=(\S+)/m.exec(text)?.[1] ?? "") ?? this.inner.utcOffset();
     this.start.before?.(text);
-    this.append(`back ${new Date(this.wallClock()).toISOString()}`);
+    this.append(this.stamped(`back ${new Date(this.wallClock()).toISOString()}`));
     for (const line of this.early) this.append(line);
     this.early = [];
+    return cut;
+  }
+
+  private rewrite(dir: string, text: string): void {
+    for (const f of chunkNames(this.fs, dir)) this.fs.unlink(`${dir}/${f}`);
+    let chunk = 1;
+    let held = "";
+    for (const line of text.split(/(?<=\n)/)) {
+      held += line;
+      if (held.length >= CHUNK_SIZE) {
+        this.fs.writeFile(`${dir}/${String(chunk++).padStart(6, "0")}`, held);
+        held = "";
+      }
+    }
+    if (held || chunk === 1) this.fs.writeFile(`${dir}/${String(chunk).padStart(6, "0")}`, held);
   }
 
   /** A game keeps the time zone it started in, which its recording holds. */
@@ -308,20 +333,17 @@ export class Recorder implements GameHost {
     const time = new Date(this.wallClock()).toISOString();
     const resumed = this.m._nhweb_resumed();
     const lines: string[] = [];
-    if (resumed && chunks.length) {
+    if (resumed === RESTORED && chunks.length) {
       const last = chunks[chunks.length - 1];
       this.chunk = Number(last);
       this.chunkText = this.fs.readFile(`${dir}/${last}`, { encoding: "utf8" });
       this.start.before?.(readRecording(this.fs, dir));
-      lines.push(
-        resumed === RECOVERED
-          ? `session recover ${this.lastCheckpointIn(dir, chunks)} ${this.m._nhweb_moves()} ${time}`
-          : `session restore ${time}`,
-      );
+      lines.push(`session restore ${time}`);
     } else {
       this.early = this.early.filter((_, i) => !this.oldGame.has(i));
-      // left by a game that was given up on, or never recorded
+      // left by a game that was given up on, never recorded, or that lost the lines after its checkpoint
       for (const f of chunks) this.fs.unlink(`${dir}/${f}`);
+      if (this.fs.analyzePath(`${dir}/${FAILED_FILE}`).exists) this.fs.unlink(`${dir}/${FAILED_FILE}`);
       if (!this.fs.analyzePath(dir).exists) this.fs.mkdir(dir);
       lines.push(
         `nhrec ${FORMAT}`,
@@ -332,50 +354,40 @@ export class Recorder implements GameHost {
     lines.push(`opt ${JSON.stringify(this.start.options)}`, `rc ${JSON.stringify(this.start.config)}`);
     lines.push(`alone ${this.inner.alone ? 1 : 0}`);
     this.dir = dir;
-    for (const line of [...lines, ...this.early]) this.append(line);
+    for (const line of [...lines.map((l) => this.stamped(l)), ...this.early]) this.append(line);
     this.early = [];
   }
 
-  /** The number of the last checkpoint the session before marked, which a recovery comes back to. */
-  private lastCheckpointIn(dir: string, chunks: string[]): number {
-    for (const f of [...chunks].reverse()) {
-      const marks = [...this.fs.readFile(`${dir}/${f}`, { encoding: "utf8" }).matchAll(/^\d+ ckpt (\d+)$/gm)];
-      if (marks.length) return Number(marks[marks.length - 1][1]);
-    }
-    return 0;
-  }
-
-  /**
-   * Before each command: a mark for each checkpoint written since the last
-   * one, and when the core has just checkpointed a new turn, that turn and
-   * when it was reached.
-   */
+  /** Before each command, when the turn has moved on: that turn and its checks. */
   private turn(): void {
     if (!this.dir) return;
-    const count = this.m._nhweb_checkpoint_count();
-    if (count !== this.lastCheckpoint) {
-      this.lastCheckpoint = count;
-      this.write(`ckpt ${count}`);
-    }
-    const turn = this.m._nhweb_checkpointed();
-    if (turn < 0 || turn === this.lastTurn) return;
+    const turn = this.m._nhweb_moves();
+    if (turn === this.lastTurn) return;
     this.lastTurn = turn;
-    this.write(`T ${turn} ${new Date(this.wallClock()).toISOString()}`);
+    this.write(`T ${turn} ${turnSum(this.m)}`);
     if (turn - this.lastCheck >= CHECK_EVERY) {
       this.lastCheck = turn;
       this.write(checkLine(turn, this.m, this.status));
-      if (this.start.shadowed) this.write(`lv ${levelsHash(this.m)}`);
+    }
+    if (this.start.shadowed && turn - this.lastFiles >= FILES_EVERY) {
+      this.lastFiles = turn;
+      this.write(`lv ${levelsHash(this.m)}`);
     }
   }
 
   private write(line: string): void {
     if (this.ended) return;
-    if (this.dir) this.append(line);
-    else this.early.push(line);
+    const text = this.stamped(line);
+    if (this.dir) this.append(text);
+    else this.early.push(text);
   }
 
-  private append(line: string): void {
-    const text = `${++this.seq} ${line}`;
+  /** The line as it goes in the file, with the player's clock when it happened. */
+  private stamped(line: string): string {
+    return `${Math.floor(this.wallClock() / 1000)} ${line}`;
+  }
+
+  private append(text: string): void {
     this.chunkText += `${text}\n`;
     this.dirty = true;
     this.unsent.push(text);
@@ -410,6 +422,7 @@ export class Recorder implements GameHost {
     if (over) {
       this.start.finished(readRecording(this.fs, this.dir));
       for (const f of chunkNames(this.fs, this.dir)) this.fs.unlink(`${this.dir}/${f}`);
+      if (this.fs.analyzePath(`${this.dir}/${FAILED_FILE}`).exists) this.fs.unlink(`${this.dir}/${FAILED_FILE}`);
       this.fs.rmdir(this.dir);
     }
   }
@@ -426,7 +439,18 @@ export function checkLine(turn: number, m: NetHackModule, status: Record<string,
 }
 
 /**
- * A hash of the game's files as the checkpoint before this left them. They hold
+ * Four hex digits for the core's random generator and where the hero is. Old
+ * recordings hold these, so this can't change; it takes in only what a change
+ * that leaves the game's play alone can't move, unlike what's on the status line.
+ */
+export function turnSum(m: NetHackModule): string {
+  let hash = 2166136261;
+  for (const c of `${m._nhweb_rng_fingerprint() >>> 0},${m._nhweb_hero_x()},${m._nhweb_hero_y()}`) hash = Math.imul(hash ^ c.charCodeAt(0), 16777619);
+  return ((hash ^ (hash >>> 16)) & 0xffff).toString(16).padStart(4, "0");
+}
+
+/**
+ * A hash of the game's files as the last checkpoint left them. They hold
  * raw pointers, so it only matches on the build that wrote it.
  */
 export function levelsHash(m: NetHackModule): string {

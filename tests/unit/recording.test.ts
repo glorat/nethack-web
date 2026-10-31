@@ -1,6 +1,8 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
+import { keepLastGame } from "../../src/port/recording";
 import { answerLine } from "../../src/worker/recorder";
-import { parseAnswer, parseRecording } from "../../src/worker/replayer";
+import type { NetHackModule } from "../../src/worker/memory";
+import { parseAnswer, parseRecording, ReplayHost } from "../../src/worker/replayer";
 
 const head = '1 nhrec 1\n2 session new 2026-01-26T12:00:00.000Z tz=+11:00\n3 opt "name:A"\n4 rc ""\n';
 
@@ -67,4 +69,21 @@ test("a character is named, so a role added before it doesn't change what's repl
   // ROLE_NONE and ROLE_RANDOM do different things in the core
   const left = answerLine(then, { kind: "player", role: -2, race: -1, gender: 0, align: 0 }).slice(2);
   expect(parseAnswer(now, left)).toEqual({ kind: "player", role: -2, race: -1, gender: 0, align: 0 });
+});
+
+test("a game that can't replay doesn't replace the last game that can", () => {
+  const set = vi.fn();
+  vi.stubGlobal("localStorage", { setItem: set });
+  expect(keepLastGame("1 nhrec 1\n1 session unrecorded 2026-01-26T12:00:00.000Z tz=+11:00\n")).toBe(false);
+  expect(set).not.toHaveBeenCalled();
+  expect(keepLastGame("1 nhrec 1\n1 session new 2026-01-26T12:00:00.000Z tz=+11:00\n")).toBe(true);
+  expect(set).toHaveBeenCalledOnce();
+  vi.unstubAllGlobals();
+});
+
+test("the clock answers with each recorded time in turn, then the last", () => {
+  const lines = [5, 6].map((n, i) => ({ at: i + 1, tag: "now", rest: String(n) }));
+  const session = { kind: "new" as const, options: "", config: "", lines };
+  const host = new ReplayHost(session, {} as NetHackModule, 0, { post() {}, pace: () => Promise.resolve() });
+  expect([host.now(), host.now(), host.now()]).toEqual([5, 6, 6]);
 });

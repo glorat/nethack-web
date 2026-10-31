@@ -241,14 +241,14 @@ test("a restored game, and one recovered after that, show the saved state", asyn
   expect(recovered.state.equipment[5]).toEqual({ letter: "", tile: -1 });
 });
 
-/** A game with a save and a recovery behind it, left open in the middle of its third session. */
+/** A game with a save and a return by replay behind it, left open in the middle of its third session. */
 async function leftOpen(options = { pageSeed: 7, seedsVary: true, options: "time" }) {
   const first = await (await Session.start(options)).skipText();
   await first.send("s".repeat(12) + "hhjj");
   await first.send("S");
   const second = await (await Session.start({ ...options, saves: first.saves() })).skipText();
   await second.send("llkks");
-  const third = await (await Session.start({ ...options, saves: second.persisted })).skipText();
+  const third = await (await Session.start({ ...options, saves: second.persisted, resume: true })).skipText();
   await third.send("s".repeat(8) + "jl");
   return { third, options };
 }
@@ -283,7 +283,7 @@ test("a game that came back by replay records on, and replays and comes back aga
   expect(restored.messages.some((t) => /welcome back/i.test(t))).toBe(true);
   await restored.send("s");
   const text = [...restored.persisted].filter(([k]) => k.startsWith("replay/")).map(([, v]) => new TextDecoder().decode(v)).join("");
-  expect(text.match(/^\d+ back \S+Z$/gm)).toHaveLength(2);
+  expect(text.match(/^\d+ back \S+Z$/gm)).toHaveLength(3);
   expect((await replayRecording(text)).error).toBeNull();
 });
 
@@ -306,7 +306,7 @@ test("a recording that goes differently falls back on the checkpoint", async () 
   const saves = new Map(third.persisted);
   const [file] = [...saves.keys()].filter((k) => k.startsWith("replay/"));
   const text = new TextDecoder().decode(saves.get(file));
-  saves.set(file, new TextEncoder().encode(text.replace(/^(\d+) now \d+$/m, "$1 k 83")));
+  saves.set(file, new TextEncoder().encode(text.replace(/^(\d+) seed \d+$/m, "$1 k 83")));
 
   // Game logs a callback that failed, as it would on being told to answer a failed replay's core
   const logged = vi.spyOn(console, "error");
@@ -316,7 +316,60 @@ test("a recording that goes differently falls back on the checkpoint", async () 
   expect(logged).not.toHaveBeenCalled();
   logged.mockRestore();
   expect(Number(next.state.status.BL_TIME?.text)).toBeGreaterThanOrEqual(Number(third.state.status.BL_TIME?.text));
-  expect(next.recorded.some((l) => / session recover /.test(l))).toBe(true);
+  expect(next.recorded.some((l) => / session unrecorded /.test(l))).toBe(true);
+});
+
+test("a recording missing a chunk isn't replayed", async () => {
+  const { third, options } = await leftOpen();
+  const saves = new Map(third.persisted);
+  const [file] = [...saves.keys()].filter((k) => k.startsWith("replay/"));
+  saves.set(file.replace(/\d+$/, "000002"), saves.get(file)!);
+  saves.delete(file);
+  const next = await (await Session.start({ ...options, saves, resume: true })).skipText();
+  expect(next.recorded.some((l) => / session unrecorded /.test(l))).toBe(true);
+});
+
+async function cutBack(tamper: (lines: string[], at: number) => void, turns = "s".repeat(8)) {
+  const { third, options } = await leftOpen();
+  await third.send(turns);
+  const saves = new Map(third.persisted);
+  const [file] = [...saves.keys()].filter((k) => k.startsWith("replay/"));
+  const lines = new TextDecoder().decode(saves.get(file)).split("\n");
+  const at = lines.findLastIndex((l) => / T \d+ /.test(l));
+  tamper(lines, at);
+  saves.set(file, new TextEncoder().encode(lines.join("\n")));
+  const next = await (await Session.start({ ...options, saves, resume: true })).skipText();
+  return { next, file, at, lines };
+}
+
+test("a game whose replay fails a sum comes back from the last one that passed, says so and keeps what was cut", async () => {
+  const { next, file, at, lines } = await cutBack((l, at) => {
+    l[at] = l[at].replace(/ \w{4}$/, /0000$/.test(l[at]) ? " 0001" : " 0000");
+  });
+  expect(next.resumeFailure).toBeNull();
+  expect(next.messages.some((t) => /last point that could be checked/.test(t))).toBe(true);
+  const turn = (t: string) => Number(/ T (\d+) /.exec(t)![1]);
+  expect(Number(next.state.status.BL_TIME?.text)).toBe(turn(lines[lines.slice(0, at).findLastIndex((l) => / T \d+ /.test(l))]));
+  await next.send("s");
+  const dir = file.replace(/[^/]+$/, "");
+  const kept = new TextDecoder().decode(next.persisted.get(file));
+  expect(kept).not.toContain(lines[at]);
+  expect(kept).toMatch(/ back /);
+  expect(next.persisted.has(`${dir}failed`)).toBe(true);
+  expect(new TextDecoder().decode(next.persisted.get(`${dir}failed`))).toContain(lines[at]);
+  // the game cut back replays, whole
+  expect((await replayRecording(kept)).error).toBeNull();
+});
+
+test("a game whose replay fails a full check goes back past the sums, to the last full check", async () => {
+  const { next, lines } = await cutBack((l) => {
+    const at = l.findLastIndex((x) => / = /.test(x));
+    l[at] = l[at].replace(/"HP":"\d+"/, '"HP":"999"');
+  });
+  expect(next.resumeFailure).toBeNull();
+  expect(next.messages.some((t) => /last point that could be checked/.test(t))).toBe(true);
+  const full = lines.filter((l) => / = /.test(l));
+  expect(next.state.status.BL_TIME?.text).toBe(/ = (\d+) /.exec(full.at(-2)!)![1]);
 });
 
 test("a replay the page died in isn't tried again", async () => {
@@ -325,7 +378,7 @@ test("a replay the page died in isn't tried again", async () => {
   saves.set("resuming", new Uint8Array());
 
   const next = await (await Session.start({ ...options, saves, resume: true })).skipText();
-  expect(next.recorded.some((l) => / session recover /.test(l))).toBe(true);
+  expect(next.recorded.some((l) => / session unrecorded /.test(l))).toBe(true);
   expect([...next.persisted.keys()]).not.toContain("resuming");
 });
 

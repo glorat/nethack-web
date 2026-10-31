@@ -190,7 +190,7 @@ test("a game whose replay goes differently comes back from its checkpoint", asyn
           const get = store.get(key);
           get.onsuccess = () => {
             const text = new TextDecoder().decode(get.result.contents);
-            get.result.contents = new TextEncoder().encode(text.replace(/^(\d+) now \d+$/m, "$1 k 83"));
+            get.result.contents = new TextEncoder().encode(text.replace(/^(\d+) seed \d+$/m, "$1 k 83"));
             store.put(get.result, key).onsuccess = () => resolve();
           };
         };
@@ -1215,7 +1215,7 @@ test("a finished game can be replayed from its end screen or its address, reload
   const file = await download;
   expect(file.suggestedFilename()).toMatch(new RegExp(`^nethack-${name}-\\d{4}-\\d\\d-\\d\\d\\.txt$`));
   const { readFile } = await import("node:fs/promises");
-  expect(await readFile((await file.path())!, "utf8")).toMatch(/^1 nhrec 1\n2 session new /);
+  expect(await readFile((await file.path())!, "utf8")).toMatch(/^\d+ nhrec 1\n\d+ session new /);
 
   await over.getByRole("button", { name: "Replay" }).click();
   const playing = page.url();
@@ -1250,7 +1250,7 @@ test("a finished game can be replayed from its end screen or its address, reload
   // an upgrade or corruption: the game goes differently from its recording
   await page.evaluate(() => {
     const text = localStorage.getItem("nethack.lastGame")!;
-    localStorage.setItem("nethack.lastGame", text.replace(/^(\d+) now \d+$/m, "$1 k 83"));
+    localStorage.setItem("nethack.lastGame", text.replace(/^(\d+) seed \d+$/m, "$1 k 83"));
   });
   await page.reload();
   const broken = page.getByRole("toolbar", { name: "Replay" });
@@ -1316,7 +1316,9 @@ test.describe("shadowing a game", () => {
     const name = `Dif${Date.now() % 100000}`;
     await startGame(page, name);
     for (let i = 0; i < 5; i++) await page.keyboard.press("s");
-    await page.waitForTimeout(500);
+    await page.keyboard.press("S");
+    const play = page.getByRole("button", { name: `Play as ${name}` });
+    await expect(play).toBeVisible();
     await page.evaluate(
       (key) =>
         new Promise<void>((resolve, reject) => {
@@ -1327,7 +1329,7 @@ test.describe("shadowing a game", () => {
             const get = store.get(key);
             get.onsuccess = () => {
               const text = new TextDecoder().decode(get.result.contents);
-              get.result.contents = new TextEncoder().encode(text.replace(/^(\d+) now \d+$/m, "$1 k 83"));
+              get.result.contents = new TextEncoder().encode(text.replace(/^(\d+) seed \d+$/m, "$1 k 83"));
               store.put(get.result, key).onsuccess = () => resolve();
             };
           };
@@ -1335,9 +1337,10 @@ test.describe("shadowing a game", () => {
       `/save/replay/0${name}/000001`,
     );
     await page.reload();
+    await play.click();
     await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15000 });
     await expect(bar(page)).toContainText("went differently", { timeout: 15000 });
-    await expect(bar(page)).toContainText("expected now");
+    await expect(bar(page)).toContainText("expected seed");
     await page.keyboard.press("s");
 
     const download = page.waitForEvent("download");

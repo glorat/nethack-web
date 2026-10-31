@@ -102,7 +102,6 @@ export class ReplayRunner {
       post: (events) => this.post(run, events),
       pace: (at) => this.pace(run, at),
       delay: () => this.delay(run),
-      checkpoint: () => {},
       bones: this.bones,
     }).then(
       () => this.end(run, null),

@@ -63,16 +63,12 @@ test("a shadow follows a game that came back, from what its recording held", asy
   expect((await shadowOf(back)).at(-1)).toMatchObject({ state: "following" });
 });
 
-test("a shadow gets past a session that was cut short, to follow the game recovered from it", async () => {
+test("a shadow says a game back from its checkpoint has no recording to follow, not that it went differently", async () => {
   const first = await (await Session.start(options)).skipText();
-  await first.send("s".repeat(45));
+  await first.send("s".repeat(5));
   const g = await (await Session.start({ ...options, saves: first.persisted })).skipText();
-  await g.send("s".repeat(30));
-  expect(g.before).not.toBeNull();
-  expect(g.recorded.some((l) => / session recover /.test(l))).toBe(true);
-  const last = (await shadowOf(g)).at(-1)!;
-  expect(last.state).toBe("following");
-  expect(last.turn).toBeGreaterThan(60);
+  await g.send("s");
+  expect((await shadowOf(g)).at(-1)).toMatchObject({ state: "unrecorded" });
 });
 
 test("a shadow doesn't compare files hashed before it started, perhaps on another build", async () => {
