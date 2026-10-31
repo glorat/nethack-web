@@ -33,10 +33,10 @@ Each line is `<seq> <tag> [args]`. `seq` counts from 1 within each session. Text
 | `c` | x y button | A click on the map |
 | `y` | JSON key [count] | An answer to a yes/no question, including the one about an old game left unfinished, whether the player or the page answered it; a new game started by destroying the old one leaves that answer out |
 | `l` | JSON text | A line typed at a prompt |
-| `m` | JSON list | Menu items chosen, each `[text, which, count]`, `which` counting the items with that text; or `[number, count]` for a choice the menu doesn't list |
+| `m` | JSON list | Menu items chosen, each `[text, which, count]`, `which` counting the items with that text; or `[number, count]` for a choice the menu doesn't list; a count of -1 means no count was given |
 | `w` | | A text window dismissed |
 | `x` | JSON name | An extended command chosen |
-| `p` | JSON list | A character chosen: the names of its role, race, gender and alignment, `null` for one left open |
+| `p` | JSON list | A character chosen: the names of its role, race, gender and alignment, or the core's negative number for one left to it |
 | `asc` | `0` or `1` | The ASCII map switched from outside the game |
 | `ckpt` | n | The core has written its `n`th checkpoint of this session, before a command or at a level change |
 | `T` | turn time | The turn has just moved on, before its first command; `time` is the player's clock, ISO 8601 UTC |
@@ -52,7 +52,7 @@ All times are the player's clock and are recorded as they were, even if that clo
 
 `src/worker/replayer.ts` plays a recording again. Each session runs on a fresh core whose host answers from the recording, checking each `ckpt`, `T`, `=` and `end` against the core. A restore starts from the files the replay itself saved; a recovery from the files as the replay had them at the checkpoint named. The replay stops with the line where the game went differently.
 
-The checks see the turn, the checkpoint count, the hero's position, the status line and the random generator, so a game that goes differently is nearly always stopped within 20 turns. Something that differs without touching any of those, such as a stored value no roll has yet depended on, replays without complaint until it does. They hold across a rebuild that doesn't change how the game plays, such as adding an extended command. A shadow, on the same build by definition, also compares the bytes of the game's files through `lv`.
+The checks see the turn, the checkpoint count, the hero's position, the status line and the random generator, so a game that goes differently is nearly always stopped within 20 turns. Something that differs without touching any of those, such as a stored value no roll has yet depended on, replays without complaint until it does. They hold across a rebuild that doesn't change how the game plays, such as adding an extended command. A shadow also compares the bytes of the game's files through `lv`, but only for lines written while it follows, since earlier ones may be from another build. A game whose files an earlier build wrote can still show a difference there that isn't one: after a rebuild, trust a shadow's `lv` result only on a new game.
 
 ## Bones
 

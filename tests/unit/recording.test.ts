@@ -64,4 +64,7 @@ test("a character is named, so a role added before it doesn't change what's repl
   const now = { kind: "player" as const, choices: choices(["New", "Archeologist", "Valkyrie"], ["human", "dwarf"]) };
   expect(parseAnswer(now, rest)).toEqual({ kind: "player", role: 2, race: 1, gender: 1, align: 0 });
   expect(() => parseAnswer({ ...now, choices: choices(["New"], ["human", "dwarf"]) }, rest)).toThrow(/no choice/);
+  // ROLE_NONE and ROLE_RANDOM do different things in the core
+  const left = answerLine(then, { kind: "player", role: -2, race: -1, gender: 0, align: 0 }).slice(2);
+  expect(parseAnswer(now, left)).toEqual({ kind: "player", role: -2, race: -1, gender: 0, align: 0 });
 });
