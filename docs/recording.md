@@ -66,7 +66,7 @@ A game left unfinished comes back by replay when it can. When the core finds the
 
 If the replay goes differently, or the recording lacks the game's start, the game comes back from its checkpoint instead, as a `session recover`. So does a game whose last replay never reached play, which `/save/resuming` marks, in case the replay itself crashes the page.
 
-The core running the replay sees what's in `/save` now, not what was there when the game was played, and the cores for earlier sessions see none of it. A game that read the high score list may therefore go differently, and come back from its checkpoint.
+The web build never reads the high score list during play, only to rank a finished game, so what's on it can't make a replay go differently. Corpses, statues and doppelgangers that would take a past player's role and name get a random role and no name, as on a new install.
 
 ## Watching a recording
 
