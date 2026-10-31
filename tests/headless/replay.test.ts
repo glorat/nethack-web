@@ -28,7 +28,7 @@ test("a finished game replays to its end, every check matching", async () => {
   const g = await (await Session.start({ pageSeed: 7, options: "time" })).skipText();
   await play(g);
   await quit(g);
-  expect(g.recording).toMatch(/ = \d+ @\d+,\d+ \{/);
+  expect(g.recording).toMatch(/ = \d+ @\d+,\d+ -?\d+ [0-9a-f]{16} \{/);
 
   const replayed = await replayRecording(g.recording!);
   expect(replayed.error).toBeNull();
@@ -97,7 +97,7 @@ test("a game whose hero starts with other attributes is caught by them", async (
   expect(n).toBeGreaterThanOrEqual(5);
 
   const replayed = await replayRecording(tampered);
-  const [, recorded, shown] = /^line \d+ \(= \d+ @\S+ (\{.*\})\): the core shows \d+ @\S+ (\{.*\})$/.exec(replayed.error?.message ?? "")!;
+  const [, recorded, shown] = /^line \d+ \(= \d+ @\S+ \S+ \S+ (\{.*\})\): the core shows \d+ @\S+ \S+ \S+ (\{.*\})$/.exec(replayed.error?.message ?? "")!;
   const [was, is] = [JSON.parse(recorded), JSON.parse(shown)];
   expect(["ST", "DX", "CO", "IN", "WI", "CH"].some((a) => was[a] !== is[a])).toBe(true);
 });
@@ -116,6 +116,21 @@ test("prompts the player cancelled replay as cancelled", async () => {
   const replayed = await replayRecording(g.recording!);
   expect(replayed.error).toBeNull();
   expect(replayed.state.status).toEqual(g.state.status);
+});
+
+test("a game that differs only in what the status line doesn't show is caught", async () => {
+  const g = await (await Session.start({ pageSeed: 7, options: "time" })).skipText();
+  await play(g);
+  await g.send("s".repeat(25));
+  await quit(g);
+  const text = g.recording!;
+  const check = /^(\d+ = \d+ @\d+,\d+) (-?\d+) ([0-9a-f]{16}) /m;
+  expect(text).toMatch(check);
+
+  const rng = await replayRecording(text.replace(check, "$1 1 $3 "));
+  expect(rng.error?.message).toMatch(/^line \d+ \(= /);
+  const levels = await replayRecording(text.replace(check, `$1 $2 ${"0".repeat(16)} `));
+  expect(levels.error?.message).toMatch(/^line \d+ \(= /);
 });
 
 test("a replay leaves the game's files byte for byte as the game did", async () => {

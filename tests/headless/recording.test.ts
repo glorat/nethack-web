@@ -30,7 +30,7 @@ test("a new game is recorded from its start, numbered line by line, and kept nex
   expect(lines.some((l) => /^uuid [\w-]{36}$/.test(l))).toBe(true);
   expect(lines).toContain(`k ${"s".charCodeAt(0)}`);
   expect(lines.some((l) => /^T \d+ \d{4}-\d\d-\d\dT[\d:.]+Z$/.test(l))).toBe(true);
-  expect(lines.some((l) => /^= \d+ @\d+,\d+ \{.*"HP":"\d+".*"LEVELDESC":"Dlvl:1".*\}$/.test(l))).toBe(true);
+  expect(lines.some((l) => /^= \d+ @\d+,\d+ -?\d+ [0-9a-f]{16} \{.*"HP":"\d+".*"LEVELDESC":"Dlvl:1".*\}$/.test(l))).toBe(true);
   expect(g.recorded.map((l) => Number(l.split(" ")[0]))).toEqual(g.recorded.map((_, i) => i + 1));
   expect(file(g)).toBe(g.recorded.map((l) => `${l}\n`).join(""));
 });
