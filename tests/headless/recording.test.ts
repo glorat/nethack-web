@@ -58,17 +58,6 @@ test("a saved game's recording carries on when it's restored", async () => {
   expect(file(next)).toBe([...g.recorded, ...next.recorded].map((l) => `${l}\n`).join(""));
 });
 
-test("a game back from its checkpoint starts a new recording, as the lines after that checkpoint were lost to it", async () => {
-  const left = await (await Session.start({ options: "time" })).skipText();
-  await left.send("sss");
-  const turn = bare(left.recorded).filter((l) => l.startsWith("T ")).at(-1)!.split(" ")[1];
-
-  const next = await (await Session.start({ saves: left.persisted, options: "time" })).skipText();
-  expect(bare(next.recorded).slice(0, 2)).toEqual(["nhrec 1", expect.stringMatching(/^session unrecorded \S+Z tz=/)]);
-  expect(next.state.status.BL_TIME?.text).toBe(turn);
-  expect(file(next)).toBe(next.recorded.map((l) => `${l}\n`).join(""));
-});
-
 test("marks turns from the core's own count, with no line for a checkpoint", async () => {
   const g = await (await Session.start({ options: "time" })).skipText();
   await g.send("sss>");

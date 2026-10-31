@@ -28,8 +28,6 @@ export function buildDebugPackage(made: {
   recording: string;
   files: Record<string, Uint8Array>;
   bones: Record<string, Uint8Array>;
-  /** What the recording held before it was cut back to where a replay last went right. */
-  failed: string | null;
   shadow: ShadowStatus | null;
 }): string {
   const { files: shadowFiles, ...shadow } = made.shadow ?? { state: null };
@@ -40,7 +38,6 @@ export function buildDebugPackage(made: {
     browser: typeof navigator === "undefined" ? "" : navigator.userAgent,
     shadow,
     recording: made.recording,
-    failed: made.failed,
     bones: encoded(made.bones),
     files: compared ? encoded(made.files) : null,
     shadowFiles: compared && shadowFiles ? encoded(shadowFiles) : null,

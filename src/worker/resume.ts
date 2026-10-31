@@ -59,10 +59,6 @@ export class ResumedHost implements GameHost {
     (this.live ?? this.replayed).bonesLeft(name, data, wizard);
   }
 
-  decided(request: GameRequest, answer: Answer | null): void {
-    this.live?.decided?.(request, answer);
-  }
-
   delayOutput(): Promise<void> {
     return this.live ? new Promise((resolve) => setTimeout(resolve, DELAY_MS)) : this.replayed.delayOutput();
   }
@@ -151,7 +147,7 @@ export function resumedHost(
   return new ResumedHost(replayed, () => {
     const cut = recorder.carryOn(text, replayed.status);
     flush();
-    if (cut) recorder.post([{ type: "message", text: "Your game has come back from the last point that could be checked.", attr: 0 }]);
+    if (cut) recorder.post([{ type: "message", text: "Your latest moves couldn't be brought back, so your game has gone back a little.", attr: 0 }]);
     return recorder;
   });
 }

@@ -139,7 +139,7 @@ export type WorkerMessage =
   | { type: "events"; events: GameEvent[] }
   | { type: "request"; id: number; request: GameRequest }
   | { type: "description"; id: number; text: string | null }
-  | { type: "debug_files"; id: number; files: Record<string, Uint8Array>; bones: Record<string, Uint8Array>; failed: string | null }
+  | { type: "debug_files"; id: number; files: Record<string, Uint8Array>; bones: Record<string, Uint8Array> }
   | { type: "shadow_status"; status: ShadowStatus }
   | ReplayMessage;
 

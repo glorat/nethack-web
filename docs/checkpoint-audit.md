@@ -1,5 +1,7 @@
 # Checkpoint audit
 
+The core no longer checkpoints before each command, and a game comes back by replaying its recording; a checkpoint is only a last resort the player chooses. This is kept for the record of what a checkpoint holds. See `docs/recording.md`.
+
 Does recovering from a checkpoint taken at a command prompt bring back the state a real save and restore would? A static read of the core (`nethack/`, audited at `c5b25cb11`), comparing `save_currentstate()` (mode WRITING) and recovery (`recover_savefile()` then `dorecover`) with `dosave0()` (mode WRITING|FREEING) and restore.
 
 ## Differences fixed
@@ -37,7 +39,6 @@ Does recovering from a checkpoint taken at a command prompt bring back the state
 
 ## Limits of the approach
 
-- Checkpoints follow `svm.moves`. A fast hero's extra action in a turn, and commands that take no time (naming, `#adjust`, options), wait for the next turn.
 - `checkpoint` off in the options leaves nothing to recover.
 - A checkpoint can pause inside its write (`getmsghistory` is a window callback). So can a level change, between saving the old level and the arrival checkpoint. Neither reaches IndexedDB: the worker only syncs while waiting for a key and at game end.
 

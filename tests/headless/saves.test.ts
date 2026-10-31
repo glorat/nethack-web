@@ -1,4 +1,5 @@
 import { expect, test, vi } from "vitest";
+import { CANT_REPLAY } from "../../src/worker/game";
 import { replayRecording, Session } from "./harness";
 
 async function extended(g: Session, name: string) {
@@ -28,10 +29,9 @@ test("a game left unfinished comes back without asking", async () => {
   const left = await (await Session.start()).skipText();
   await left.send("llll");
 
-  const next = await (await Session.start({ saves: left.saves() })).skipText();
-  expect(next.messages.some((t) => /welcome back/i.test(t))).toBe(true);
+  const next = await (await Session.start({ saves: left.persisted })).skipText();
+  expect(next.recorded.some((l) => / back /.test(l))).toBe(true);
   expect(next.messages.some((t) => /old game in progress/i.test(t))).toBe(false);
-  expect([...next.saves().keys()]).not.toContain("recovering");
 });
 
 test("a game left unfinished days ago still comes back", async () => {
@@ -39,21 +39,7 @@ test("a game left unfinished days ago still comes back", async () => {
   await left.send("llll");
 
   const next = await (await Session.start({ saves: left.persisted, savesAge: 4 })).skipText();
-  expect(next.messages.some((t) => /welcome back/i.test(t))).toBe(true);
-});
-
-test("a game that can't be recovered is asked about the next time", async () => {
-  const left = await (await Session.start()).skipText();
-  const saves = left.saves();
-  // a checkpoint cut short
-  saves.set("0Tester.0", new Uint8Array());
-
-  const failed = await Session.start({ saves });
-  expect(failed.ended).toBe(true);
-  const next = await Session.start({ saves: failed.saves() });
-  expect(next.prompt).toMatchObject({ kind: "yn", query: expect.stringMatching(/old game in progress/i) });
-  await (await next.yn("y")).skipText();
-  expect(next.messages.some((t) => /welcome to NetHack/i.test(t))).toBe(true);
+  expect(next.recorded.some((l) => / back /.test(l))).toBe(true);
 });
 
 test("a game left unfinished is asked about while another tab is playing", async () => {
@@ -61,16 +47,6 @@ test("a game left unfinished is asked about while another tab is playing", async
 
   const next = await Session.start({ saves: left.saves(), otherTab: true });
   expect(next.prompt).toMatchObject({ kind: "yn", query: expect.stringMatching(/old game in progress/i) });
-});
-
-test("a recovered game comes back as of the last command, not the last level change", async () => {
-  const left = await (await Session.start({ options: "time" })).skipText();
-  await left.send("s".repeat(10));
-  const turn = left.state.status.BL_TIME?.text;
-  expect(Number(turn)).toBeGreaterThan(10);
-
-  const next = await (await Session.start({ saves: left.saves(), options: "time" })).skipText();
-  expect(next.state.status.BL_TIME?.text).toBe(turn);
 });
 
 test("a game comes back with the start time it had, in the page's time zone", async () => {
@@ -87,7 +63,7 @@ test("a game comes back with the start time it had, in the page's time zone", as
   expect(xlog).toContain(`starttime=${Date.parse(date) / 1000}\t`);
 });
 
-test("a game recovered while engulfed is still engulfed", async () => {
+test("a game that comes back while engulfed is still engulfed", async () => {
   const g = await (await Session.start({ wizard: true, options: "pettype:none" })).skipText();
   await g.send("\x07");
   await g.getlin("fog cloud");
@@ -100,9 +76,8 @@ test("a game recovered while engulfed is still engulfed", async () => {
   }
   expect(g.messages.some((t) => /engulfs you/.test(t))).toBe(true);
 
-  const next = await Session.start({ saves: g.saves(), wizard: true });
-  // debug mode asks whether to keep the save file it restores
-  await (await next.yn("n")).skipText();
+  const next = await (await Session.start({ saves: g.persisted, wizard: true, resume: true })).skipText();
+  expect(next.resumeFailure).toBeNull();
   await next.send("\x18");
   if (next.prompt?.kind !== "menu") throw new Error("no attributes");
   const shown = next.prompt.items.map((item) => item.text);
@@ -119,7 +94,7 @@ async function toAltar(g: Session, altar: { x: number; y: number }) {
   throw new Error("no free square by the altar");
 }
 
-test("checkpointing each turn doesn't make a priest greet the hero again soon after", async () => {
+test("a priest doesn't greet the hero again soon after", async () => {
   const g = await (await Session.start({ wizard: true, seed: 1, options: "pettype:none" })).skipText();
   await extended(g, "wizloaddes");
   await (await g.getlin("minetn-2")).skipText();
@@ -146,7 +121,7 @@ async function luck(g: Session): Promise<string | undefined> {
   return line?.trim();
 }
 
-test("a game recovered on a full moon is as lucky as it was", async () => {
+test("a game that comes back on a full moon is as lucky as it was", async () => {
   // a full moon
   const date = "2024-01-25T12:00:00";
   const g = await (await Session.start({ wizard: true, date, options: "pettype:none" })).skipText();
@@ -155,13 +130,12 @@ test("a game recovered on a full moon is as lucky as it was", async () => {
   const before = await luck(g);
   expect(before).toBe("You are lucky (1).");
 
-  const next = await Session.start({ saves: g.saves(), wizard: true, date });
-  // debug mode asks whether to keep the save file it restores
-  await (await next.yn("n")).skipText();
+  const next = await (await Session.start({ saves: g.persisted, wizard: true, date })).skipText();
+  expect(next.resumeFailure).toBeNull();
   expect(await luck(next)).toBe(before);
 });
 
-test("checkpointing doesn't bring back what's been rubbed off the start of an engraving", async () => {
+test("what's been rubbed off the start of an engraving stays off", async () => {
   const g = await (await Session.start({ seed: 1, options: "pettype:none" })).skipText();
   // off the stairs, where nothing can be written
   await (await g.send("j")).skipText();
@@ -174,7 +148,7 @@ test("checkpointing doesn't bring back what's been rubbed off the start of an en
   expect(read).toBe('You read: "x".');
 });
 
-test("a meal on the floor that was stopped carries on after recovery", async () => {
+test("a meal on the floor that was stopped carries on after coming back", async () => {
   const g = await (await Session.start({ wizard: true, seed: 1, options: "pettype:none" })).skipText();
   await g.send("\x17");
   await (await g.getlin("food ration")).skipText();
@@ -187,24 +161,23 @@ test("a meal on the floor that was stopped carries on after recovery", async () 
   await (await g.yn("y")).skipText();
   expect(g.messages.at(-1)).toBe("You stop eating the food ration.");
 
-  const next = await Session.start({ saves: g.saves(), wizard: true });
-  // debug mode asks whether to keep the save file it restores
-  await (await next.yn("n")).skipText();
+  const next = await (await Session.start({ saves: g.persisted, wizard: true, resume: true })).skipText();
+  expect(next.resumeFailure).toBeNull();
   await next.send("e");
   await (await next.yn("y")).skipText();
   expect(next.messages).toContain("You resume your meal.");
 });
 
-test("restoring a save removes it, leaving the game to recovery", async () => {
-  const saved = await (await Session.start()).skipText();
+test("restoring a save removes it, leaving the game to its recording", async () => {
+  const saved = await (await Session.start({ pageSeed: 7 })).skipText();
   await saved.send("S");
 
-  const restored = await (await Session.start({ saves: saved.saves() })).skipText();
+  const restored = await (await Session.start({ pageSeed: 7, saves: saved.saves() })).skipText();
   expect(restored.messages.some((t) => /welcome back/i.test(t))).toBe(true);
   expect([...restored.saves().keys()]).not.toContain("0Tester");
 
-  const next = await (await Session.start({ saves: restored.saves() })).skipText();
-  expect(next.messages.some((t) => /Restoring save file/.test(t))).toBe(true);
+  const next = await (await Session.start({ pageSeed: 7, saves: restored.persisted })).skipText();
+  expect(next.recorded.some((l) => / back /.test(l))).toBe(true);
 });
 
 test("the high score list is kept between games", async () => {
@@ -220,8 +193,8 @@ test("the high score list is kept between games", async () => {
   expect(scores.some((line) => /Tester-Val/.test(line))).toBe(true);
 });
 
-test("a restored game, and one recovered after that, show the saved state", async () => {
-  const g = await (await Session.start({ options: "pettype:none" })).skipText();
+test("a restored game, and one brought back after that, show the saved state", async () => {
+  const g = await (await Session.start({ pageSeed: 7, options: "pettype:none" })).skipText();
   const shieldOn = g.state.status.BL_AC?.text;
   await g.send("T");
   if (g.prompt?.kind === "yn") await g.yn(g.state.inventory.find((i) => /shield/.test(i.text))!.accelerator);
@@ -229,14 +202,14 @@ test("a restored game, and one recovered after that, show the saved state", asyn
   expect(Number(shieldOff)).toBeGreaterThan(Number(shieldOn));
   await g.send("S");
 
-  const restored = await (await Session.start({ saves: g.saves() })).skipText();
+  const restored = await (await Session.start({ pageSeed: 7, saves: g.saves() })).skipText();
   expect(restored.state.status.BL_AC?.text).toBe(shieldOff);
   expect(restored.state.equipment[5]).toEqual({ letter: "", tile: -1 });
   expect(restored.state.inventory.some((i) => /small shield/.test(i.text))).toBe(true);
 
-  // the restore wrote a checkpoint, which is what recovery starts from
-  const recovered = await Session.start({ saves: restored.saves() });
+  const recovered = await Session.start({ pageSeed: 7, saves: restored.persisted });
   await recovered.skipText();
+  expect(recovered.resumeFailure).toBeNull();
   expect(recovered.state.status.BL_AC?.text).toBe(shieldOff);
   expect(recovered.state.equipment[5]).toEqual({ letter: "", tile: -1 });
 });
@@ -255,7 +228,7 @@ async function leftOpen(options = { pageSeed: 7, seedsVary: true, options: "time
 
 test("a game left unfinished comes back by replay, as of the very last command", async () => {
   const { third, options } = await leftOpen();
-  // takes no time, so no checkpoint has it
+  // takes no time, so only the recording has it
   await third.send("i");
   await third.dismiss();
 
@@ -298,36 +271,14 @@ test("what's typed after coming back by replay is what the next turn takes", asy
   expect(next.recorded.filter((l) => / k \d+$/.test(l))).toHaveLength(3);
 });
 
-test("a recording that goes differently falls back on the checkpoint", async () => {
-  // one session, so that the core carrying on is the one that fails
-  const options = { pageSeed: 7, seedsVary: true, options: "time" };
-  const third = await (await Session.start(options)).skipText();
-  await third.send("s".repeat(8));
-  const saves = new Map(third.persisted);
-  const [file] = [...saves.keys()].filter((k) => k.startsWith("replay/"));
-  const text = new TextDecoder().decode(saves.get(file));
-  saves.set(file, new TextEncoder().encode(text.replace(/^(\d+) seed \d+$/m, "$1 k 83")));
-
-  // Game logs a callback that failed, as it would on being told to answer a failed replay's core
-  const logged = vi.spyOn(console, "error");
-  const next = await (await Session.start({ ...options, saves, resume: true })).skipText();
-  expect(next.resumeFailure).not.toBeNull();
-  // the core going on through a turn gives a failed replay's core its chance to complain
-  await next.send("s");
-  expect(logged).not.toHaveBeenCalled();
-  logged.mockRestore();
-  expect(Number(next.state.status.BL_TIME?.text)).toBeGreaterThanOrEqual(Number(third.state.status.BL_TIME?.text));
-  expect(next.recorded.some((l) => / session unrecorded /.test(l))).toBe(true);
-});
-
 test("a recording missing a chunk isn't replayed", async () => {
   const { third, options } = await leftOpen();
   const saves = new Map(third.persisted);
   const [file] = [...saves.keys()].filter((k) => k.startsWith("replay/"));
   saves.set(file.replace(/\d+$/, "000002"), saves.get(file)!);
   saves.delete(file);
-  const next = await (await Session.start({ ...options, saves, resume: true })).skipText();
-  expect(next.recorded.some((l) => / session unrecorded /.test(l))).toBe(true);
+  const next = await Session.start({ ...options, saves, resume: true });
+  expect(next.prompt).toMatchObject({ kind: "yn", query: CANT_REPLAY });
 });
 
 async function cutBack(tamper: (lines: string[], at: number) => void, turns = "s".repeat(8)) {
@@ -343,21 +294,18 @@ async function cutBack(tamper: (lines: string[], at: number) => void, turns = "s
   return { next, file, at, lines };
 }
 
-test("a game whose replay fails a sum comes back from the last one that passed, says so and keeps what was cut", async () => {
+test("a game whose replay fails a sum comes back from the last one that passed, and says so", async () => {
   const { next, file, at, lines } = await cutBack((l, at) => {
     l[at] = l[at].replace(/ \w{4}$/, /0000$/.test(l[at]) ? " 0001" : " 0000");
   });
   expect(next.resumeFailure).toBeNull();
-  expect(next.messages.some((t) => /last point that could be checked/.test(t))).toBe(true);
+  expect(next.messages.some((t) => /couldn't be brought back, so your game has gone back/.test(t))).toBe(true);
   const turn = (t: string) => Number(/ T (\d+) /.exec(t)![1]);
   expect(Number(next.state.status.BL_TIME?.text)).toBe(turn(lines[lines.slice(0, at).findLastIndex((l) => / T \d+ /.test(l))]));
   await next.send("s");
-  const dir = file.replace(/[^/]+$/, "");
   const kept = new TextDecoder().decode(next.persisted.get(file));
   expect(kept).not.toContain(lines[at]);
   expect(kept).toMatch(/ back /);
-  expect(next.persisted.has(`${dir}failed`)).toBe(true);
-  expect(new TextDecoder().decode(next.persisted.get(`${dir}failed`))).toContain(lines[at]);
   // the game cut back replays, whole
   expect((await replayRecording(kept)).error).toBeNull();
 });
@@ -368,25 +316,72 @@ test("a game whose replay fails a full check goes back past the sums, to the las
     l[at] = l[at].replace(/"HP":"\d+"/, '"HP":"999"');
   });
   expect(next.resumeFailure).toBeNull();
-  expect(next.messages.some((t) => /last point that could be checked/.test(t))).toBe(true);
+  expect(next.messages.some((t) => /couldn't be brought back, so your game has gone back/.test(t))).toBe(true);
   const full = lines.filter((l) => / = /.test(l));
   expect(next.state.status.BL_TIME?.text).toBe(/ = (\d+) /.exec(full.at(-2)!)![1]);
 });
 
-test("a replay the page died in isn't tried again", async () => {
+test("a page closed during a replay asks first, and Recover replays it", async () => {
   const { third, options } = await leftOpen();
   const saves = new Map(third.persisted);
   saves.set("resuming", new Uint8Array());
-
-  const next = await (await Session.start({ ...options, saves, resume: true })).skipText();
-  expect(next.recorded.some((l) => / session unrecorded /.test(l))).toBe(true);
+  const next = await Session.start({ ...options, saves, resume: true });
+  expect(next.prompt).toMatchObject({ kind: "yn", query: expect.stringMatching(/old game in progress/i) });
+  await (await next.yn("r")).skipText();
+  expect(next.recorded.some((l) => / back /.test(l))).toBe(true);
+  expect(next.state.status.BL_TIME?.text).toBe(third.state.status.BL_TIME?.text);
+  await next.send("s");
   expect([...next.persisted.keys()]).not.toContain("resuming");
 });
 
-test("a game saved and a game with no recording of its start don't come back by replay", async () => {
+test("a game that can't replay is the player's to destroy or continue, with no replay after that", async () => {
+  const { third, options } = await leftOpen();
+  const saves = new Map(third.persisted);
+  const [file] = [...saves.keys()].filter((k) => k.startsWith("replay/"));
+  saves.set(file, new TextEncoder().encode(new TextDecoder().decode(saves.get(file)).replace(/^(\d+) seed \d+$/m, "$1 k 83")));
+
+  const destroyed = await Session.start({ ...options, saves: new Map(saves), resume: true });
+  expect(destroyed.prompt).toMatchObject({ kind: "yn", query: CANT_REPLAY, choices: "yrn" });
+  await (await destroyed.yn("y")).skipText();
+  expect(destroyed.state.status.BL_TIME?.text).toBe("1");
+  expect(destroyed.recorded.some((l) => / session new /.test(l))).toBe(true);
+
+  const continued = await Session.start({ ...options, saves, resume: true });
+  await (await continued.yn("r")).skipText();
+  expect(continued.recorded.some((l) => / session unrecorded /.test(l))).toBe(true);
+  expect(continued.recorded.some((l) => / y "r"/.test(l))).toBe(false);
+  await continued.send("s");
+  const again = await Session.start({ ...options, saves: continued.persisted, resume: true });
+  expect(again.prompt).toMatchObject({ kind: "yn", query: CANT_REPLAY });
+});
+
+test("a game ends with anything else left beside its recording", async () => {
+  const g = await (await Session.start({ pageSeed: 7 })).skipText();
+  await g.send("s");
+  const [file] = [...g.persisted.keys()].filter((k) => k.startsWith("replay/"));
+  g.m.FS.writeFile(`/save/${file.replace(/[^/]+$/, "failed")}`, "left by an older build");
+  await quit(g);
+  expect(g.ended).toBe(true);
+  expect([...g.persisted.keys()].filter((k) => k.startsWith("replay/"))).toEqual([]);
+});
+
+test("answering Recover with another tab open brings the game back by replay", async () => {
+  const { third, options } = await leftOpen();
+  const next = await Session.start({ ...options, saves: third.persisted, resume: true, otherTab: true });
+  expect(next.prompt).toMatchObject({ kind: "yn", query: expect.stringMatching(/old game in progress/i) });
+  await (await next.yn("r")).skipText();
+  expect(next.recorded.some((l) => / back /.test(l))).toBe(true);
+  expect(next.state.status.BL_TIME?.text).toBe(third.state.status.BL_TIME?.text);
+});
+
+test("a game with no recording of its start asks, and one saved without one still restores", async () => {
   const left = await (await Session.start()).skipText();
-  const saves = new Map([...left.saves()].filter(([k]) => !k.startsWith("replay/")));
-  const next = await (await Session.start({ saves, resume: true })).skipText();
-  expect(next.resumeFailure).toBeNull();
-  expect(next.recorded.some((l) => / session unrecorded /.test(l))).toBe(true);
+  const without = (saves: Map<string, Uint8Array>) => new Map([...saves].filter(([k]) => !k.startsWith("replay/")));
+  const asked = await Session.start({ saves: without(left.persisted) });
+  expect(asked.prompt).toMatchObject({ kind: "yn", query: CANT_REPLAY });
+
+  await left.send("S");
+  const restored = await (await Session.start({ saves: without(left.saves()) })).skipText();
+  expect(restored.recorded.some((l) => / session unrecorded /.test(l))).toBe(true);
+  expect(restored.messages.some((t) => /welcome back/i.test(t))).toBe(true);
 });

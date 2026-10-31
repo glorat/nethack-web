@@ -1,7 +1,7 @@
 // Records everything a game takes from the page, one line at a time, so the
 // game can be played again exactly. See docs/recording.md for the format.
 import type { Answer, GameEvent, GameRequest, MenuSelection, PlayerPick } from "../protocol";
-import { type GameHost, type Input, OLD_GAME } from "./game";
+import { CANT_REPLAY, type GameHost, type Input, OLD_GAME } from "./game";
 import type { NetHackModule } from "./memory";
 import { sha256 } from "./sha256";
 
@@ -13,8 +13,6 @@ export const FORMAT = 1;
 const CHUNK_SIZE = 64 * 1024;
 const CHECK_EVERY = 100;
 const FILES_EVERY = 20;
-// what was recorded of a game cut back to a point before a replay failed, for working out why
-export const FAILED_FILE = "failed";
 
 type FS = NetHackModule["FS"];
 
@@ -135,6 +133,8 @@ export interface RecorderStart {
  * came back, in /save next to the game so it lasts as long as the game does.
  */
 export class Recorder implements GameHost {
+  // missing once a replay has failed, as it would only fail the same way again
+  readonly resume?: () => Promise<boolean>;
   private readonly fs: FS;
   private readonly wallClock: () => number;
   /** Lines from before the game is in play, when it isn't yet known which game they belong to. */
@@ -162,6 +162,7 @@ export class Recorder implements GameHost {
   ) {
     this.fs = m.FS as FS;
     this.wallClock = start.wallClock ?? (() => Date.now());
+    this.resume = start.resume && (() => this.replayRecorded());
   }
 
   get alone(): boolean {
@@ -183,8 +184,8 @@ export class Recorder implements GameHost {
     return answer;
   }
 
-  decided(request: GameRequest, answer: Answer | null): void {
-    if (request.kind === "yn" && request.query === OLD_GAME && !this.dir) this.oldGame.add(this.early.length);
+  private decided(request: GameRequest, answer: Answer | null): void {
+    if (request.kind === "yn" && (request.query === OLD_GAME || request.query === CANT_REPLAY) && !this.dir) this.oldGame.add(this.early.length);
     this.write(answerLine(request, answer));
   }
 
@@ -224,7 +225,7 @@ export class Recorder implements GameHost {
   }
 
   /** Offers the unfinished recording of the game the core has found left behind, if it can be replayed. */
-  async resume(): Promise<boolean> {
+  private async replayRecorded(): Promise<boolean> {
     const dir = this.gameDir();
     if (!this.start.resume || !dir) return false;
     if (chunkNames(this.fs, dir).some((f, i) => Number(f) !== i + 1)) return false;
@@ -240,14 +241,8 @@ export class Recorder implements GameHost {
    */
   carryOn(text: string, status: Record<string, string>): boolean {
     const dir = this.gameDir()!;
-    const held = readRecording(this.fs, dir);
-    const cut = held !== text;
-    if (cut) {
-      const path = `${dir}/${FAILED_FILE}`;
-      const before = this.fs.analyzePath(path).exists ? this.fs.readFile(path, { encoding: "utf8" }) : "";
-      this.fs.writeFile(path, before + held);
-      this.rewrite(dir, text);
-    }
+    const cut = readRecording(this.fs, dir) !== text;
+    if (cut) this.rewrite(dir, text);
     const chunks = chunkNames(this.fs, dir);
     const last = chunks[chunks.length - 1];
     const lastText = this.fs.readFile(`${dir}/${last}`, { encoding: "utf8" });
@@ -341,9 +336,8 @@ export class Recorder implements GameHost {
       lines.push(`session restore ${time}`);
     } else {
       this.early = this.early.filter((_, i) => !this.oldGame.has(i));
-      // left by a game that was given up on, never recorded, or that lost the lines after its checkpoint
+      // left by a game that was given up on, or never recorded
       for (const f of chunks) this.fs.unlink(`${dir}/${f}`);
-      if (this.fs.analyzePath(`${dir}/${FAILED_FILE}`).exists) this.fs.unlink(`${dir}/${FAILED_FILE}`);
       if (!this.fs.analyzePath(dir).exists) this.fs.mkdir(dir);
       lines.push(
         `nhrec ${FORMAT}`,
@@ -421,8 +415,8 @@ export class Recorder implements GameHost {
     this.send(true);
     if (over) {
       this.start.finished(readRecording(this.fs, this.dir));
-      for (const f of chunkNames(this.fs, this.dir)) this.fs.unlink(`${this.dir}/${f}`);
-      if (this.fs.analyzePath(`${this.dir}/${FAILED_FILE}`).exists) this.fs.unlink(`${this.dir}/${FAILED_FILE}`);
+      // whatever is here, as a directory with anything left in it can't go, which would stop the game ending
+      for (const f of this.fs.readdir(this.dir)) if (f !== "." && f !== "..") this.fs.unlink(`${this.dir}/${f}`);
       this.fs.rmdir(this.dir);
     }
   }
