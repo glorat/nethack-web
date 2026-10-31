@@ -87,7 +87,7 @@ test("a line lost from the middle of a recording is caught", async () => {
   expect((await replayRecording(lines.join("\n"))).error?.message).toBe("line 11 is missing");
 });
 
-test("a game that differs only in the hero's starting attributes is caught", async () => {
+test("a game whose hero starts with other attributes is caught by them", async () => {
   const g = await (await Session.start({ pageSeed: 7, options: "time" })).skipText();
   await play(g);
   await quit(g);
@@ -97,5 +97,7 @@ test("a game that differs only in the hero's starting attributes is caught", asy
   expect(n).toBeGreaterThanOrEqual(5);
 
   const replayed = await replayRecording(tampered);
-  expect(replayed.error?.message).toMatch(/^line \d+ \(= /);
+  const [, recorded, shown] = /^line \d+ \(= \d+ @\S+ (\{.*\})\): the core shows \d+ @\S+ (\{.*\})$/.exec(replayed.error?.message ?? "")!;
+  const [was, is] = [JSON.parse(recorded), JSON.parse(shown)];
+  expect(["ST", "DX", "CO", "IN", "WI", "CH"].some((a) => was[a] !== is[a])).toBe(true);
 });

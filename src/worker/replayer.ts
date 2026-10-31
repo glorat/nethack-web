@@ -219,7 +219,9 @@ export class ReplayHost implements GameHost {
       }
       this.at++;
       if (tags.includes(line.tag)) return line;
-      if (!this.mark(line)) {
+      const marked = this.guard(() => this.mark(line), line);
+      if (marked === null) return null;
+      if (!marked) {
         this.fail(line, `expected ${tags.join(" or ")}`);
         return null;
       }
