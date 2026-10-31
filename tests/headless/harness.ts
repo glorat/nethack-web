@@ -6,7 +6,7 @@ import type { Answer, GameEvent, GameRequest, MapCell } from "../../src/protocol
 import { applyEvents, cellAt, initialState, type GameState } from "../../src/port/state";
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
 import { Recorder } from "../../src/worker/recorder";
-import { type BootCore, replay, ReplayError, writeSaveFiles } from "../../src/worker/replayer";
+import { type BootCore, never, replay, ReplayError, writeSaveFiles } from "../../src/worker/replayer";
 import { describeSquare, type EmscriptenFS, type NetHackModule } from "../../src/worker/memory";
 
 const ROOT = resolve(__dirname, "../..");
@@ -22,6 +22,8 @@ export interface SessionOptions {
   seed?: number;
   /** Seeds the page gives the core instead, which then reseeds at each level change as in play. */
   pageSeed?: number;
+  /** With pageSeed: each seed one more than the last, as different as real ones, not all the same. */
+  seedsVary?: boolean;
   /** The page's clock, which stands still. */
   date?: string;
   /** The page's time zone, in seconds east of UTC; UTC if not given. */
@@ -284,6 +286,7 @@ export class Session {
 
   private host(options: SessionOptions) {
     const now = Math.floor(new Date(options.date ?? DEFAULT_DATE).getTime() / 1000);
+    let seeds = 0;
     return {
       post: (events: GameEvent[]) => {
         if (this.failPost?.(events)) {
@@ -316,7 +319,7 @@ export class Session {
       alone: !options.otherTab,
       now: () => now,
       utcOffset: () => options.utcOffset ?? 0,
-      randomSeed: () => options.pageSeed ?? 0,
+      randomSeed: () => (options.pageSeed ?? 0) + (options.seedsVary ? seeds++ : 0),
       uuid: () => PAGE_UUID,
     };
   }
@@ -355,48 +358,60 @@ export interface Replayed {
   error: ReplayError | null;
 }
 
+/** Boots a fresh real core for each session of a replay, in Node. */
+export async function headlessBoot(): Promise<() => BootCore> {
+  const { default: createModule } = await import(pathToFileURL(resolve(ROOT, "public/nethack.js")).href);
+  let latest = 0;
+  return () => {
+    const run = ++latest;
+    return async (session, files, makeHost) => {
+      let host: ReturnType<typeof makeHost> | null = null;
+      const printed: string[] = [];
+      const m: Module = await createModule({
+        noInitialRun: true,
+        wasmBinary: readFileSync(resolve(ROOT, "public/nethack.wasm")),
+        print: (line: string) => printed.push(line),
+        printErr: (line: string) => printed.push(line),
+        onExit: () => host?.stopped(`the core exited before the session's end: ${printed.join(" / ")}`),
+        onAbort: (what: unknown) => host?.stopped(`the core aborted: ${String(what)}`),
+        preRun: [
+          (mod: Module) => {
+            mod.ENV.USER = "player";
+            mod.ENV.NETHACKOPTIONS = session.options;
+            mod.FS.writeFile(CONFIG_FILE, new TextEncoder().encode(session.config));
+            mod.FS.mkdir("/save");
+            writeSaveFiles(mod, files);
+          },
+        ],
+      });
+      // as the worker does: a core for a playing-through a seek has replaced must not start, or it takes over the shim's helpers
+      if (run !== latest) return never();
+      const shared = (globalThis as { nethackGlobal?: { shimFunctionRunning?: unknown } }).nethackGlobal;
+      if (shared) shared.shimFunctionRunning = null;
+      host = makeHost(m);
+      const game = new Game(m, host);
+      host.game = game;
+      const callback = `nethackCallback${++sessions}`;
+      (globalThis as Record<string, unknown>)[callback] = (name: string, ...args: unknown[]) => game.callback(name, args);
+      m.ccall("shim_graphics_set_callback", null, ["string"], [callback]);
+      try {
+        m._main(0, 0);
+      } catch (e) {
+        if ((e as { name?: string }).name !== "ExitStatus") throw e;
+      }
+    };
+  };
+}
+
 /** Plays a recording again on the real core, as fast as it goes. */
 export async function replayRecording(text: string): Promise<Replayed> {
-  const { default: createModule } = await import(pathToFileURL(resolve(ROOT, "public/nethack.js")).href);
   let state = initialState();
-  const boot: BootCore = async (session, files, makeHost) => {
-    let host: ReturnType<typeof makeHost> | null = null;
-    const printed: string[] = [];
-    const m: Module = await createModule({
-      noInitialRun: true,
-      wasmBinary: readFileSync(resolve(ROOT, "public/nethack.wasm")),
-      print: (line: string) => printed.push(line),
-      printErr: (line: string) => printed.push(line),
-      onExit: () => host?.stopped(`the core exited before the session's end: ${printed.join(" / ")}`),
-      onAbort: (what: unknown) => host?.stopped(`the core aborted: ${String(what)}`),
-      preRun: [
-        (mod: Module) => {
-          mod.ENV.USER = "player";
-          mod.ENV.NETHACKOPTIONS = session.options;
-          mod.FS.writeFile(CONFIG_FILE, new TextEncoder().encode(session.config));
-          mod.FS.mkdir("/save");
-          writeSaveFiles(mod, files);
-        },
-      ],
-    });
-    const shared = (globalThis as { nethackGlobal?: { shimFunctionRunning?: unknown } }).nethackGlobal;
-    if (shared) shared.shimFunctionRunning = null;
-    host = makeHost(m);
-    const game = new Game(m, host);
-    host.game = game;
-    const callback = `nethackCallback${++sessions}`;
-    (globalThis as Record<string, unknown>)[callback] = (name: string, ...args: unknown[]) => game.callback(name, args);
-    m.ccall("shim_graphics_set_callback", null, ["string"], [callback]);
-    try {
-      m._main(0, 0);
-    } catch (e) {
-      if ((e as { name?: string }).name !== "ExitStatus") throw e;
-    }
-  };
+  const boot = (await headlessBoot())();
   try {
     await replay(text, boot, {
       post: (events) => (state = applyEvents(state, events)),
       pace: () => Promise.resolve(),
+      delay: () => Promise.resolve(),
       checkpoint: () => {},
     });
     return { state, error: null };

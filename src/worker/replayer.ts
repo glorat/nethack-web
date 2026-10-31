@@ -7,7 +7,11 @@ import { ANSWER_TAGS, checkLine, FORMAT, zoneSeconds } from "./recorder";
 
 export class ReplayError extends Error {}
 
-const NEVER = new Promise<never>(() => {});
+/** A promise that never settles; a fresh one each time, as one shared would keep every core waiting on it alive. */
+export const never = <T>() => new Promise<T>(() => {});
+const MARKS = new Set(["ckpt", "T", "=", "asc"]);
+// as long as Game pauses for the core's delay_output
+const DELAY_MS = 50;
 
 interface Line {
   seq: number;
@@ -109,8 +113,14 @@ export function parseInput(line: Line): Input {
 export interface ReplayHooks {
   /** The events the game shows, as it would to a player. */
   post(events: GameEvent[]): void;
-  /** Waited for before each answer, to set the pace; resolves at once to go as fast as the core can. */
-  pace(): Promise<void>;
+  /**
+   * Waited for before each answer, to set the pace; resolves at once to go as
+   * fast as the core can. `turn` if a turn has begun since the last answer,
+   * `request` if this answer is to a prompt rather than a key for a command.
+   */
+  pace(at: { turn?: number; request?: GameRequest }): Promise<void>;
+  /** The core's pause in an animation, such as a zap; it plays at its own pace without this. */
+  delay?(): Promise<void>;
   /** The core has reached checkpoint `n` of this session. */
   checkpoint(n: number): void;
 }
@@ -153,13 +163,13 @@ export class ReplayHost implements GameHost {
 
   // what goes wrong in here is the replay's to report: Game would answer the core ESC and carry on
   async request(request: GameRequest): Promise<Answer | null> {
-    const line = await this.next(ANSWER_TAGS[request.kind]);
-    return this.guard(() => parseAnswer(request.kind, line.rest), line) ?? NEVER;
+    const line = await this.next([ANSWER_TAGS[request.kind]], request);
+    return this.guard(() => parseAnswer(request.kind, line.rest), line) ?? never();
   }
 
   async nextInput(): Promise<Input> {
-    const line = await this.next("k", "c");
-    return this.guard(() => parseInput(line), line) ?? NEVER;
+    const line = await this.next(["k", "c"]);
+    return this.guard(() => parseInput(line), line) ?? never();
   }
 
   async persist(exiting = false): Promise<void> {
@@ -201,11 +211,29 @@ export class ReplayHost implements GameHost {
     return this.offset;
   }
 
-  /** The next answer for the core, once the pace allows; never, past the session's end. */
-  private async next(...tags: string[]): Promise<Line> {
-    if (this.done) return NEVER;
-    await this.hooks.pace();
-    return this.take(...tags) ?? NEVER;
+  delayOutput(): Promise<void> {
+    return this.hooks.delay?.() ?? new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+  }
+
+  /**
+   * The next answer for the core, once the pace allows; never, past the
+   * session's end. The marks before it are checked first, so a pause at a
+   * new turn comes before that turn's first command.
+   */
+  private async next(tags: string[], request?: GameRequest): Promise<Line> {
+    let turn: number | undefined;
+    for (let line = this.session.lines[this.at]; line && MARKS.has(line.tag); line = this.session.lines[this.at]) {
+      this.at++;
+      if (line.tag === "T") turn = Number(line.rest.split(" ")[0]);
+      if (this.guard(() => this.mark(line), line) === null) break;
+    }
+    if (this.done) return never();
+    try {
+      await this.hooks.pace({ turn, request });
+    } catch (e) {
+      this.stopped(e instanceof Error ? e.message : String(e));
+    }
+    return this.take(...tags) ?? never();
   }
 
   /** The next line, which must have one of `tags`, after the marks that come before it. */

@@ -1,5 +1,6 @@
 // Messages between the game worker and the UI thread. The worker owns the
 // WASM core; the UI only ever sees these types.
+import type { GameState } from "./port/state";
 
 export type WindowKind = "message" | "status" | "map" | "menu" | "text";
 
@@ -135,7 +136,35 @@ export type Answer =
 export type WorkerMessage =
   | { type: "events"; events: GameEvent[] }
   | { type: "request"; id: number; request: GameRequest }
-  | { type: "description"; id: number; text: string | null };
+  | { type: "description"; id: number; text: string | null }
+  | ReplayMessage;
+
+/** What a replay tells the page, besides the game's own events. */
+export type ReplayMessage =
+  /** A prompt the player answered, shown for a moment; null once it's answered. */
+  | { type: "replay_prompt"; request: GameRequest | null }
+  /** Everything a seek skipped over, all at once. */
+  | { type: "replay_state"; state: GameState }
+  | { type: "replay_progress"; progress: ReplayProgress };
+
+export interface ReplayProgress {
+  turn: number;
+  playing: boolean;
+  /** Going ahead to a turn without showing the way. */
+  seeking: boolean;
+  /** Where the replay stopped: at the recording's end, or where the game went differently. */
+  ended: null | { error: string | null };
+}
+
+export type ReplayControl =
+  | { action: "play" }
+  | { action: "pause" }
+  /** Plays to the next turn, then pauses. */
+  | { action: "step" }
+  /** Turns a second; Infinity as fast as the core goes. */
+  | { action: "speed"; turnsPerSecond: number }
+  /** Plays again from the start, without showing it, up to this turn, then pauses there. */
+  | { action: "seek"; turn: number };
 
 export interface StartOptions {
   /** Base URL that nethack.js and nethack.wasm are served from. */
@@ -148,6 +177,9 @@ export interface StartOptions {
 
 export type UiMessage =
   | { type: "start"; start: StartOptions }
+  /** Plays a recording instead of a game. */
+  | { type: "replay"; assetBase: string; text: string; turnsPerSecond: number }
+  | { type: "replay_control"; control: ReplayControl }
   | { type: "key"; code: number }
   | { type: "click"; x: number; y: number; button: number }
   | { type: "ascii_map"; on: boolean }
