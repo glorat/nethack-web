@@ -68,6 +68,15 @@ function soleTab(): Promise<boolean> {
   });
 }
 
+/** A version 4 UUID; crypto.randomUUID is missing outside https and localhost. */
+function uuid(): string {
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const hex = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 async function start({ assetBase, options, config }: StartOptions): Promise<void> {
   const url = new URL("nethack.js", assetBase).href;
   const { default: createModule } = (await import(/* @vite-ignore */ url)) as {
@@ -95,6 +104,7 @@ async function start({ assetBase, options, config }: StartOptions): Promise<void
     alone: await soleTab(),
     now: () => Math.floor(Date.now() / 1000),
     randomSeed: () => crypto.getRandomValues(new Uint32Array(1))[0],
+    uuid,
   };
 
   module = await createModule({
