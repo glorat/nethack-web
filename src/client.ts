@@ -1,8 +1,18 @@
-import type { Answer, GameEvent, GameRequest, StartOptions, UiMessage, WorkerMessage } from "./protocol";
+import type {
+  Answer,
+  GameEvent,
+  GameRequest,
+  ReplayControl,
+  ReplayMessage,
+  StartOptions,
+  UiMessage,
+  WorkerMessage,
+} from "./protocol";
 
 export interface ClientHandlers {
   events(events: GameEvent[]): void;
   request(id: number, request: GameRequest): void;
+  replay?(message: ReplayMessage): void;
 }
 
 /** Main-thread handle on the game worker. */
@@ -17,10 +27,10 @@ export class GameClient {
       const msg = ev.data;
       if (msg.type === "events") handlers.events(msg.events);
       else if (msg.type === "request") handlers.request(msg.id, msg.request);
-      else {
+      else if (msg.type === "description") {
         this.descriptions.get(msg.id)?.(msg.text);
         this.descriptions.delete(msg.id);
-      }
+      } else handlers.replay?.(msg);
     };
     this.worker.onerror = (ev) => handlers.events([{ type: "error", text: ev.message || "worker failed" }]);
   }
@@ -31,6 +41,15 @@ export class GameClient {
 
   start(start: StartOptions): void {
     this.send({ type: "start", start });
+  }
+
+  /** Plays a recorded game instead of a new one. */
+  replay(assetBase: string, text: string, turnsPerSecond: number): void {
+    this.send({ type: "replay", assetBase, text, turnsPerSecond });
+  }
+
+  replayControl(control: ReplayControl): void {
+    this.send({ type: "replay_control", control });
   }
 
   key(code: number): void {

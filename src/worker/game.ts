@@ -60,6 +60,8 @@ export interface GameHost {
   persist(exiting?: boolean): Promise<void>;
   /** An answer Game gave the core itself, going by something outside it. */
   decided?(request: GameRequest, answer: Answer | null): void;
+  /** The core's pause in an animation; a short wait if not given. */
+  delayOutput?(): Promise<void>;
   /** No other tab is playing, so a game left unfinished can't be one still going on there. */
   readonly alone: boolean;
   /** Seconds since 1970, for every time the core reads. */
@@ -282,7 +284,7 @@ export class Game {
         return 0;
       case "shim_delay_output":
         this.flush();
-        await new Promise((r) => setTimeout(r, 50));
+        await (this.host.delayOutput?.() ?? new Promise((r) => setTimeout(r, 50)));
         return 0;
       case "shim_getmsghistory":
       case "shim_get_color_string":

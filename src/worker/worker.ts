@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
 import type { Answer, GameEvent, GameRequest, StartOptions, UiMessage, WorkerMessage } from "../protocol";
+import { ReplayRunner } from "./replay-runner";
+import { type BootCore, never, writeSaveFiles } from "./replayer";
 import { CONFIG_FILE, Game, type Input } from "./game";
 import { Recorder } from "./recorder";
 import { describeSquare, type NetHackModule } from "./memory";
@@ -15,6 +17,7 @@ let nextRequestId = 1;
 let module: NetHackModule | null = null;
 let game: Game | null = null;
 let recorder: Recorder | null = null;
+let runner: ReplayRunner | null = null;
 
 function send(message: WorkerMessage): void {
   self.postMessage(message);
@@ -79,11 +82,15 @@ function uuid(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-async function start({ assetBase, options, config }: StartOptions): Promise<void> {
+type CreateModule = (config: object) => Promise<NetHackModule>;
+
+async function loadCore(assetBase: string): Promise<CreateModule> {
   const url = new URL("nethack.js", assetBase).href;
-  const { default: createModule } = (await import(/* @vite-ignore */ url)) as {
-    default: (config: object) => Promise<NetHackModule>;
-  };
+  return ((await import(/* @vite-ignore */ url)) as { default: CreateModule }).default;
+}
+
+async function start({ assetBase, options, config }: StartOptions): Promise<void> {
+  const createModule = await loadCore(assetBase);
 
   // taken once, so a game doesn't change zone as daylight saving starts or ends
   const utcOffset = -new Date().getTimezoneOffset() * 60;
@@ -147,6 +154,72 @@ async function start({ assetBase, options, config }: StartOptions): Promise<void
   }
 }
 
+/** The callbacks of each replay core, by playing-through, so a seek can let the old cores go. */
+const replayCallbacks = new Map<number, string[]>();
+let replayRuns = 0;
+
+/** Boots a fresh core for each session of one playing-through of a recording. */
+function replayBoot(createModule: CreateModule, assetBase: string): BootCore {
+  const run = ++replayRuns;
+  for (const [old, names] of replayCallbacks) {
+    for (const name of names) delete (globalThis as Record<string, unknown>)[name];
+    replayCallbacks.delete(old);
+  }
+  const names: string[] = [];
+  replayCallbacks.set(run, names);
+  return async (session, files, makeHost) => {
+    let host: ReturnType<typeof makeHost> | null = null;
+    const m = await createModule({
+      noInitialRun: true,
+      locateFile: (path: string) => new URL(path, assetBase).href,
+      print: (s: string) => console.log(s),
+      printErr: (s: string) => console.warn(s),
+      onExit: () => host?.stopped("the core exited before the session's end"),
+      onAbort: (what: unknown) => host?.stopped(`the core aborted: ${String(what)}`),
+      preRun: [
+        (core: NetHackModule) => {
+          core.ENV.USER = "player";
+          core.ENV.NETHACKOPTIONS = session.options;
+          core.FS.writeFile(CONFIG_FILE, session.config);
+          core.FS.mkdir(SAVE_DIR);
+          writeSaveFiles(core, files);
+        },
+      ],
+    });
+    // a seek while this core was loading: it belongs to a playing-through no one watches
+    if (run !== replayRuns) return never();
+    // the core before this one is left waiting in a callback for good
+    const shared = (globalThis as { nethackGlobal?: { shimFunctionRunning?: unknown } }).nethackGlobal;
+    if (shared) shared.shimFunctionRunning = null;
+    host = makeHost(m);
+    const replayed = new Game(m, host);
+    host.game = replayed;
+    module = m;
+    game = replayed;
+    const name = `nethackReplay${run}_${names.length}`;
+    names.push(name);
+    (globalThis as Record<string, unknown>)[name] = (cb: string, ...args: unknown[]) => replayed.callback(cb, args);
+    m.ccall("shim_graphics_set_callback", null, ["string"], [name]);
+    try {
+      m._main(0, 0);
+    } catch (e) {
+      if ((e as { name?: string })?.name !== "ExitStatus") throw e;
+    }
+  };
+}
+
+async function startReplay(assetBase: string, text: string, turnsPerSecond: number): Promise<void> {
+  const createModule = await loadCore(assetBase);
+  send({ type: "events", events: [{ type: "ready" }] });
+  runner = new ReplayRunner(
+    text,
+    () => replayBoot(createModule, assetBase),
+    { events: (events) => send({ type: "events", events }), replay: (message) => send(message) },
+    turnsPerSecond,
+  );
+  runner.start();
+}
+
 self.onmessage = (ev: MessageEvent<UiMessage>) => {
   const msg = ev.data;
   switch (msg.type) {
@@ -154,6 +227,14 @@ self.onmessage = (ev: MessageEvent<UiMessage>) => {
       start(msg.start).catch((e) =>
         send({ type: "events", events: [{ type: "error", text: String(e?.stack ?? e) }] }),
       );
+      break;
+    case "replay":
+      startReplay(msg.assetBase, msg.text, msg.turnsPerSecond).catch((e) =>
+        send({ type: "events", events: [{ type: "error", text: String(e?.stack ?? e) }] }),
+      );
+      break;
+    case "replay_control":
+      runner?.control(msg.control);
       break;
     case "key":
       pushInput({ key: msg.code });
