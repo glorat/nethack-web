@@ -1,7 +1,8 @@
 /// <reference lib="webworker" />
 import type { Answer, GameEvent, GameRequest, StartOptions, UiMessage, WorkerMessage } from "../protocol";
 import { ReplayRunner } from "./replay-runner";
-import { type BootCore, never, writeSaveFiles } from "./replayer";
+import { type BootCore, never, saveFiles, writeSaveFiles } from "./replayer";
+import { Shadow } from "./shadow";
 import { CONFIG_FILE, Game, type Input } from "./game";
 import { BonesDb } from "./bones";
 import { Recorder } from "./recorder";
@@ -20,6 +21,7 @@ let module: NetHackModule | null = null;
 let game: Game | null = null;
 let recorder: Recorder | null = null;
 let runner: ReplayRunner | null = null;
+let shadow: Shadow | null = null;
 
 function send(message: WorkerMessage): void {
   self.postMessage(message);
@@ -73,6 +75,11 @@ function soleTab(): Promise<boolean> {
       return lock ? new Promise<void>(() => {}) : undefined;
     });
   });
+}
+
+/** What's kept of the games in /save, without the recordings and bones kept beside them. */
+function gameFiles(m: NetHackModule): Record<string, Uint8Array> {
+  return Object.fromEntries([...saveFiles(m)].filter(([f]) => !/^(replay|bones)\//.test(f)));
 }
 
 /** A version 4 UUID; crypto.randomUUID is missing outside https and localhost. */
@@ -154,7 +161,8 @@ async function start({ assetBase, options, config }: StartOptions): Promise<void
     new Recorder(host, m, {
       options: coreOptions,
       config: coreConfig,
-      stream: (lines) => send({ type: "events", events: [{ type: "recorded", lines }] }),
+      stream: (lines, atPrompt) => send({ type: "events", events: [{ type: "recorded", lines, atPrompt }] }),
+      before: (text) => send({ type: "events", events: [{ type: "recorded_before", text }] }),
       finished: (text) => send({ type: "events", events: [{ type: "recording", text }] }),
       resume,
     });
@@ -300,6 +308,37 @@ async function startReplay(assetBase: string, text: string, turnsPerSecond: numb
   runner.start();
 }
 
+/** A core of its own, reading this browser's bones, that follows the game by its recording. */
+async function startShadow(assetBase: string): Promise<void> {
+  const createModule = await loadCore(assetBase);
+  module = await createModule({
+    noInitialRun: true,
+    locateFile: (path: string) => new URL(path, assetBase).href,
+    preRun: [
+      (m: NetHackModule) => {
+        m.FS.mkdir(SAVE_DIR);
+        m.FS.mount(m.IDBFS, {}, SAVE_DIR);
+      },
+    ],
+  });
+  await syncfs(true);
+  const db = new BonesDb(module.FS);
+  shadow = new Shadow(
+    replayBoot(createModule, assetBase, () => true),
+    (hash) => db.get(hash),
+    (status) => send({ type: "shadow_status", status }),
+  );
+  for (const message of shadowWaiting.splice(0)) followShadow(message);
+}
+
+const shadowWaiting: Extract<UiMessage, { type: "shadow_before" | "shadow_lines" }>[] = [];
+
+function followShadow(message: Extract<UiMessage, { type: "shadow_before" | "shadow_lines" }>): void {
+  if (!shadow) shadowWaiting.push(message);
+  else if (message.type === "shadow_before") shadow.before(message.text);
+  else shadow.add(message.lines, message.atPrompt);
+}
+
 self.onmessage = (ev: MessageEvent<UiMessage>) => {
   const msg = ev.data;
   switch (msg.type) {
@@ -316,6 +355,24 @@ self.onmessage = (ev: MessageEvent<UiMessage>) => {
     case "replay_control":
       runner?.control(msg.control);
       break;
+    case "shadow":
+      startShadow(msg.assetBase).catch((e) =>
+        send({ type: "shadow_status", status: { state: "mismatch", turn: 0, message: String(e?.stack ?? e) } }),
+      );
+      break;
+    case "shadow_before":
+    case "shadow_lines":
+      followShadow(msg);
+      break;
+    case "debug_files": {
+      const db = module && new BonesDb(module.FS);
+      const bones = Object.fromEntries(msg.hashes.flatMap((h) => {
+        const data = db?.get(h);
+        return data ? [[h, data]] : [];
+      }));
+      send({ type: "debug_files", id: msg.id, files: module ? gameFiles(module) : {}, bones });
+      break;
+    }
     case "key":
       pushInput({ key: msg.code });
       break;

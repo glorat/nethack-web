@@ -1258,3 +1258,84 @@ test("a finished game can be replayed from its end screen or its address, reload
   await expect(broken).not.toContainText("line ");
   expect(errors).toEqual([]);
 });
+
+test.describe("shadowing a game", () => {
+  const bar = (page: Page) => page.getByRole("status", { name: "Shadow" });
+  const turnsIn = async (page: Page) => Number(/turn (\d+)/.exec((await bar(page).innerText()) ?? "")?.[1] ?? -1);
+
+  test("is off for players, and a developer's address turns it on and off", async ({ page }) => {
+    await startGame(page, `Off${Date.now() % 100000}`);
+    await expect(bar(page)).toHaveCount(0);
+    await page.goto(`/play/?shadow&name=On${Date.now() % 100000}`);
+    await expect(bar(page)).toBeVisible();
+    await page.goto(`/play/?shadow=0&name=On${Date.now() % 100000}`);
+    await expect(bar(page)).toHaveCount(0);
+  });
+
+  test("follows a game through a reload to its end, and gives a package that holds it", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.addInitScript(() => localStorage.setItem("nethack.shadow", "1"));
+    const name = `Sha${Date.now() % 100000}`;
+    await startGame(page, name);
+    for (let i = 0; i < 25; i++) await page.keyboard.press("s");
+    await expect(bar(page)).toContainText("following");
+    await expect.poll(() => turnsIn(page), { timeout: 15000 }).toBeGreaterThan(5);
+
+    await page.reload();
+    await expect(page.locator(".stats-title")).toBeVisible({ timeout: 15000 });
+    await expect(bar(page)).toContainText("following", { timeout: 15000 });
+    await page.keyboard.press("s");
+    await expect(bar(page)).not.toContainText("differently");
+
+    const during = page.waitForEvent("download");
+    await bar(page).getByRole("button", { name: "Download Debug Package" }).click();
+    const { readFile } = await import("node:fs/promises");
+    const held = JSON.parse(await readFile((await (await during).path())!, "utf8"));
+    expect(held.recording).toMatch(/^\d+ back /m);
+    expect(held.core).toMatch(/^[0-9a-f]+$/);
+    expect(Object.keys(held.files)).toContain(`0${name}.0`);
+
+    await page.keyboard.press("#");
+    await page.keyboard.type("quit");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("y");
+    const over = page.getByRole("dialog", { name: "The game is over" });
+    for (let i = 0; i < 40 && !(await over.isVisible()); i++) {
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(150);
+    }
+    await expect(bar(page)).toContainText("matched to the end", { timeout: 15000 });
+    expect(errors).toEqual([]);
+  });
+
+  test("says where a game goes differently", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("nethack.shadow", "1"));
+    const name = `Dif${Date.now() % 100000}`;
+    await startGame(page, name);
+    for (let i = 0; i < 5; i++) await page.keyboard.press("s");
+    await page.waitForTimeout(500);
+    await page.evaluate(
+      (key) =>
+        new Promise<void>((resolve, reject) => {
+          const open = indexedDB.open("/save");
+          open.onerror = reject;
+          open.onsuccess = () => {
+            const store = open.result.transaction("FILE_DATA", "readwrite").objectStore("FILE_DATA");
+            const get = store.get(key);
+            get.onsuccess = () => {
+              const text = new TextDecoder().decode(get.result.contents);
+              get.result.contents = new TextEncoder().encode(text.replace(/^(\d+) now \d+$/m, "$1 k 83"));
+              store.put(get.result, key).onsuccess = () => resolve();
+            };
+          };
+        }),
+      `/save/replay/0${name}/000001`,
+    );
+    await page.reload();
+    await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15000 });
+    await expect(bar(page)).toContainText("went differently", { timeout: 15000 });
+    await expect(bar(page)).toContainText("expected now");
+    await page.keyboard.press("s");
+  });
+});

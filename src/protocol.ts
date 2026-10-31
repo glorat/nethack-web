@@ -73,8 +73,10 @@ export type GameEvent =
   /** The core's ascii_map option, changed in its options menu. */
   | { type: "ascii_map"; on: boolean }
   | { type: "game_over"; text: string }
-  /** Lines added to the game's recording, as they're written. */
-  | { type: "recorded"; lines: string[] }
+  /** Lines added to the game's recording, as they're written; `atPrompt` once the core is waiting and all it did is there. */
+  | { type: "recorded"; lines: string[]; atPrompt: boolean }
+  /** What the recording of a game that has come back already held. */
+  | { type: "recorded_before"; text: string }
   /** The whole recording of a game that has ended. */
   | { type: "recording"; text: string }
   | { type: "error"; text: string };
@@ -137,7 +139,19 @@ export type WorkerMessage =
   | { type: "events"; events: GameEvent[] }
   | { type: "request"; id: number; request: GameRequest }
   | { type: "description"; id: number; text: string | null }
+  | { type: "debug_files"; id: number; files: Record<string, Uint8Array>; bones: Record<string, Uint8Array> }
+  | { type: "shadow_status"; status: ShadowStatus }
   | ReplayMessage;
+
+/** How a second core following the game by its recording is getting on. */
+export interface ShadowStatus {
+  state: "following" | "ended" | "mismatch";
+  turn: number;
+  /** Where it went differently. */
+  message?: string;
+  /** Its game files when it did. */
+  files?: Record<string, Uint8Array>;
+}
 
 /** What a replay tells the page, besides the game's own events. */
 export type ReplayMessage =
@@ -180,6 +194,12 @@ export type UiMessage =
   /** Plays a recording instead of a game. */
   | { type: "replay"; assetBase: string; text: string; turnsPerSecond: number }
   | { type: "replay_control"; control: ReplayControl }
+  /** Becomes a shadow: follows a game by the recording lines it's sent. */
+  | { type: "shadow"; assetBase: string }
+  | { type: "shadow_before"; text: string }
+  | { type: "shadow_lines"; lines: string[]; atPrompt: boolean }
+  /** The game's files, and these bones; answered with a "debug_files" message of the same id. */
+  | { type: "debug_files"; id: number; hashes: string[] }
   | { type: "key"; code: number }
   | { type: "click"; x: number; y: number; button: number }
   | { type: "ascii_map"; on: boolean }

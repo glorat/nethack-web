@@ -92,8 +92,10 @@ export interface RecorderStart {
   options: string;
   /** The .nethackrc. */
   config: string;
-  /** Gets each line as it's written, to send on as the game is played. */
-  stream(lines: string[]): void;
+  /** Gets each line as it's written, to send on as the game is played; `atPrompt` once the core is waiting and all it did is there. */
+  stream(lines: string[], atPrompt: boolean): void;
+  /** Gets what the recording already held, for a game that has come back. */
+  before?(text: string): void;
   /** Gets the whole recording when the game ends. */
   finished(text: string): void;
   /** Replays this game's unfinished recording and carries on from its end; true if this core has been replaced. */
@@ -119,6 +121,8 @@ export class Recorder implements GameHost {
   private chunkText = "";
   private dirty = false;
   private unsent: string[] = [];
+  /** Lines have been sent since the core was last waiting. */
+  private midway = false;
   private offset: number | null = null;
   private lastTurn = -1;
   private lastCheckpoint = 0;
@@ -148,7 +152,7 @@ export class Recorder implements GameHost {
 
   async request(request: GameRequest): Promise<Answer | null> {
     this.begin();
-    this.send();
+    this.send(true);
     const answer = await this.inner.request(request);
     this.decided(request, answer);
     return answer;
@@ -163,7 +167,7 @@ export class Recorder implements GameHost {
     this.begin();
     this.turn();
     this.save();
-    this.send();
+    this.send(true);
     const input = await this.inner.nextInput(request);
     this.write(inputLine(input));
     return input;
@@ -222,6 +226,7 @@ export class Recorder implements GameHost {
     this.lastTurn = this.m._nhweb_checkpointed();
     this.lastCheck = Number([...text.matchAll(/^\d+ = (\d+) /gm)].at(-1)?.[1] ?? -Infinity);
     this.offset = zoneSeconds(/^\d+ session new \S+ tz=(\S+)/m.exec(text)?.[1] ?? "") ?? this.inner.utcOffset();
+    this.start.before?.(text);
     this.append(`back ${new Date(this.wallClock()).toISOString()}`);
     for (const line of this.early) this.append(line);
     this.early = [];
@@ -284,6 +289,7 @@ export class Recorder implements GameHost {
       const last = chunks[chunks.length - 1];
       this.chunk = Number(last);
       this.chunkText = this.fs.readFile(`${dir}/${last}`, { encoding: "utf8" });
+      this.start.before?.(readRecording(this.fs, dir));
       lines.push(
         resumed === RECOVERED
           ? `session recover ${this.lastCheckpointIn(dir, chunks)} ${this.m._nhweb_moves()} ${time}`
@@ -351,11 +357,12 @@ export class Recorder implements GameHost {
     this.unsent.push(text);
   }
 
-  private send(): void {
-    if (!this.unsent.length) return;
+  private send(atPrompt = false): void {
+    if (!this.unsent.length && !(atPrompt && this.midway)) return;
     const lines = this.unsent;
     this.unsent = [];
-    this.start.stream(lines);
+    this.midway = !atPrompt;
+    this.start.stream(lines, atPrompt);
   }
 
   /** Writes the chunk being added to into the file system, for the next persist to keep. */
@@ -375,6 +382,7 @@ export class Recorder implements GameHost {
     this.write(`end ${over ? "over" : "save"}`);
     this.ended = true;
     this.save();
+    this.send(true);
     if (over) {
       this.start.finished(readRecording(this.fs, this.dir));
       for (const f of chunkNames(this.fs, this.dir)) this.fs.unlink(`${this.dir}/${f}`);

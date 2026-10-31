@@ -13,7 +13,7 @@ const MARKS = new Set(["ckpt", "T", "=", "asc", "back"]);
 // as long as Game pauses for the core's delay_output
 const DELAY_MS = 50;
 
-interface Line {
+export interface Line {
   seq: number;
   tag: string;
   rest: string;
@@ -34,16 +34,21 @@ export interface Recording {
   sessions: RecordedSession[];
 }
 
+/** A line's parts; throws if it can't be read. */
+export function parseLine(raw: string): Line {
+  // [\s\S], as JSON leaves U+2028 and U+2029 in strings, which . doesn't match
+  const m = /^(\d+) (\S+)(?: ([\s\S]*))?$/.exec(raw.replace(/\r$/, ""));
+  if (!m) throw new ReplayError(`unreadable line: ${raw}`);
+  return { seq: Number(m[1]), tag: m[2], rest: m[3] ?? "" };
+}
+
 export function parseRecording(text: string): Recording {
   const sessions: RecordedSession[] = [];
   let utcOffset: number | null = null;
   let seq = 0;
   for (const raw of text.split("\n")) {
     if (!raw) continue;
-    // [\s\S], as JSON leaves U+2028 and U+2029 in strings, which . doesn't match
-    const m = /^(\d+) (\S+)(?: ([\s\S]*))?$/.exec(raw.replace(/\r$/, ""));
-    if (!m) throw new ReplayError(`unreadable line: ${raw}`);
-    const line = { seq: Number(m[1]), tag: m[2], rest: m[3] ?? "" };
+    const line = parseLine(raw);
     // each session numbers its lines from 1, so a line lost from the middle shows
     if (line.seq !== (line.seq === 1 ? 1 : seq + 1)) throw new ReplayError(`line ${seq + 1} is missing`);
     seq = line.seq;
@@ -125,6 +130,8 @@ export interface ReplayHooks {
   checkpoint(n: number): void;
   /** The bones with this hash, which a recording names rather than holds. */
   bones?(hash: string): Uint8Array | undefined;
+  /** For a recording still being written: resolves when there are more lines, in place of ending where they run out. */
+  more?(): Promise<void>;
 }
 
 /** How a session's replay stopped: at its recorded end, or where its recording ran out. */
@@ -249,12 +256,16 @@ export class ReplayHost implements GameHost {
    */
   private async next(tags: string[], request?: GameRequest): Promise<Line> {
     let turn: number | undefined;
-    for (let line = this.session.lines[this.at]; line && MARKS.has(line.tag); line = this.session.lines[this.at]) {
-      this.at++;
-      if (line.tag === "T") turn = Number(line.rest.split(" ")[0]);
-      if (this.guard(() => this.mark(line), line) === null) break;
+    for (;;) {
+      for (let line = this.session.lines[this.at]; line && MARKS.has(line.tag); line = this.session.lines[this.at]) {
+        this.at++;
+        if (line.tag === "T") turn = Number(line.rest.split(" ")[0]);
+        if (this.guard(() => this.mark(line), line) === null) break;
+      }
+      if (this.done) return never();
+      if (this.session.lines[this.at] || !this.hooks.more) break;
+      await this.hooks.more();
     }
-    if (this.done) return never();
     try {
       await this.hooks.pace({ turn, request });
     } catch (e) {
@@ -380,8 +391,15 @@ export type BootCore = (
  * Plays the whole recording, session by session. Rejects with a ReplayError
  * where the game goes differently from how it was recorded.
  */
-export async function replay(text: string, boot: BootCore, hooks: ReplayHooks): Promise<void> {
+export async function replay(
+  text: string,
+  boot: BootCore,
+  hooks: ReplayHooks,
+  /** Is given the last session, for adding lines to as they come. */
+  follow?: (last: RecordedSession) => void,
+): Promise<void> {
   const { utcOffset, sessions } = parseRecording(text);
+  follow?.(sessions[sessions.length - 1]);
   let files = new Map<string, Uint8Array>();
   for (let i = 0; i < sessions.length; i++) {
     const session = sessions[i];
