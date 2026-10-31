@@ -143,6 +143,62 @@ test("a game in progress comes back after a reload without asking", async ({ pag
   await page.waitForTimeout(500);
 
   await page.reload();
+  // replayed, it never left the game it was in, so the core has nothing to welcome it back to
+  await expect(page.locator(".messages")).toContainText(/welcome to NetHack/i, { timeout: 15_000 });
+  await expect(page.locator(".messages")).not.toContainText(/old game in progress|welcome back/i);
+  await expect(page.locator(".stats-title")).toHaveText(title);
+
+  // the player has it from there, and that lasts through another reload
+  await page.keyboard.press("l");
+  await page.waitForTimeout(500);
+  const recording = () =>
+    page.evaluate(
+      (dir) =>
+        new Promise<string>((resolve, reject) => {
+          const open = indexedDB.open("/save");
+          open.onerror = reject;
+          open.onsuccess = () => {
+            const get = open.result.transaction("FILE_DATA").objectStore("FILE_DATA").get(`/save/replay/${dir}/000001`);
+            get.onsuccess = () => resolve(new TextDecoder().decode(get.result.contents));
+          };
+        }),
+      `0${name}`,
+    );
+  expect(await recording()).toMatch(/^\d+ back \S+Z$/m);
+  await page.reload();
+  await expect(page.locator(".stats-title")).toHaveText(title, { timeout: 15_000 });
+  await expect(page.locator(".messages")).not.toContainText(/old game in progress|welcome back/i);
+  expect((await recording()).match(/^\d+ back /gm)).toHaveLength(2);
+});
+
+test("a game whose replay goes differently comes back from its checkpoint", async ({ page }) => {
+  const name = `Div${Date.now() % 100000}`;
+  await startGame(page, name);
+  const title = await page.locator(".stats-title").innerText();
+  await page.keyboard.press("l");
+  await page.waitForTimeout(500);
+  await page.keyboard.press("s");
+  await page.waitForTimeout(500);
+
+  await page.evaluate(
+    (key) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open("/save");
+        open.onerror = reject;
+        open.onsuccess = () => {
+          const store = open.result.transaction("FILE_DATA", "readwrite").objectStore("FILE_DATA");
+          const get = store.get(key);
+          get.onsuccess = () => {
+            const text = new TextDecoder().decode(get.result.contents);
+            get.result.contents = new TextEncoder().encode(text.replace(/^(\d+) now \d+$/m, "$1 k 83"));
+            store.put(get.result, key).onsuccess = () => resolve();
+          };
+        };
+      }),
+    `/save/replay/0${name}/000001`,
+  );
+
+  await page.reload();
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
   await expect(page.locator(".messages")).not.toContainText(/old game in progress/i);
   await expect(page.locator(".stats-title")).toHaveText(title);
@@ -1137,7 +1193,7 @@ test("Choose Font sets the ASCII map's font and size, switches to ASCII, and is 
   expect(await page.evaluate(() => localStorage.getItem("nethack.asciiFont"))).toBeNull();
 });
 
-test("a finished game can be replayed from its end screen and the landing page, and downloaded", async ({ page }) => {
+test("a finished game can be replayed from its end screen or its address, reloaded, and downloaded", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const name = `Rep${Date.now() % 100000}`;
@@ -1161,12 +1217,13 @@ test("a finished game can be replayed from its end screen and the landing page, 
   expect(await readFile((await file.path())!, "utf8")).toMatch(/^1 nhrec 1\n2 session new /);
 
   await over.getByRole("button", { name: "Replay" }).click();
+  const playing = page.url();
   const bar = page.getByRole("toolbar", { name: "Replay" });
   await expect(bar).toBeVisible();
   await expect(page.locator(".overlay-note")).toBeHidden();
   await bar.getByLabel("Speed").selectOption({ label: "Max" });
   await expect(bar).toContainText("End of the recording", { timeout: 20000 });
-  await expect(bar).not.toContainText("Stopped");
+  await expect(bar).not.toContainText("no longer available");
   await expect(page.locator(".messages")).toContainText(/Really quit without saving\?/);
   // a replay is watched, not played: the game over screen of the game it replays doesn't come up
   await expect(over).toBeHidden();
@@ -1178,8 +1235,26 @@ test("a finished game can be replayed from its end screen and the landing page, 
   await expect(bar).toContainText("Turn 4 of");
 
   await bar.getByRole("button", { name: "Exit Replay" }).click();
-  await expect(page.getByRole("button", { name: "Replay Last Game" })).toBeVisible();
-  await page.getByRole("button", { name: "Replay Last Game" }).click();
+  await expect(page).not.toHaveURL(/replay/);
+  // the end screen alone offers it
+  await expect(page.getByRole("button", { name: /replay/i })).toHaveCount(0);
+
+  await page.goto(playing);
   await expect(page.getByRole("toolbar", { name: "Replay" })).toBeVisible();
+  await page.reload();
+  const again = page.getByRole("toolbar", { name: "Replay" });
+  await again.getByLabel("Speed").selectOption({ label: "Max" });
+  await expect(again).toContainText("End of the recording", { timeout: 20000 });
+
+  // an upgrade or corruption: the game goes differently from its recording
+  await page.evaluate(() => {
+    const text = localStorage.getItem("nethack.lastGame")!;
+    localStorage.setItem("nethack.lastGame", text.replace(/^(\d+) now \d+$/m, "$1 k 83"));
+  });
+  await page.reload();
+  const broken = page.getByRole("toolbar", { name: "Replay" });
+  await broken.getByLabel("Speed").selectOption({ label: "Max" });
+  await expect(broken).toContainText("This replay is no longer available.", { timeout: 20000 });
+  await expect(broken).not.toContainText("line ");
   expect(errors).toEqual([]);
 });

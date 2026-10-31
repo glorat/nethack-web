@@ -41,6 +41,7 @@ export class ReplayRunner {
     private readonly boot: (current: () => boolean) => BootCore,
     private readonly page: RunnerPage,
     private turnsPerSecond: number,
+    private readonly bones?: (hash: string) => Uint8Array | undefined,
   ) {}
 
   start(): void {
@@ -102,6 +103,7 @@ export class ReplayRunner {
       pace: (at) => this.pace(run, at),
       delay: () => this.delay(run),
       checkpoint: () => {},
+      bones: this.bones,
     }).then(
       () => this.end(run, null),
       (e: unknown) => this.end(run, e instanceof Error ? e.message : String(e)),
@@ -175,6 +177,7 @@ export class ReplayRunner {
   private end(run: number, error: string | null): void {
     if (run !== this.run) return;
     if (this.seekTo !== null) this.arrive();
+    if (error) console.warn("the replay stopped", error);
     this.ended = { error };
     this.playing = false;
     this.stepping = false;
