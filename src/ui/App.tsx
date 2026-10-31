@@ -630,7 +630,7 @@ export function App() {
   if (!playing) return <div class="loading">Loading…</div>;
 
   return (
-    <div class="app">
+    <div class="app" data-commanding={commanding || undefined}>
       <MenuBar menus={menus} />
       <div class="game">
         <div class="main-area">

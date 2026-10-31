@@ -19,26 +19,22 @@ async function enterGame(page: Page, name: string) {
   await play.click();
 }
 
-/** Answers whatever the game asks, the picker taking its defaults, until play has settled. */
+/** Answers whatever the game asks, the picker taking its defaults, until the core waits for a command. */
 async function untilPlaying(page: Page) {
-  let quiet = 0;
-  for (let i = 0; i < 40; i++) {
-    const dialog = page.getByRole("dialog");
-    // the intro text can arrive just after the map, so wait for a settled screen
-    if ((await page.locator(".stats-title").isVisible()) && !(await dialog.isVisible())) {
-      if (++quiet >= 3) return;
-    } else {
-      quiet = 0;
-    }
-    if (await dialog.isVisible()) {
-      const text = (await dialog.innerText()).toLowerCase();
-      if (text.includes("choose your character")) await page.keyboard.press("Enter");
-      else if (text.includes("shall i pick") || text.includes("is this ok")) await page.keyboard.press("y");
-      else if (text.includes("tutorial")) await dialog.getByRole("button", { name: /just start play/i }).click();
-      else if (await dialog.getByRole("button", { name: "OK", exact: true }).isVisible()) await dialog.getByRole("button", { name: "OK", exact: true }).click();
-      else await page.keyboard.press("Escape");
-    }
-    await page.waitForTimeout(300);
+  const dialog = page.getByRole("dialog");
+  const playing = page.locator(".app[data-commanding]");
+  for (;;) {
+    await dialog.or(playing).first().waitFor();
+    if (!(await dialog.isVisible())) return;
+    const shown = await dialog.innerText();
+    const text = shown.toLowerCase();
+    if (text.includes("choose your character")) await page.keyboard.press("Enter");
+    else if (text.includes("shall i pick") || text.includes("is this ok")) await page.keyboard.press("y");
+    else if (text.includes("tutorial")) await dialog.getByRole("button", { name: /just start play/i }).click();
+    else if (await dialog.getByRole("button", { name: "OK", exact: true }).isVisible()) await dialog.getByRole("button", { name: "OK", exact: true }).click();
+    else await page.keyboard.press("Escape");
+    // the next dialog can reuse this one's element, so wait on what it shows
+    await page.waitForFunction((shown) => document.querySelector<HTMLElement>('[role="dialog"]')?.innerText !== shown, shown, { polling: "raf" });
   }
 }
 
@@ -343,6 +339,8 @@ test("right-clicking the map offers a look and a wiki search", async ({ page, co
 
   await page.mouse.click(middle.x, middle.y, { button: "right" });
   await expect(menu).toBeVisible();
+  // its key listener is attached after the paint that shows it
+  await settle(page);
   await page.keyboard.press("Escape");
   await expect(menu).toBeHidden();
 
