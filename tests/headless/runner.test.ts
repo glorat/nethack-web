@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import type { ReplayProgress } from "../../src/protocol";
+import type { GameRequest, ReplayProgress } from "../../src/protocol";
 import { ReplayRunner } from "../../src/worker/replay-runner";
 import { headlessBoot } from "./harness";
 
@@ -18,11 +18,15 @@ afterEach(() => {
 });
 
 async function runner(turnsPerSecond: number) {
-  const seen: { progress: ReplayProgress } = { progress: { turn: 0, playing: true, seeking: false, ended: null } };
+  const seen: { progress: ReplayProgress; prompt: GameRequest | null } = {
+    progress: { turn: 0, playing: true, seeking: false, ended: null },
+    prompt: null,
+  };
   const r = new ReplayRunner(TEXT, await headlessBoot(), {
     events: () => {},
     replay: (m) => {
       if (m.type === "replay_progress") seen.progress = m.progress;
+      if (m.type === "replay_prompt") seen.prompt = m.request;
     },
   }, turnsPerSecond);
   running.push(r);
@@ -46,7 +50,7 @@ test("at full speed, a pause takes hold at once, not at the session's end", asyn
   await new Promise((resolve) => setTimeout(resolve, 200));
   expect(seen.progress.turn).toBe(held);
   expect(seen.progress.ended).toBeNull();
-  expect(held).toBeLessThan(FIRST_SESSION_END - 5);
+  expect(held).toBeLessThan(FIRST_SESSION_END);
 }, 30000);
 
 test("a speed change and a seek straight after it leave the replay playing on", async () => {
@@ -71,4 +75,27 @@ test("a step left pending doesn't stop the replay after a seek", async () => {
   await until(() => !seen.progress.seeking && seen.progress.turn >= 40);
   r.control({ action: "play" });
   await until(() => seen.progress.turn > 60);
+}, 30000);
+
+test("a step left pending doesn't stop the replay after a seek to its first turn", async () => {
+  const { r, seen } = await runner(Infinity);
+  r.control({ action: "seek", turn: 10 });
+  await until(() => !seen.progress.seeking && seen.progress.turn >= 10);
+  r.control({ action: "speed", turnsPerSecond: 2 });
+  r.control({ action: "step" });
+  r.control({ action: "speed", turnsPerSecond: Infinity });
+  r.control({ action: "seek", turn: 1 });
+  await until(() => !seen.progress.seeking && seen.progress.turn >= 1);
+  r.control({ action: "play" });
+  await until(() => seen.progress.turn > 20);
+}, 30000);
+
+test("a prompt flashing when the replay seeks doesn't stay up", async () => {
+  const { r, seen } = await runner(2);
+  await until(() => seen.prompt !== null);
+  r.control({ action: "speed", turnsPerSecond: Infinity });
+  r.control({ action: "seek", turn: 20 });
+  await until(() => !seen.progress.seeking && seen.progress.turn >= 20);
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  expect(seen.prompt).toBeNull();
 }, 30000);

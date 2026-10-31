@@ -154,19 +154,17 @@ async function start({ assetBase, options, config }: StartOptions): Promise<void
   }
 }
 
-/** The callbacks of each replay core, by playing-through, so a seek can let the old cores go. */
-const replayCallbacks = new Map<number, string[]>();
+/** The callbacks of the replay's cores, which hold the cores; dropped to let them go. */
+let replayCallbacks: string[] = [];
 let replayRuns = 0;
 
+const dropCallback = (name: string) => delete (globalThis as Record<string, unknown>)[name];
+
 /** Boots a fresh core for each session of one playing-through of a recording. */
-function replayBoot(createModule: CreateModule, assetBase: string): BootCore {
+function replayBoot(createModule: CreateModule, assetBase: string, current: () => boolean): BootCore {
   const run = ++replayRuns;
-  for (const [old, names] of replayCallbacks) {
-    for (const name of names) delete (globalThis as Record<string, unknown>)[name];
-    replayCallbacks.delete(old);
-  }
-  const names: string[] = [];
-  replayCallbacks.set(run, names);
+  for (const name of replayCallbacks.splice(0)) dropCallback(name);
+  let sessions = 0;
   return async (session, files, makeHost) => {
     let host: ReturnType<typeof makeHost> | null = null;
     const m = await createModule({
@@ -187,7 +185,7 @@ function replayBoot(createModule: CreateModule, assetBase: string): BootCore {
       ],
     });
     // a seek while this core was loading: it belongs to a playing-through no one watches
-    if (run !== replayRuns) return never();
+    if (!current()) return never();
     // the core before this one is left waiting in a callback for good
     const shared = (globalThis as { nethackGlobal?: { shimFunctionRunning?: unknown } }).nethackGlobal;
     if (shared) shared.shimFunctionRunning = null;
@@ -196,9 +194,11 @@ function replayBoot(createModule: CreateModule, assetBase: string): BootCore {
     host.game = replayed;
     module = m;
     game = replayed;
-    const name = `nethackReplay${run}_${names.length}`;
-    names.push(name);
+    const name = `nethackReplay${run}_${sessions++}`;
+    replayCallbacks.push(name);
     (globalThis as Record<string, unknown>)[name] = (cb: string, ...args: unknown[]) => replayed.callback(cb, args);
+    // the session's core is let go once its session is over
+    void host.finished.then(() => dropCallback(name));
     m.ccall("shim_graphics_set_callback", null, ["string"], [name]);
     try {
       m._main(0, 0);
@@ -213,7 +213,7 @@ async function startReplay(assetBase: string, text: string, turnsPerSecond: numb
   send({ type: "events", events: [{ type: "ready" }] });
   runner = new ReplayRunner(
     text,
-    () => replayBoot(createModule, assetBase),
+    (current) => replayBoot(createModule, assetBase, current),
     { events: (events) => send({ type: "events", events }), replay: (message) => send(message) },
     turnsPerSecond,
   );

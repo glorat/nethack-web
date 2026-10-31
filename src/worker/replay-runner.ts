@@ -33,8 +33,12 @@ export class ReplayRunner {
 
   constructor(
     private readonly text: string,
-    /** Boots cores for one playing-through; a new one is asked for at each seek. */
-    private readonly boot: () => BootCore,
+    /**
+     * Boots cores for one playing-through; a new one is asked for at each seek.
+     * `current` says whether that playing-through is still wanted, for a core
+     * that finishes loading after a seek or stop not to start.
+     */
+    private readonly boot: (current: () => boolean) => BootCore,
     private readonly page: RunnerPage,
     private turnsPerSecond: number,
   ) {}
@@ -91,7 +95,9 @@ export class ReplayRunner {
     this.state = { ...initialState(), started: true };
     this.ended = null;
     this.page.replay({ type: "replay_state", state: this.state });
-    replay(this.text, this.boot(), {
+    // a prompt flashing when the last playing-through was replaced
+    this.page.replay({ type: "replay_prompt", request: null });
+    replay(this.text, this.boot(() => run === this.run), {
       post: (events) => this.post(run, events),
       pace: (at) => this.pace(run, at),
       delay: () => this.delay(run),
@@ -126,10 +132,12 @@ export class ReplayRunner {
       }
       this.progress();
     }
-    if (this.seekTo !== null) return this.breathe();
-    if (at.turn !== undefined) {
-      if (Number.isFinite(this.turnsPerSecond)) await sleep(1000 / this.turnsPerSecond);
-      else await this.breathe();
+    if (this.seekTo !== null || !Number.isFinite(this.turnsPerSecond)) {
+      await this.breathe();
+      if (run !== this.run) return never();
+      if (this.seekTo !== null) return;
+    } else if (at.turn !== undefined) {
+      await sleep(1000 / this.turnsPerSecond);
       if (run !== this.run) return never();
     }
     await this.untilPlaying(run);
