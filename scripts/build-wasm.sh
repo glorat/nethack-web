@@ -36,6 +36,8 @@ cd "$NH"
 if [ ! -d lib/lua ]; then
     make fetch-lua
 fi
+# several targets each build makedefs if it's missing, and overwrite it and hacklib.a under each other
+make CROSS_TO_WASM=1 makedefs
 make -j"$JOBS" CROSS_TO_WASM=1 all
 
 mkdir -p "$ROOT/public"
