@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { sortKey } from "../../src/port/sort";
 import { clipAround } from "../../src/ui/scroll";
 
@@ -19,7 +19,14 @@ async function enterGame(page: Page, name: string) {
   await play.click();
 }
 
-/** Answers whatever the game asks, the picker taking its defaults, until the core waits for a command. */
+/** Chooses the role, and the first of what's allowed for the rest, over the picker's random default. */
+async function pickCharacter(picker: Locator, role: RegExp) {
+  await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: role }).click();
+  await picker.getByRole("listbox", { name: "Race" }).locator("button:not([disabled])").first().click();
+  for (const name of ["Gender", "Alignment"]) await picker.getByRole("radiogroup", { name }).locator("button:not([disabled])").first().click();
+}
+
+/** Answers whatever the game asks, choosing a character in the picker, until the core waits for a command. */
 async function untilPlaying(page: Page) {
   const dialog = page.getByRole("dialog");
   const playing = page.locator(".app[data-commanding]");
@@ -28,7 +35,10 @@ async function untilPlaying(page: Page) {
     if (!(await dialog.isVisible())) return;
     const shown = await dialog.innerText();
     const text = shown.toLowerCase();
-    if (text.includes("choose your character")) await page.keyboard.press("Enter");
+    if (text.includes("choose your character")) {
+      await pickCharacter(dialog, /Valkyrie/);
+      await page.keyboard.press("Enter");
+    }
     else if (text.includes("shall i pick") || text.includes("is this ok")) await page.keyboard.press("y");
     else if (text.includes("tutorial")) await dialog.getByRole("button", { name: /just start play/i }).click();
     else if (await dialog.getByRole("button", { name: "OK", exact: true }).isVisible()) await dialog.getByRole("button", { name: "OK", exact: true }).click();
@@ -73,7 +83,7 @@ const recording = (page: Page, name: string) =>
 async function startAs(page: Page, name: string, role: RegExp) {
   await enterGame(page, name);
   const picker = page.getByRole("dialog", { name: "Choose your character" });
-  await picker.getByRole("option", { name: role }).click();
+  await pickCharacter(picker, role);
   await picker.getByRole("button", { name: "Play" }).click();
   await untilPlaying(page);
 }

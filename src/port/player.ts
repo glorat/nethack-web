@@ -1,6 +1,5 @@
 // The character picker's rules: a pick that rules out another choice moves
 // that choice to the first one still allowed, as Cocoa's picker does.
-import { fixedInputs } from "./fixedinputs";
 import type { PlayerChoices, PlayerPick } from "../protocol";
 
 export const GENDERS = ["Male", "Female"];
@@ -9,10 +8,7 @@ export const ALIGNS = ["Lawful", "Neutral", "Chaotic"];
 /** Returns an integer in [0, n). */
 export type Random = (n: number) => number;
 
-const pageRandom: Random = (n) => {
-  const fixed = fixedInputs();
-  return fixed ? fixed.seed % n : Math.floor(Math.random() * n);
-};
+const mathRandom: Random = (n) => Math.floor(Math.random() * n);
 
 function indices(n: number, ok: (i: number) => boolean): number[] {
   return Array.from({ length: n }, (_, i) => i).filter(ok);
@@ -45,7 +41,7 @@ export function withRace(c: PlayerChoices, p: PlayerPick, race: number): PlayerP
 }
 
 /** Fills whatever `c.chosen` leaves open at random, keeping what it fixes where the rules allow. */
-export function randomPick(c: PlayerChoices, random: Random = pageRandom): PlayerPick {
+export function randomPick(c: PlayerChoices, random: Random = mathRandom): PlayerPick {
   const { chosen } = c;
   // a race chosen without a role picks the role to suit it, not the other way round
   const raceFirst = chosen.race >= 0 && chosen.role < 0;

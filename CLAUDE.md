@@ -28,5 +28,5 @@
 - `pnpm run test:e2e:update`: how a new version of the service worker takes over (about 45s). Not part of `test:e2e` or CI, so run it after changing the service worker or the update flow.
 - Prefer a headless scenario (`tests/headless`, via `Session` in `harness.ts`) to an e2e test unless the behaviour lives in the UI.
 - Scenarios are deterministic: `seed` sets `NETHACK_SEED`, `date` fakes `Date`, `wizard: true` allows debug-mode commands, and `failPost` makes a window callback throw once.
-- Playwright games on the dev server are deterministic too: `playwright.config.ts` sets `nethack.fixedInputs`, which fixes the seeds, clock, game id and the picker's choice.
+- Playwright games on the dev server are deterministic too: `playwright.config.ts` sets `nethack.fixedInputs`, which fixes the seeds, clock, time zone and game id (`src/worker/authority.ts`). The tests choose their character, as the picker's default is random.
 - When fixing a bug, check its test fails without the fix.
