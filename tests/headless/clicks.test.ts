@@ -37,3 +37,38 @@ test("a secondary click describes the square, even unexplored ground far away", 
   expect(g.messages.at(-1)).toMatch(/unexplored/);
   expect(turn(g)).toBe(before);
 });
+
+test("hovering over a nearby object learns nothing of it, where looking does", async () => {
+  // seed 18 arrives on level 2 beside a scroll, which the hero sees up close only on moving
+  const g = await (await Session.start({ seed: 18, wizard: true, options: "pettype:none" })).skipText();
+  await g.send("\x16");
+  await g.getlin("2");
+  while (g.prompt && g.prompt.kind !== "poskey") await (g.prompt.kind === "text" ? g.dismiss() : g.yn("n"));
+  expect(g.describe(19, 3)).toMatch(/\(a scroll\)$/);
+  expect(g.describe(19, 3)).toMatch(/\(a scroll\)$/);
+  await g.click(19, 3, 2);
+  expect(g.messages.at(-1)).toMatch(/scroll labeled/);
+});
+
+test("hovering over an object the hero hallucinates leaves the game's random numbers as they were", async () => {
+  const g = await (await Session.start({ wizard: true, options: "pettype:none" })).skipText();
+  await g.send("\x17");
+  await g.getlin("potion of hallucination");
+  const potion = g.state.inventory.find((i) => /potion/.test(i.text))!.accelerator;
+  await g.send("q");
+  await g.yn(potion);
+  // debug mode shows what drinking it did
+  for (let i = 0; i < 10 && g.prompt && g.prompt.kind !== "poskey"; i++)
+    await (g.prompt.kind === "menu" ? g.answer({ kind: "menu", selection: [] }) : g.dismiss());
+  const spot = { ...g.hero };
+  await g.send("d");
+  await g.yn("b");
+  await g.send("l");
+  if (g.hero.x === spot.x) await g.send("h");
+  expect(g.hero.x).not.toBe(spot.x);
+
+  // what a hallucinating hero sees there is never the dagger, so the core makes an object to describe
+  const before = g.rng;
+  for (let i = 0; i < 5; i++) expect(g.describe(spot.x, spot.y)).toBeTruthy();
+  expect(g.rng).toBe(before);
+});
