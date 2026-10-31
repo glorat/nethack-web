@@ -1136,3 +1136,50 @@ test("Choose Font sets the ASCII map's font and size, switches to ASCII, and is 
   await expect.poll(height).toBe(tiled);
   expect(await page.evaluate(() => localStorage.getItem("nethack.asciiFont"))).toBeNull();
 });
+
+test("a finished game can be replayed from its end screen and the landing page, and downloaded", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const name = `Rep${Date.now() % 100000}`;
+  await startGame(page, name);
+  for (let i = 0; i < 6; i++) await page.keyboard.press("s");
+  await page.keyboard.press("#");
+  await page.keyboard.type("quit");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("y");
+  const over = page.getByRole("dialog", { name: "The game is over" });
+  for (let i = 0; i < 40 && !(await over.isVisible()); i++) {
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(150);
+  }
+
+  const download = page.waitForEvent("download");
+  await over.getByRole("button", { name: "Download Recording" }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(new RegExp(`^nethack-${name}-\\d{4}-\\d\\d-\\d\\d\\.txt$`));
+  const { readFile } = await import("node:fs/promises");
+  expect(await readFile((await file.path())!, "utf8")).toMatch(/^1 nhrec 1\n2 session new /);
+
+  await over.getByRole("button", { name: "Replay" }).click();
+  const bar = page.getByRole("toolbar", { name: "Replay" });
+  await expect(bar).toBeVisible();
+  await expect(page.locator(".overlay-note")).toBeHidden();
+  await bar.getByLabel("Speed").selectOption({ label: "Max" });
+  await expect(bar).toContainText("End of the recording", { timeout: 20000 });
+  await expect(bar).not.toContainText("Stopped");
+  await expect(page.locator(".messages")).toContainText(/Really quit without saving\?/);
+  // a replay is watched, not played: the game over screen of the game it replays doesn't come up
+  await expect(over).toBeHidden();
+
+  // back to a turn part way, paused there, then one turn on
+  await bar.getByLabel("Turn").fill("3");
+  await expect(bar).toContainText("Turn 3 of");
+  await bar.getByRole("button", { name: "Step" }).click();
+  await expect(bar).toContainText("Turn 4 of");
+
+  await bar.getByRole("button", { name: "Exit Replay" }).click();
+  await expect(page.getByRole("button", { name: "Replay Last Game" })).toBeVisible();
+  await page.getByRole("button", { name: "Replay Last Game" }).click();
+  await expect(page.getByRole("toolbar", { name: "Replay" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
