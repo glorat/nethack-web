@@ -180,6 +180,15 @@ export type ReplayControl =
   /** Plays again from the start, without showing it, up to this turn, then pauses there. */
   | { action: "seek"; turn: number };
 
+/** The values a game would otherwise take from the machine, as a replay has them from its recording. */
+export interface FixedInputs {
+  /** The first seed; each one asked for after it is one more, as different as real ones, not all the same. */
+  seed: number;
+  /** Seconds since 1970, for every time the core reads. */
+  now: number;
+  uuid: string;
+}
+
 export interface StartOptions {
   /** Base URL that nethack.js and nethack.wasm are served from. */
   assetBase: string;
@@ -189,6 +198,7 @@ export interface StartOptions {
   config: string;
   /** A shadow is following, and needs what a game that comes back had already recorded. */
   shadowed?: boolean;
+  fixed?: FixedInputs;
 }
 
 export type UiMessage =

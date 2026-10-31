@@ -10,6 +10,22 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:5199/",
     viewport: { width: 1400, height: 900 },
+    timezoneId: "UTC",
+    storageState: {
+      cookies: [],
+      origins: [
+        {
+          origin: "http://127.0.0.1:5199",
+          localStorage: [
+            {
+              name: "nethack.fixedInputs",
+              // a Monday at no full or new moon, which change what the game says and does
+              value: JSON.stringify({ seed: 1, now: Date.UTC(2026, 5, 22, 12) / 1000, uuid: "00000000-0000-4000-8000-000000000001" }),
+            },
+          ],
+        },
+      ],
+    },
   },
   webServer: [
     {
