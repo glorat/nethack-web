@@ -71,7 +71,7 @@ A game left unfinished comes back by replay when it can. When the core finds the
 
 If the replay goes differently, the recording is cut back to its last line known good, and the game comes back from there and says so. An ASCII map switched in the part cut off stays as the page has it, while the core goes back to how it was, until it's next switched. A failed `=` goes back to the `=` before it, as sums take no account of the status line; anything else goes back to the last sum or `=` that passed.
 
-A replay is applied once, as it would only fail the same way again. If no check had passed, the second replay fails too, or the recording can't be replayed, the player chooses: destroy the game, or continue from its last level change, losing what came after. A game continued that way starts its recording again as `session unrecorded`, so it can never be replayed or accepted by a server, and it's offered the same choice on every later close. The core's checkpoints play no other part. Only the player can destroy a game.
+A replay is applied once, as it would only fail the same way again. If no check had passed, the second replay fails too, or the recording can't be replayed, the player chooses: destroy the game, or continue from its last level change, losing what came after. A game continued that way starts its recording again as `session unrecorded`, so it can never be replayed, and it's offered the same choice on every later close. The core's checkpoints play no other part. Only the player can destroy a game.
 
 A page that closes or crashes during a replay leaves `/save/resuming`, so the next start asks first instead of replaying. So does another tab being open, or having no locks to tell. There Destroy deletes the game and Recover applies its replay.
 

@@ -41,7 +41,7 @@ const HASH = "#".charCodeAt(0);
 // Save & Quit is a deliberate choice, as Cocoa takes it
 const ALWAYS_YES = ["Really save?", "Overwrite the old file?"];
 export const OLD_GAME = "Old game in progress. Destroy [y], Recover [r], or Cancel [n]?";
-export const CANT_REPLAY = "Your game can't be replayed. Destroy it, or continue from its last level change, losing what came after? A game continued this way can never be replayed or accepted by a server.";
+export const CANT_REPLAY = "Your game can't be replayed. Destroy it, or continue from its last level change, losing what came after? A game continued this way can never be replayed.";
 // left behind by a replay that never reached play, whether the page closed or crashed, so the next start asks first
 export const RESUMING = "/save/resuming";
 
