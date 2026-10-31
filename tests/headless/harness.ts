@@ -106,7 +106,7 @@ export class Session {
   /** /save as it was at the last persist, which is all a closed page would have kept. */
   persisted: Map<string, Uint8Array> = new Map();
 
-  /** Why the replay of a game left unfinished failed, if it did and the game came back from its checkpoint. */
+  /** Why the replay of a game left unfinished failed, if it did and the game was asked about instead. */
   resumeFailure: string | null = null;
 
   private liveHost: ReturnType<Session["host"]> | null = null;
@@ -201,7 +201,7 @@ export class Session {
       before: (text) => (this.before = text),
       shadowed: options.shadowed,
       finished: (text) => (this.recording = text),
-      resume: options.resume ? (text, name) => this.resume(options, text, name) : undefined,
+      resume: options.resume !== false && this.resumeFailure === null ? (text, name) => this.resume(options, text, name) : undefined,
     });
   }
 

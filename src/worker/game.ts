@@ -41,9 +41,8 @@ const HASH = "#".charCodeAt(0);
 // Save & Quit is a deliberate choice, as Cocoa takes it
 const ALWAYS_YES = ["Really save?", "Overwrite the old file?"];
 export const OLD_GAME = "Old game in progress. Destroy [y], Recover [r], or Cancel [n]?";
-// left behind by a recovery that never reached play, so the next start asks instead of failing again
-const RECOVERING = "/save/recovering";
-// left behind by a replay that never reached play, so the next start falls back on the checkpoint
+export const CANT_REPLAY = "Your game can't be replayed. Destroy it, or continue from its last level change, losing what came after? A game continued this way can never be replayed or accepted by a server.";
+// left behind by a replay that never reached play, whether the page closed or crashed, so the next start asks first
 export const RESUMING = "/save/resuming";
 
 interface Window {
@@ -62,12 +61,10 @@ export interface GameHost extends Authority {
   /** Keeps /save; `exiting` when the core is about to end, after which the page may go at any moment. */
   persist(exiting?: boolean): Promise<void>;
   /**
-   * Brings the game left unfinished back some other way than recovery; true
-   * if this core has been replaced, and is never to go on.
+   * Brings the game left unfinished back by its recording; true if this core
+   * has been replaced, and is never to go on.
    */
   resume?(): Promise<boolean>;
-  /** An answer Game gave the core itself, going by something outside it. */
-  decided?(request: GameRequest, answer: Answer | null): void;
   /** The core's pause in an animation; a short wait if not given. */
   delayOutput?(): Promise<void>;
 }
@@ -112,7 +109,6 @@ export class Game {
   /** The cell last drawn on each map square, by y * COLNO + x. */
   private cells = new Map<number, MapCell>();
   private mapCursor = { x: 0, y: 0 };
-  private recovering = false;
 
   constructor(
     private readonly m: NetHackModule,
@@ -146,10 +142,6 @@ export class Game {
   }
 
   private async input(): Promise<Input> {
-    if (this.recovering && this.m._nhweb_in_play()) {
-      this.recovering = false;
-      this.m.FS.unlink(RECOVERING);
-    }
     this.optionsFile();
     this.refreshPeaceful();
     this.expireChanges();
@@ -541,33 +533,48 @@ export class Game {
     return unknown && (Math.abs(x - this.mapCursor.x) > 1 || Math.abs(y - this.mapCursor.y) > 1);
   }
 
+  /** Replays the game left unfinished; true if this core has been replaced, and is never to go on. */
+  private async replayLeftGame(): Promise<boolean> {
+    if (!this.host.resume) return false;
+    this.m.FS.writeFile(RESUMING, "");
+    // saved before replaying, in case the replay crashes the page
+    await this.host.persist();
+    if (await this.host.resume()) return true;
+    this.m.FS.unlink(RESUMING);
+    return false;
+  }
+
+  /** What becomes of a game left unfinished: replayed, or as the player says; only the player can give it up. */
+  private async leftGame(query: string, choices: string): Promise<number> {
+    const fs = this.m.FS;
+    const asked = (q: string, c: string) => this.ask({ kind: "yn", query: q, choices: c, defaultChoice: "n" });
+    const keyOf = (answer: Answer | null) => (answer?.kind === "yn" ? answer.key : "n");
+    if (this.host.resume) {
+      const interrupted = fs.analyzePath(RESUMING).exists;
+      if (this.host.alone && !interrupted) {
+        if (await this.replayLeftGame()) return new Promise<number>(() => {});
+      } else {
+        const key = keyOf(await asked(query, choices));
+        if (key !== "r") {
+          if (key === "y" && interrupted) fs.unlink(RESUMING);
+          return key === "y" ? "y".charCodeAt(0) : "n".charCodeAt(0);
+        }
+        if (await this.replayLeftGame()) return new Promise<number>(() => {});
+      }
+    }
+    const key = keyOf(await asked(CANT_REPLAY, "yrn"));
+    if (key !== "y" && key !== "r") return "n".charCodeAt(0);
+    if (fs.analyzePath(RESUMING).exists) fs.unlink(RESUMING);
+    return key.charCodeAt(0);
+  }
+
   private async yn(query: string, choices: string, def: number): Promise<number> {
     if (ALWAYS_YES.includes(query)) {
       this.m._nhweb_set_yn_number(0);
       return "y".charCodeAt(0);
     }
     // a game left unfinished comes back, as Cocoa brings back the game it was quit in
-    if (query === OLD_GAME && this.host.alone) {
-      if (this.host.resume && !this.m.FS.analyzePath(RESUMING).exists) {
-        this.m.FS.writeFile(RESUMING, "");
-        // saved before replaying, in case the replay crashes the page
-        await this.host.persist();
-        if (await this.host.resume()) return new Promise<number>(() => {});
-      }
-      if (this.m.FS.analyzePath(RESUMING).exists) this.m.FS.unlink(RESUMING);
-      if (!this.m.FS.analyzePath(RECOVERING).exists) {
-        this.m.FS.writeFile(RECOVERING, "");
-        // saved before recovering, in case the recovery crashes the core
-        await this.host.persist();
-        this.recovering = true;
-        this.host.decided?.(
-          { kind: "yn", query, choices: choices ?? "", defaultChoice: def ? String.fromCharCode(def) : "" },
-          { kind: "yn", key: "r" },
-        );
-        return "r".charCodeAt(0);
-      }
-      this.m.FS.unlink(RECOVERING);
-    }
+    if (query === OLD_GAME) return this.leftGame(query, choices ?? "");
     const answer = await this.ask({
       kind: "yn",
       query,

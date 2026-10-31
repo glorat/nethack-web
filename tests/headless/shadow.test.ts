@@ -60,10 +60,11 @@ test("a shadow follows a game that came back, from what its recording held", asy
   expect((await shadowOf(back)).at(-1)).toMatchObject({ state: "following" });
 });
 
-test("a shadow says a game back from its checkpoint has no recording to follow, not that it went differently", async () => {
+test("a shadow says a game with no recording of its start has nothing to follow, not that it went differently", async () => {
   const first = await (await Session.start(options)).skipText();
-  await first.send("s".repeat(5));
-  const g = await (await Session.start({ ...options, saves: first.persisted })).skipText();
+  await first.send("S");
+  const saves = new Map([...first.saves()].filter(([k]) => !k.startsWith("replay/")));
+  const g = await (await Session.start({ ...options, saves })).skipText();
   await g.send("s");
   expect((await shadowOf(g)).at(-1)).toMatchObject({ state: "unrecorded" });
 });

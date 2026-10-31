@@ -144,7 +144,7 @@ test("Save & Quit goes to the landing page, and Play and a reload both bring the
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
   await expect(page.locator(".stats-title")).toHaveText(title);
 
-  // the restore deleted the save, so a reload recovers the game in progress
+  // the restore deleted the save, so a reload replays the game in progress
   await page.reload();
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
   await expect(page.locator(".stats-title")).toHaveText(title);
@@ -213,10 +213,9 @@ test("a game in progress comes back after a reload without asking", async ({ pag
   await expect.poll(async () => (await recording(page, name)).match(/^\d+ back /gm)).toHaveLength(2);
 });
 
-test("a game whose replay goes differently comes back from its checkpoint", async ({ page }) => {
+test("a game whose replay goes differently is the player's to destroy or continue", async ({ page }) => {
   const name = `Div${Date.now() % 100000}`;
   await startGame(page, name);
-  const title = await page.locator(".stats-title").innerText();
   await page.keyboard.press("l");
   await page.keyboard.press("s");
   await expect.poll(() => recording(page, name)).toMatch(/^\d+ k 115\b/m);
@@ -240,9 +239,12 @@ test("a game whose replay goes differently comes back from its checkpoint", asyn
   );
 
   await page.reload();
+  // a move key typed while it loads mustn't answer what it hasn't seen
+  await page.keyboard.press("y");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText(/can't be replayed/i, { timeout: 15_000 });
+  await dialog.getByRole("button", { name: "Continue" }).click();
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
-  await expect(page.locator(".messages")).not.toContainText(/old game in progress/i);
-  await expect(page.locator(".stats-title")).toHaveText(title);
 });
 
 test("a game playing in another tab is asked about, not taken over", async ({ page, context }) => {

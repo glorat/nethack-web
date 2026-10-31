@@ -475,6 +475,8 @@ export function App() {
 
   // keys typed before a dialog opened are its first keys; its listeners are attached by now
   useLayoutEffect(() => {
+    // but not these, whose first key could destroy a game the player hasn't been asked about yet
+    if (pending?.request.kind === "yn" && ["ynr", "yrn"].includes(pending.request.choices)) typeAhead.current = [];
     while (pending && answered.current !== pending.id && typeAhead.current.length) {
       const k = typeAhead.current.shift()!;
       window.dispatchEvent(new KeyboardEvent("keydown", { ...k, cancelable: true }));
@@ -703,8 +705,8 @@ export function App() {
           status={shadowStatus}
           onDownload={async () => {
             const text = recorded?.text ?? shadowRecording.current;
-            const { files, bones, failed } = await client.files(namedBones(text));
-            const made = { recording: text, files, bones, failed, shadow: shadowStatus };
+            const { files, bones } = await client.files(namedBones(text));
+            const made = { recording: text, files, bones, shadow: shadowStatus };
             downloadText(buildDebugPackage(made), debugPackageName());
           }}
         />

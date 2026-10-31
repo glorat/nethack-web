@@ -187,7 +187,6 @@ export type SessionEnd = "end" | "out";
  * the core is where the recording says it was.
  */
 export class ReplayHost implements GameHost {
-  // the recording says what was answered about an old game, so the question must be asked
   readonly alone = false;
   game: Game | null = null;
   private at = 0;

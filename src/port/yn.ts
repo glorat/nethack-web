@@ -87,6 +87,8 @@ export function answerLabel(choices: string, key: string): string {
       ? { r: "Right", l: "Left" }
       : choices === "ynr"
         ? { y: "Destroy", r: "Recover", n: "Cancel" }
+        : choices === "yrn"
+          ? { y: "Destroy", r: "Continue", n: "Cancel" }
         : choices.startsWith("hs")
           ? { h: "Hide", s: "Spin a web", q: "Quit" }
           : answers.every((a) => a in YES_NO)
