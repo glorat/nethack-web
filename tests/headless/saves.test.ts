@@ -299,7 +299,7 @@ test("a game whose replay fails a sum comes back from the last one that passed, 
     l[at] = l[at].replace(/ \w{4}$/, /0000$/.test(l[at]) ? " 0001" : " 0000");
   });
   expect(next.resumeFailure).toBeNull();
-  expect(next.messages.some((t) => /last point that could be checked/.test(t))).toBe(true);
+  expect(next.messages.some((t) => /couldn't be brought back, so your game has gone back/.test(t))).toBe(true);
   const turn = (t: string) => Number(/ T (\d+) /.exec(t)![1]);
   expect(Number(next.state.status.BL_TIME?.text)).toBe(turn(lines[lines.slice(0, at).findLastIndex((l) => / T \d+ /.test(l))]));
   await next.send("s");
@@ -316,7 +316,7 @@ test("a game whose replay fails a full check goes back past the sums, to the las
     l[at] = l[at].replace(/"HP":"\d+"/, '"HP":"999"');
   });
   expect(next.resumeFailure).toBeNull();
-  expect(next.messages.some((t) => /last point that could be checked/.test(t))).toBe(true);
+  expect(next.messages.some((t) => /couldn't be brought back, so your game has gone back/.test(t))).toBe(true);
   const full = lines.filter((l) => / = /.test(l));
   expect(next.state.status.BL_TIME?.text).toBe(/ = (\d+) /.exec(full.at(-2)!)![1]);
 });

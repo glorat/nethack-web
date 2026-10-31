@@ -147,7 +147,7 @@ export function resumedHost(
   return new ResumedHost(replayed, () => {
     const cut = recorder.carryOn(text, replayed.status);
     flush();
-    if (cut) recorder.post([{ type: "message", text: "Your game has come back from the last point that could be checked.", attr: 0 }]);
+    if (cut) recorder.post([{ type: "message", text: "Your latest moves couldn't be brought back, so your game has gone back a little.", attr: 0 }]);
     return recorder;
   });
 }

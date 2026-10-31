@@ -191,7 +191,7 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
         (events) => shown.push(...events),
       ));
     } catch (e) {
-      // the next core asks the player, as nothing has been touched
+      // the core after this has no resume, so it asks the player
       console.warn("couldn't replay the game", e);
       replayFailed = true;
       await playLive();

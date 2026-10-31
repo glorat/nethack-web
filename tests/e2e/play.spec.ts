@@ -242,7 +242,7 @@ test("a game whose replay goes differently is the player's to destroy or continu
   // a move key typed while it loads mustn't answer what it hasn't seen
   await page.keyboard.press("y");
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText(/can't be replayed/i, { timeout: 15_000 });
+  await expect(dialog).toContainText(/couldn't be brought back/i, { timeout: 15_000 });
   await dialog.getByRole("button", { name: "Continue" }).click();
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
 });
