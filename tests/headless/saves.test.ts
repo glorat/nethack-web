@@ -34,6 +34,14 @@ test("a game left unfinished comes back without asking", async () => {
   expect([...next.saves().keys()]).not.toContain("recovering");
 });
 
+test("a game left unfinished days ago still comes back", async () => {
+  const left = await (await Session.start()).skipText();
+  await left.send("llll");
+
+  const next = await (await Session.start({ saves: left.persisted, savesAge: 4 })).skipText();
+  expect(next.messages.some((t) => /welcome back/i.test(t))).toBe(true);
+});
+
 test("a game that can't be recovered is asked about the next time", async () => {
   const left = await (await Session.start()).skipText();
   const saves = left.saves();

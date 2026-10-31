@@ -7,7 +7,7 @@ import { applyEvents, cellAt, initialState, type GameState } from "../../src/por
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
 import { Recorder } from "../../src/worker/recorder";
 import { type BootCore, replay, ReplayError, writeSaveFiles } from "../../src/worker/replayer";
-import type { EmscriptenFS, NetHackModule } from "../../src/worker/memory";
+import { describeSquare, type EmscriptenFS, type NetHackModule } from "../../src/worker/memory";
 
 const ROOT = resolve(__dirname, "../..");
 
@@ -36,6 +36,8 @@ export interface SessionOptions {
   saves?: Map<string, Uint8Array>;
   /** Another tab is playing too. */
   otherTab?: boolean;
+  /** How many days ago the files in `saves` were last written. */
+  savesAge?: number;
 }
 
 type Module = NetHackModule & {
@@ -43,6 +45,7 @@ type Module = NetHackModule & {
     readFile(path: string): Uint8Array;
     stat(path: string): { mode: number };
     isDir(mode: number): boolean;
+    utime(path: string, atime: number, mtime: number): void;
     writeFile(path: string, data: Uint8Array): void;
   };
 };
@@ -123,6 +126,10 @@ export class Session {
               if (!mod.FS.analyzePath(dir).exists) mod.FS.mkdir(dir);
             }
             mod.FS.writeFile(`/save/${file}`, data);
+            if (options.savesAge) {
+              const then = Date.now() - options.savesAge * 24 * 3600 * 1000;
+              mod.FS.utime(`/save/${file}`, then, then);
+            }
           }
         },
       ],
@@ -235,6 +242,16 @@ export class Session {
 
   cell(x: number, y: number): MapCell | null {
     return cellAt(this.state, x, y);
+  }
+
+  /** What hovering over a square says, as the map's tooltip asks while the core waits. */
+  describe(x: number, y: number): string | null {
+    return describeSquare(this.m, x, y);
+  }
+
+  /** A hash of the core's main random generator, which any use of it changes. */
+  get rng(): number {
+    return this.m._nhweb_rng_fingerprint();
   }
 
   /** The hero's square: the core puts the cursor there before asking for a command. */
