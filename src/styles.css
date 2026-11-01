@@ -308,3 +308,15 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .replay-turn { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .replay-error { color: #f28b82; }
 .replay-spacer { flex: 1 1 0; }
+
+.server-waiting {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 4px 12px;
+  border-radius: 4px;
+  background: #000c;
+  color: #fff;
+}

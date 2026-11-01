@@ -1,19 +1,18 @@
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
-import { rebuildRecording } from "../../src/port/upload";
+import { rebuildRecording } from "../rebuild-recording";
 
 const FIRESTORE = "http://127.0.0.1:8299";
 const EMULATORS = /^http:\/\/127\.0\.0\.1:(8299|9299|5299)\//;
 
-/** A unique game, with the upload on. */
-async function setUp(page: Page): Promise<string> {
-  const uuid = crypto.randomUUID();
-  await page.addInitScript((uuid) => {
-    localStorage.setItem("nethack.upload", "1");
-    localStorage.setItem("nethack.fixedInputs", JSON.stringify({ seed: 1, now: Date.UTC(2026, 5, 22, 12) / 1000, utcOffset: 0, uuid }));
-  }, uuid);
-  return uuid;
-}
+const online = (page: Page) =>
+  page.addInitScript(() => {
+    localStorage.setItem("nethack.online", "1");
+    localStorage.removeItem("nethack.fixedInputs");
+  });
+
+const gameId = (page: Page) => page.evaluate(() => document.documentElement.dataset.serverGame!);
 
 async function untilPlaying(page: Page, name: string) {
   await page.goto("/");
@@ -61,7 +60,8 @@ async function quit(page: Page): Promise<string> {
     await page.keyboard.press("n");
     await page.waitForFunction((shown) => document.querySelector<HTMLElement>('[role="dialog"]')?.innerText !== shown, shown, { polling: "raf" });
   }
-  return (await page.evaluate(() => localStorage.getItem("nethack.lastGame")))!;
+  const [download] = await Promise.all([page.waitForEvent("download"), over.getByRole("button", { name: /download/i }).click()]);
+  return readFileSync(await download.path(), "utf8");
 }
 
 interface Stored {
@@ -89,6 +89,37 @@ async function stored(page: Page, game: string): Promise<Stored[]> {
     .sort((a, b) => (a.id < b.id ? -1 : 1));
 }
 
+interface Logged {
+  method: string;
+  turn?: number;
+  seed?: number;
+  now?: number;
+  validTurns?: number;
+}
+
+/** A game's request log, oldest first, read as the server would. */
+async function requests(page: Page, game: string): Promise<Logged[]> {
+  const response = await page.request.post(`${FIRESTORE}/v1/projects/demo-nethack/databases/(default)/documents:runQuery`, {
+    headers: { Authorization: "Bearer owner" },
+    data: { structuredQuery: { from: [{ collectionId: "requests", allDescendants: true }], orderBy: [{ field: { fieldPath: "receivedAt" } }] } },
+  });
+  type Fields = Record<string, { stringValue?: string; integerValue?: string; mapValue?: { fields: Record<string, { integerValue?: string }> } }>;
+  const rows = (await response.json()) as { document?: { name: string; fields: Fields } }[];
+  return rows
+    .filter((r) => r.document?.name.includes(`/games/${game}/`))
+    .map((r) => {
+      const { method, input, output } = r.document!.fields;
+      const number = (value?: { integerValue?: string }) => (value?.integerValue === undefined ? undefined : Number(value.integerValue));
+      return {
+        method: method.stringValue!,
+        turn: number(input.mapValue?.fields.turn),
+        seed: number(output.mapValue?.fields.seed),
+        now: number(output.mapValue?.fields.now),
+        validTurns: number(output.mapValue?.fields.validTurns),
+      };
+    });
+}
+
 async function expectUploaded(page: Page, game: string, text: string): Promise<Stored[]> {
   await expect.poll(async () => rebuildRecording(await stored(page, game)), { timeout: 30_000 }).toBe(text);
   return stored(page, game);
@@ -100,8 +131,9 @@ function sweepAndRead(game: string): { recording: string; batches: number; segme
 }
 
 test("a game swept during and after play can be rebuilt from its archive and replayed", async ({ page }) => {
-  const game = await setUp(page);
+  await online(page);
   await untilPlaying(page, `Sw${Date.now() % 100000}`);
+  const game = await gameId(page);
   await pass(page, 3);
   await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(0);
   const during = sweepAndRead(game);
@@ -128,8 +160,9 @@ test("a game swept during and after play can be rebuilt from its archive and rep
 });
 
 test("a whole game can be rebuilt from the server and replayed", async ({ page }) => {
-  const game = await setUp(page);
+  await online(page);
   await untilPlaying(page, `Up${Date.now() % 100000}`);
+  const game = await gameId(page);
   await pass(page, 3);
   await page.waitForTimeout(1200);
   await pass(page, 3);
@@ -160,8 +193,9 @@ test("a whole game can be rebuilt from the server and replayed", async ({ page }
 });
 
 test("a game reloaded part way through is still whole on the server", async ({ page }) => {
-  const game = await setUp(page);
+  await online(page);
   await untilPlaying(page, `Re${Date.now() % 100000}`);
+  const game = await gameId(page);
   await pass(page, 5);
   await page.waitForTimeout(1200);
   await pass(page, 2);
@@ -175,7 +209,7 @@ test("a game reloaded part way through is still whole on the server", async ({ p
 });
 
 test("a write that arrives but whose answer is lost isn't stored twice or lost", async ({ page }) => {
-  const game = await setUp(page);
+  await online(page);
   let dropped = 0;
   await page.route(/\/documents:commit/, async (route) => {
     if (dropped++ % 2) return route.continue();
@@ -183,6 +217,7 @@ test("a write that arrives but whose answer is lost isn't stored twice or lost",
     await route.abort();
   });
   await untilPlaying(page, `Lo${Date.now() % 100000}`);
+  const game = await gameId(page);
   await pass(page, 3);
   const text = await quit(page);
   await expect.poll(() => dropped, { timeout: 15_000 }).toBeGreaterThan(1);
@@ -191,18 +226,246 @@ test("a write that arrives but whose answer is lost isn't stored twice or lost",
   await expectUploaded(page, game, text);
 });
 
-test("a game plays with the server out of reach, and is sent when it comes back", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  const game = await setUp(page);
-  await page.route(EMULATORS, (route) => route.abort());
-  await untilPlaying(page, `Of${Date.now() % 100000}`);
+test("a game's seeds, time and id are the server's, and every ask is in its log", async ({ page }) => {
+  await online(page);
+  await untilPlaying(page, `Se${Date.now() % 100000}`);
+  const game = await gameId(page);
+  await pass(page, 2);
+  const text = await quit(page);
+  await expectUploaded(page, game, text);
+
+  expect(text).toContain(` uuid ${game}\n`);
+  const log = await requests(page, game);
+  expect(log[0].method).toBe("startGame");
+  const asked = log.filter((r) => r.method === "seed");
+  expect(asked[0]).toMatchObject({ turn: 0, validTurns: 100 });
+  const seeds = [...text.matchAll(/^\d+ seed (\d+)$/gm)].map((m) => Number(m[1]));
+  // a new game asks once at its start: the core's seeds count up from that one answer
+  expect(seeds.length).toBeGreaterThan(1);
+  expect(seeds).toEqual(seeds.map((_, i) => (asked[0].seed! + i) >>> 0));
+  const times = new Set(asked.map((r) => r.now));
+  for (const [, now] of text.matchAll(/^\d+ now (\d+)$/gm)) expect(times).toContain(Number(now));
+});
+
+test("a game saved and restored carries on as the same game", async ({ page }) => {
+  await online(page);
+  const name = `Sv${Date.now() % 100000}`;
+  await untilPlaying(page, name);
+  const game = await gameId(page);
+  await pass(page, 3);
+  await page.keyboard.press("#");
+  await page.keyboard.type("save");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("y");
+  await page.waitForURL((url) => !url.pathname.includes("/play"), { timeout: 15_000 });
+
+  expect(await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name))).not.toContain("/save");
+  await page.goto(`/play/?name=${name}`);
+  await page.locator(".stats-title").waitFor({ timeout: 15_000 });
+  await afterPrompts(page);
+  expect(await gameId(page)).toBe(game);
+  expect((await requests(page, game)).filter((r) => r.method === "seed").some((r) => r.turn! > 0)).toBe(true);
+  await pass(page, 2);
+  const text = await quit(page);
+  expect(text).toMatch(/ session restore /);
+  await expectUploaded(page, game, text);
+  expect((await requests(page, game)).filter((r) => r.method === "startGame")).toHaveLength(1);
+});
+
+test("a new game gets its own ID, and the old one stays in flight to come back to", async ({ page }) => {
+  await online(page);
+  const name = `De${Date.now() % 100000}`;
+  await untilPlaying(page, name);
+  const old = await gameId(page);
+  await pass(page, 2);
+  await expect.poll(async () => (await stored(page, old)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(1200);
+  const before = rebuildRecording(await stored(page, old));
+
+  await page.goto(`/play/?name=${name}&new`);
+  await page.getByRole("dialog", { name: "Choose your character" }).waitFor({ timeout: 15_000 });
+  await expect.poll(() => gameId(page)).not.toBe(old);
+  await page.goto(`/play/?name=${name}&game=${old}`);
+  await page.locator(".stats-title").waitFor({ timeout: 15_000 });
+  await afterPrompts(page);
+  expect(await gameId(page)).toBe(old);
+  await pass(page, 2);
+  const text = await quit(page);
+  expect(text.startsWith(before)).toBe(true);
+  await expectUploaded(page, old, text);
+});
+
+test("a game playing in two tabs tells the one that loses, and its lines stay out", async ({ page, context }) => {
+  await online(page);
+  const name = `Tw${Date.now() % 100000}`;
+  await untilPlaying(page, name);
+  const game = await gameId(page);
+  await pass(page, 1);
+  await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(1200);
+
+  const other = await context.newPage();
+  await online(other);
+  await other.goto(`/play/?name=${name}&game=${game}`);
+  await other.locator(".stats-title").waitFor({ timeout: 15_000 });
+  await afterPrompts(other);
+  await pass(other, 2);
+  await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(1);
+  await pass(page, 2);
+  await expect(page.getByRole("status").filter({ hasText: "played elsewhere" })).toBeVisible({ timeout: 10_000 });
+});
+
+/** Answers `resumeGame` with its recording changed. */
+function changeRecording(page: Page, change: (recording: string) => string) {
+  return page.route(/\/europe-west1\/user$/, async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as { result?: { recording?: string } };
+    if (body.result?.recording) body.result.recording = change(body.result.recording);
+    await route.fulfill({ response, json: body });
+  });
+}
+
+const breakSum = (text: string, which: number) => {
+  let seen = 0;
+  return text.replace(/^(\d+ T \d+ )\w+$/gm, (line, head: string) => (seen++ === which ? `${head}ffff` : line));
+};
+
+test("a game that can't be replayed says so, and leaves the way to a new one", async ({ page }) => {
+  await online(page);
+  const name = `Lo${Date.now() % 100000}`;
+  await untilPlaying(page, name);
+  const old = await gameId(page);
+  await pass(page, 2);
+  await expect.poll(async () => (await stored(page, old)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(1200);
+
+  await changeRecording(page, (text) => breakSum(text, 0));
+  await page.reload();
+  const lost = page.getByRole("link", { name: "Start a new game" });
+  await lost.waitFor({ timeout: 15_000 });
+  await page.unroute(/\/europe-west1\/user$/);
+  await lost.click();
+  await page.getByRole("dialog", { name: "Choose your character" }).waitFor({ timeout: 15_000 });
+  await expect.poll(() => gameId(page)).not.toBe(old);
+});
+
+test("a game that goes differently goes back to where it last agreed, and carries on", async ({ page }) => {
+  await online(page);
+  await untilPlaying(page, `Cu${Date.now() % 100000}`);
+  const game = await gameId(page);
   await pass(page, 5);
+  await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(1200);
+
+  await changeRecording(page, (text) => breakSum(text, 3));
+  await page.reload();
+  await expect(page.locator(".messages")).toContainText(/gone back a little/i, { timeout: 15_000 });
+  await page.unroute(/\/europe-west1\/user$/);
+  await pass(page, 2);
+  const text = await quit(page);
+  await expect.poll(async () => rebuildRecording(await stored(page, game)), { timeout: 30_000 }).toBe(text);
+  expect((await stored(page, game)).at(-1)!.id.startsWith("0002-")).toBe(true);
+});
+
+test("keys typed while a game comes back are dropped, not played unseen", async ({ page }) => {
+  await online(page);
+  await untilPlaying(page, `Bl${Date.now() % 100000}`);
+  const game = await gameId(page);
+  await pass(page, 2);
+  await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(1200);
+
+  await page.route(/\/europe-west1\/user$/, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.continue();
+  });
+  await page.reload();
+  await page.locator(".app").waitFor({ timeout: 15_000 });
+  // past the moment the page starts listening, and at a person's pace
+  await page.waitForTimeout(400);
+  await page.keyboard.type("sss", { delay: 120 });
+  await page.locator(".app[data-commanding]").waitFor({ timeout: 15_000 });
+  await page.unroute(/\/europe-west1\/user$/);
+  const text = await quit(page);
+  expect(text.slice(text.search(/^\d+ back /m))).toMatch(/^\d+ back \S+\n(?:(?!\d+ k ).*\n)*\d+ k 35\n/);
+});
+
+test("the clock after a game comes back is the server's", async ({ page }) => {
+  await online(page);
+  await untilPlaying(page, `Cl${Date.now() % 100000}`);
+  const game = await gameId(page);
+  await pass(page, 2);
+  await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(1200);
+  const issued = 1_700_000_000;
+  await page.route(/\/europe-west1\/user$/, async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as { result?: { recording?: string; now?: number } };
+    if (body.result?.recording) body.result.now = issued;
+    await route.fulfill({ response, json: body });
+  });
+  await page.reload();
+  await page.locator(".stats-title").waitFor({ timeout: 15_000 });
+  await afterPrompts(page);
+  const text = await quit(page);
+  const after = text.slice(text.search(/^\d+ back /m));
+  expect(/^\d+ now (\d+)$/m.exec(after)?.[1]).toBe(String(issued));
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
+test("an online game leaves the offline last-game replay alone", async ({ page }) => {
+  await online(page);
+  await page.addInitScript(() => localStorage.setItem("nethack.lastGame", "offline game"));
+  await untilPlaying(page, `Rp${Date.now() % 100000}`);
+  await pass(page, 1);
+  await quit(page);
+  expect(await page.evaluate(() => localStorage.getItem("nethack.lastGame"))).toBe("offline game");
+  await expect(page.getByRole("dialog", { name: "The game is over" }).getByRole("button", { name: /replay/i })).toHaveCount(0);
+});
+
+test("with the server out of reach, a new game waits and says so, then starts", async ({ page }) => {
+  await online(page);
+  await page.route(EMULATORS, (route) => route.abort());
+  await page.goto("/");
+  await page.getByLabel("Who are you?").fill(`Wa${Date.now() % 100000}`);
+  await page.getByRole("button", { name: /^Play/ }).click();
+  const waiting = page.getByRole("status").filter({ hasText: "Waiting for the server" });
+  await waiting.waitFor({ timeout: 15_000 });
+  await page.unroute(EMULATORS);
+  await page.getByRole("dialog", { name: "Choose your character" }).waitFor({ timeout: 20_000 });
+  await expect(waiting).toHaveCount(0);
+});
+
+test("a game plays on while its lines can't be sent, saying so, and they follow when they can", async ({ page }) => {
+  await online(page);
+  await page.route(/\/documents:commit/, (route) => route.abort());
+  await untilPlaying(page, `Of${Date.now() % 100000}`);
+  const game = await gameId(page);
+  await pass(page, 5);
+  const notice = page.getByRole("status").filter({ hasText: "Not connected" });
+  await expect(notice).toBeVisible({ timeout: 10_000 });
   const text = await quit(page);
   expect(text).toMatch(/ end over\n$/);
   expect(await stored(page, game)).toEqual([]);
-
-  await page.unroute(EMULATORS);
+  await page.unroute(/\/documents:commit/);
   await expectUploaded(page, game, text);
-  expect(errors).toEqual([]);
+  await expect(notice).toHaveCount(0);
+});
+
+test("an offline game never reaches the server, and stays apart from an online one of the same name", async ({ page }) => {
+  const name = `Ap${Date.now() % 100000}`;
+  const reached: string[] = [];
+  page.on("request", (r) => {
+    if (EMULATORS.test(r.url())) reached.push(r.url());
+  });
+  await untilPlaying(page, name);
+  await pass(page, 2);
+  await page.waitForTimeout(1200);
+  expect(reached).toEqual([]);
+
+  await online(page);
+  await page.goto(`/play/?name=${name}`);
+  // a new character, not the offline game coming back
+  await page.getByRole("dialog", { name: "Choose your character" }).waitFor({ timeout: 20_000 });
+  expect(await gameId(page)).toBeTruthy();
 });

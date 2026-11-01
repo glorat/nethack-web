@@ -12,7 +12,9 @@ import { buildDebugPackage, debugPackageName, namedBones } from "../port/debug-p
 import { downloadRecording, downloadText, keepLastGame, lastGame, lastTurn } from "../port/recording";
 import { gameAuthority } from "../port/fixedinputs";
 import { shadowWanted } from "../port/shadow";
-import { createUploader, uploadWanted } from "../server/upload";
+import { linesIn, type OnlineSession } from "../port/online";
+import type { LogUploader, UploadNotice } from "../port/upload";
+import { createOnlineSession, createUploader, onlineWanted } from "../server/upload";
 import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port/tilesets";
 import { loadTileSheet, type TileSheet } from "../tiles";
 import { beep, wakeBeep } from "./beep";
@@ -61,6 +63,7 @@ const TEXT_SIZE_KEY = "nethack.textSize";
 // the core's farewell after Save & Quit, the one ending with nothing left to read
 const SAVED_FAREWELL = "Be seeing you...";
 const LANDING_PATH = import.meta.env.BASE_URL;
+const SAVE_SEND_MS = 5000;
 // with Cmd or Ctrl and Option, as Cocoa's View menu has them; 0 is back to the default
 const TEXT_SIZE_KEYS: Record<string, (size: number) => number> = {
   Equal: biggerTextSize,
@@ -176,7 +179,15 @@ export function App() {
   const shadowRecording = useRef("");
   const [shadowStatus, setShadowStatus] = useState<ShadowStatus | null>(null);
   const [shadowing] = useState(() => !replay && shadowWanted());
-  const [uploader] = useState(() => (!replay && uploadWanted() ? createUploader() : null));
+  const [online] = useState(() => !replay && onlineWanted());
+  const session = useRef<OnlineSession | null>(null);
+  const uploader = useRef<LogUploader | null>(null);
+  const [serverWaiting, setServerWaiting] = useState(false);
+  const [uploadNotice, setUploadNotice] = useState<UploadNotice | null>(null);
+  const [serverRefused, setServerRefused] = useState(false);
+  const [gameLost, setGameLost] = useState(false);
+  /** Keys typed before an online game has shown anything were typed without seeing it. */
+  const unseen = useRef(online);
   const [sheet, setSheet] = useState<TileSheet | null>(null);
   const [state, setState] = useState(initialState);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -308,6 +319,7 @@ export function App() {
           setState((s) => applyEvents(s, events));
           for (const e of events) {
             if (e.type === "bell") beep();
+            if (e.type === "game_lost") setGameLost(true);
             if (e.type === "text_size") optionsTextSize.current(e.size, e.atStart);
             // a replayed game's options are its player's, not to be kept as this one's
             if (e.type === "options_file" && !replay)
@@ -315,12 +327,17 @@ export function App() {
                 localStorage.setItem(OPTIONS_KEY, savedOptionsFile(e.text, BASE_OPTIONS));
               } catch {}
             if (e.type === "recording") {
-              setRecorded({ text: e.text, kept: keepLastGame(e.text) });
-              uploader?.finished(e.text);
+              // the last-game replay is offline's; an online game's will have its own way, from the server
+              setRecorded({ text: e.text, kept: !online && keepLastGame(e.text) });
+              uploader.current?.finished(e.text);
             }
-            if (e.type === "recorded") uploader?.add(e.lines);
+            if (e.type === "recorded") {
+              session.current?.recorded(e.lines.join("\n"));
+              uploader.current?.add(e.lines, e.atPrompt);
+            }
             if (e.type === "recorded_before") {
-              uploader?.before(e.text);
+              session.current?.recorded(e.text);
+              uploader.current?.before(e.text);
               shadowRecording.current = e.text;
               shadow.current?.before(e.text);
             }
@@ -330,7 +347,20 @@ export function App() {
             }
           }
         },
+        seedWanted: (id) => {
+          session.current?.seed().then(
+            ({ seed, now }) => client.seedReply(id, seed, now),
+            (e) => {
+              console.warn("the server refused a seed", e);
+              setServerRefused(true);
+            },
+          );
+        },
         request: (id, request) => {
+          if (unseen.current) {
+            unseen.current = false;
+            typeAhead.current = [];
+          }
           // a pick is for the menu the inventory key opens next, or nothing
           const letter = pendingPick.current;
           pendingPick.current = null;
@@ -510,16 +540,43 @@ export function App() {
     client.key(key);
   };
 
-  const start = (name: string) => {
+  useEffect(() => {
+    const closing = () => uploader.current?.flushNow();
+    window.addEventListener("pagehide", closing);
+    return () => window.removeEventListener("pagehide", closing);
+  }, []);
+
+  const start = async (name: string) => {
     wakeBeep();
     setPlaying(true);
+    const assetBase = new URL(import.meta.env.BASE_URL, location.href).href;
+    const options = `name:${name}`;
+    const config = configFile(`${BASE_OPTIONS}${ascii ? ",ascii_map" : ""}`, savedOptions());
+    if (!online) return client.start({ assetBase, options, config, shadowed: shadowing, authority: gameAuthority() });
+    session.current = createOnlineSession(setServerWaiting);
+    const params = new URLSearchParams(location.search);
+    // the browser's zone stands in for the player's choice until there's somewhere to make it
+    const utcOffset = -new Date().getTimezoneOffset() * 60;
+    const build = { version: __NETHACK_VERSION__, core: __CORE_COMMIT__ };
+    const game = await session.current
+      .open({ name, utcOffset, options, config, build }, { game: params.get("game") ?? undefined, fresh: params.has("new") })
+      .catch((e) => {
+        console.warn("the server refused the game", e);
+        return null;
+      });
+    if (!game) return setServerRefused(true);
+    // a reload comes back to this game, not to whichever is latest
+    params.set("game", game.game);
+    params.delete("new");
+    history.replaceState(null, "", `${location.pathname}?${params}`);
+    document.documentElement.dataset.serverGame = game.game;
+    uploader.current = createUploader(game.game, { generation: game.generation, sent: linesIn(game.recording) }, setUploadNotice);
     client.start({
-      assetBase: new URL(import.meta.env.BASE_URL, location.href).href,
-      options: `name:${name}`,
-      config: configFile(`${BASE_OPTIONS}${ascii ? ",ascii_map" : ""}`, savedOptions()),
+      assetBase,
+      options: game.options,
+      config: game.config,
       shadowed: shadowing,
-      uploading: !!uploader,
-      authority: gameAuthority(),
+      authority: { kind: "online", game: game.game, utcOffset: game.utcOffset, recording: game.recording, now: game.now },
     });
   };
 
@@ -536,13 +593,17 @@ export function App() {
     if (!name) location.replace(LANDING_PATH);
     else if (sheet && !playing) {
       if (shadowing) shadow.current = new ShadowClient(new URL(import.meta.env.BASE_URL, location.href).href, setShadowStatus);
-      start(name);
+      void start(name);
     }
   }, [sheet]);
 
   // replace: Back from the landing page shouldn't start another game
   useEffect(() => {
-    if (!replay && state.gameOver === SAVED_FAREWELL) location.replace(LANDING_PATH);
+    if (replay || state.gameOver !== SAVED_FAREWELL) return;
+    const leave = () => location.replace(LANDING_PATH);
+    // the server holds the only copy, so the save has to get there; but a player offline can't be kept here
+    if (uploader.current) void Promise.race([uploader.current.settled(), new Promise((r) => setTimeout(r, SAVE_SEND_MS))]).then(leave);
+    else leave();
   }, [state.gameOver]);
 
   // absent until the core has read its options, which would overrule a switch made before; and in a replay,
@@ -637,12 +698,33 @@ export function App() {
   ];
 
   if (state.error) return <div class="fatal">{state.error}</div>;
+  if (gameLost) {
+    const params = new URLSearchParams(location.search);
+    params.delete("game");
+    params.set("new", "");
+    return (
+      <div class="fatal">
+        Sorry, this game can't be brought back. <a href={`${location.pathname}?${params}`}>Start a new game</a>
+      </div>
+    );
+  }
   if (!sheet) return <div class="loading">Loading tiles…</div>;
   const optionsDialog = editingOptions ? <OptionsDialog text={savedOptions()} onDone={saveOptions} /> : null;
   if (!playing) return <div class="loading">Loading…</div>;
 
   return (
     <div class="app" data-commanding={commanding || undefined}>
+      {(serverWaiting || uploadNotice || serverRefused) && (
+        <div class="server-waiting" role="status">
+          {serverRefused
+            ? "The server can't continue this game"
+            : serverWaiting
+              ? "Waiting for the server"
+              : uploadNotice === "elsewhere"
+                ? "This game is being played elsewhere, so your moves here aren't being saved"
+                : "Not connected: your latest moves aren't saved yet"}
+        </div>
+      )}
       <MenuBar menus={menus} />
       <div class="game">
         <div class="main-area">

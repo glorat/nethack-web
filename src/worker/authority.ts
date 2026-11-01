@@ -12,7 +12,7 @@ export interface Authority {
   /** Seconds east of UTC, for the game's local time. */
   utcOffset(): number;
   /** An unguessable 32-bit seed, asked for at the start and at each level change. */
-  randomSeed(): number;
+  randomSeed(): number | Promise<number>;
   /** A new game's id, kept in its save and in any bones it leaves. */
   uuid(): string;
   /** The bones the core may load for a level it's making, if any; `name` says which level. */
@@ -72,6 +72,27 @@ async function fixedAuthority(inputs: FixedInputs, files: Files): Promise<Author
   };
 }
 
-export function createAuthority(choice: AuthorityChoice, files: Files): Promise<Authority> {
+export type AskSeed = () => Promise<{ seed: number; now: number }>;
+
+/** Everything comes from the server. Bones stay out until the server has its own, so none cross over from offline games. */
+async function onlineAuthority(game: string, utcOffset: number, firstNow: number, askSeed: AskSeed): Promise<Authority> {
+  let now = firstNow;
+  return {
+    alone: await soleTab(),
+    now: () => now,
+    utcOffset: () => utcOffset,
+    async randomSeed() {
+      const reply = await askSeed();
+      now = reply.now;
+      return reply.seed;
+    },
+    uuid: () => game,
+    bonesWanted: async () => null,
+    bonesLeft() {},
+  };
+}
+
+export function createAuthority(choice: AuthorityChoice, files: Files, askSeed: AskSeed): Promise<Authority> {
+  if (import.meta.env.DEV && choice.kind === "online") return onlineAuthority(choice.game, choice.utcOffset, choice.now, askSeed);
   return import.meta.env.DEV && choice.kind === "fixed" ? fixedAuthority(choice.inputs, files) : browserAuthority(files);
 }
