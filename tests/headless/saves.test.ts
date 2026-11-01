@@ -241,6 +241,14 @@ test("a game left unfinished comes back by replay, as of the very last command",
   expect([...next.persisted.keys()]).not.toContain("resuming");
 });
 
+test("a game that comes back shows only its last session, not the sessions before", async () => {
+  const { third, options } = await leftOpen();
+  const next = await (await Session.start({ ...options, saves: third.persisted, resume: true })).skipText();
+  expect(next.resumeFailure).toBeNull();
+  expect(next.messages.some((t) => /welcome back to NetHack/.test(t))).toBe(true);
+  expect(next.messages.some((t) => /welcome to NetHack/.test(t))).toBe(false);
+});
+
 test("a game that came back by replay records on, and replays and comes back again", async () => {
   const { third, options } = await leftOpen();
   const resumeOptions = { ...options, resume: true };

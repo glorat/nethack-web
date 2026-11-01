@@ -1,7 +1,8 @@
 // Brings back a game whose page closed, by replaying its recording and letting
 // the player carry on from the end of it. See docs/recording.md.
+import { HeldEvents } from "../port/held-events";
 import type { Answer, GameEvent, GameRequest } from "../protocol";
-import { type GameHost, type Input, RESUMING } from "./game";
+import { Game, type GameHost, type Input, RESUMING } from "./game";
 import type { NetHackModule } from "./memory";
 import type { Recorder } from "./recorder";
 import { type BootCore, never, parseRecording, type RecordedSession, replay, ReplayError, type ReplayHost, writeSaveFiles } from "./replayer";
@@ -150,4 +151,42 @@ export function resumedHost(
     if (cut) recorder.post([{ type: "message", text: "Your latest moves couldn't be brought back, so your game has gone back a little.", attr: 0 }]);
     return recorder;
   });
+}
+
+/** What differs between the places a game comes back: the worker, and headless tests. */
+export interface ResumeHere {
+  /** Boots a core with nothing kept, for each session before the last; each attempt at the replay gets its own. */
+  boot(): BootCore | Promise<BootCore>;
+  bones(hash: string): Uint8Array | undefined;
+  /** Boots the core the player will carry on with; `stopped` is for its exit or abort. */
+  load(session: RecordedSession, stopped: (why: string) => void): Promise<NetHackModule>;
+  /** Gives that core the game's files as the replay left them. */
+  place(m: NetHackModule, files: Map<string, Uint8Array>): void;
+  recorder(m: NetHackModule, session: RecordedSession): Recorder;
+  run(m: NetHackModule, game: Game): void;
+  /** Takes the page to where the replay got to, as the player takes over. */
+  show(events: GameEvent[]): void;
+}
+
+/** Brings the game in `text` back unseen, going back to its last good line if it must. Rejects if it can't. */
+export function resumeUnseen(text: string, here: ResumeHere): Promise<void> {
+  let held = new HeldEvents();
+  return resumeToLastGood(text, async (text) => resumeGame(
+    text,
+    {
+      bones: here.bones,
+      boot: await here.boot(),
+      bootLast: async (session, files, makeHost) => {
+        held = new HeldEvents();
+        let replayed: ReplayHost | null = null;
+        const m = await here.load(session, (why) => replayed?.stopped(why));
+        here.place(m, files);
+        replayed = makeHost(m);
+        const game = new Game(m, resumedHost(replayed, text, here.recorder(m, session), () => here.show(held.all())));
+        replayed.game = game;
+        here.run(m, game);
+      },
+    },
+    (events) => held.add(events),
+  ));
 }
