@@ -15,6 +15,7 @@
     "test:e2e:update": "E2E_UPDATE=1 playwright test update.spec"
   },
   "dependencies": {
+    "firebase": "^13.1.0",
     "preact": "^11.1.0"
   },
   "devDependencies": {
