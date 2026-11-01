@@ -108,6 +108,7 @@ export class Game {
   private floorTile: number | undefined;
   /** The cell last drawn on each map square, by y * COLNO + x. */
   private cells = new Map<number, MapCell>();
+  private monsters = new Map<number, MapCell>();
   private mapCursor = { x: 0, y: 0 };
 
   constructor(
@@ -158,14 +159,18 @@ export class Game {
    * Dispatched from the shim with already-decoded arguments; see winshim.c for each signature.
    * Never rejects: the shim has no handler for that, and the core would wait forever.
    */
-  async callback(name: string, args: unknown[]): Promise<unknown> {
-    try {
-      return await this.dispatch(name, args);
-    } catch (e) {
+  callback(name: string, args: unknown[]): unknown {
+    const failed = (e: unknown) => {
       console.error(`${name} failed`, e);
       this.pending = [];
       this.mapBatch = [];
       return this.fallback(name, args);
+    };
+    try {
+      const result = this.dispatch(name, args);
+      return result instanceof Promise ? result.catch(failed) : result;
+    } catch (e) {
+      return failed(e);
     }
   }
 
@@ -189,7 +194,7 @@ export class Game {
     }
   }
 
-  private async dispatch(name: string, args: unknown[]): Promise<unknown> {
+  private dispatch(name: string, args: unknown[]): unknown {
     const a = args as number[];
     switch (name) {
       case "shim_init_nhwindows":
@@ -244,20 +249,16 @@ export class Game {
         return this.selectMenu(a[0], a[1], a[2]);
       case "shim_message_menu":
         return 0;
-      case "shim_nhgetch": {
-        const input = await this.input();
-        return "key" in input ? input.key : ESC;
-      }
+      case "shim_nhgetch":
+        return this.input().then((input) => ("key" in input ? input.key : ESC));
       case "shim_nh_poskey":
         return this.poskey(a[0], a[1], a[2]);
       case "shim_yn_function":
         return this.yn(args[0] as string, args[1] as string, a[2]);
       case "shim_getlin":
         return this.getlin(args[0] as string, a[1]);
-      case "shim_get_ext_cmd": {
-        const answer = await this.ask({ kind: "ext_cmd", commands: readExtCommands(this.m) });
-        return answer?.kind === "ext_cmd" ? answer.index : -1;
-      }
+      case "shim_get_ext_cmd":
+        return this.ask({ kind: "ext_cmd", commands: readExtCommands(this.m) }).then((answer) => (answer?.kind === "ext_cmd" ? answer.index : -1));
       case "shim_status_enablefield":
         // a field the core stops showing, such as Xp while polymorphed, is no longer updated
         if (!a[3]) delete this.status[this.statusFieldName(a[0])];
@@ -276,8 +277,7 @@ export class Game {
         return 0;
       case "shim_delay_output":
         this.flush();
-        await (this.host.delayOutput?.() ?? new Promise((r) => setTimeout(r, 50)));
-        return 0;
+        return (this.host.delayOutput?.() ?? new Promise((r) => setTimeout(r, 50))).then(() => 0);
       case "shim_getmsghistory":
       case "shim_get_color_string":
         return "";
@@ -294,10 +294,11 @@ export class Game {
         // it would use up bones meant for a real game, even in declining them
         if (this.m._nhweb_wizard()) return 0;
         const path = args[0] as string;
-        const data = await this.host.bonesWanted(baseName(path));
-        if (!data) return 0;
-        this.m.FS.writeFile(path, data);
-        return 1;
+        return this.host.bonesWanted(baseName(path)).then((data) => {
+          if (!data) return 0;
+          this.m.FS.writeFile(path, data);
+          return 1;
+        });
       }
       case "shim_bones_saved": {
         const path = args[0] as string;
@@ -309,10 +310,11 @@ export class Game {
         return 0;
       case "shim_exit_nhwindows":
         this.flush();
-        await this.host.persist(true);
-        this.emit({ type: "game_over", text: (args[0] as string) ?? "" });
-        this.flush();
-        return 0;
+        return this.host.persist(true).then(() => {
+          this.emit({ type: "game_over", text: (args[0] as string) ?? "" });
+          this.flush();
+          return 0;
+        });
       default:
         return 0;
     }
@@ -340,6 +342,7 @@ export class Game {
     if (w.kind === NHW_MAP) {
       this.mapBatch = [];
       this.cells.clear();
+      this.monsters.clear();
       this.emit({ type: "map_clear" });
     }
     w.lines = [];
@@ -347,13 +350,13 @@ export class Game {
     return 0;
   }
 
-  private async displayWindow(win: number, blocking: boolean): Promise<number> {
+  private displayWindow(win: number, blocking: boolean): number | Promise<number> {
     const w = this.windows.get(win);
     if (!w) return 0;
     if ((w.kind === NHW_TEXT || w.kind === NHW_MENU) && w.lines.length) {
       const lines = w.lines;
       w.lines = [];
-      await this.ask({ kind: "text", lines });
+      return this.ask({ kind: "text", lines }).then(() => 0);
     } else if (blocking || w.kind === NHW_MAP) {
       this.flush();
     }
@@ -401,6 +404,8 @@ export class Game {
       symbol: symbolText(gi.ch, !!this.m._nhweb_dec_graphics()),
     };
     this.cells.set(y * COLNO + x, cell);
+    if (this.canBePeaceful(gi.glyph)) this.monsters.set(y * COLNO + x, cell);
+    else this.monsters.delete(y * COLNO + x);
     this.mapBatch.push(cell);
     return 0;
   }
@@ -435,13 +440,20 @@ export class Game {
   private refreshPeaceful(): void {
     // once the game is over, keep the marks the map last showed, as Cocoa does
     if (!this.m._nhweb_in_play()) return;
-    for (const [at, cell] of this.cells) {
+    for (const [at, cell] of this.monsters) {
       const marks = this.m._nhweb_map_marks(cell.x, cell.y, cell.glyph, cell.glyphFlags);
       if ((marks & MARK_PEACEFUL) === (cell.marks & MARK_PEACEFUL)) continue;
       const redrawn = { ...cell, marks };
       this.cells.set(at, redrawn);
+      this.monsters.set(at, redrawn);
       this.mapBatch.push(redrawn);
     }
+  }
+
+  /** The only glyphs nhweb_map_marks() can call peaceful. */
+  private canBePeaceful(glyph: number): boolean {
+    return (glyph >= this.glyphConstant("GLYPH_MON_OFF") && glyph < this.glyphConstant("GLYPH_PET_OFF"))
+      || (glyph >= this.glyphConstant("GLYPH_DETECT_OFF") && glyph < this.glyphConstant("GLYPH_BODY_OFF"));
   }
 
   private backgroundTile(glyph: number, bk: GlyphInfo | null): number {
