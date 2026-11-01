@@ -12,9 +12,9 @@ import { buildDebugPackage, debugPackageName, namedBones } from "../port/debug-p
 import { downloadRecording, downloadText, keepLastGame, lastGame, lastTurn } from "../port/recording";
 import { gameAuthority } from "../port/fixedinputs";
 import { shadowWanted } from "../port/shadow";
-import { linesIn, type OnlineSession } from "../port/online";
+import { chosenZone, linesIn, onlineWanted, type OnlineSession } from "../port/online";
 import type { LogUploader, UploadNotice } from "../port/upload";
-import { createOnlineSession, createUploader, onlineWanted } from "../server/upload";
+import { createOnlineSession, createUploader } from "../server/upload";
 import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port/tilesets";
 import { loadTileSheet, type TileSheet } from "../tiles";
 import { beep, wakeBeep } from "./beep";
@@ -179,7 +179,7 @@ export function App() {
   const shadowRecording = useRef("");
   const [shadowStatus, setShadowStatus] = useState<ShadowStatus | null>(null);
   const [shadowing] = useState(() => !replay && shadowWanted());
-  const [online] = useState(() => !replay && onlineWanted());
+  const [online] = useState(() => !replay && onlineWanted(location.search));
   const session = useRef<OnlineSession | null>(null);
   const uploader = useRef<LogUploader | null>(null);
   const [serverWaiting, setServerWaiting] = useState(false);
@@ -555,8 +555,7 @@ export function App() {
     if (!online) return client.start({ assetBase, options, config, shadowed: shadowing, authority: gameAuthority() });
     session.current = createOnlineSession(setServerWaiting);
     const params = new URLSearchParams(location.search);
-    // the browser's zone stands in for the player's choice until there's somewhere to make it
-    const utcOffset = -new Date().getTimezoneOffset() * 60;
+    const utcOffset = chosenZone(location.search, -new Date().getTimezoneOffset() * 60);
     const build = { version: __NETHACK_VERSION__, core: __CORE_COMMIT__ };
     const game = await session.current
       .open({ name, utcOffset, options, config, build }, { game: params.get("game") ?? undefined, fresh: params.has("new") })
@@ -568,6 +567,7 @@ export function App() {
     // a reload comes back to this game, not to whichever is latest
     params.set("game", game.game);
     params.delete("new");
+    params.delete("tz");
     history.replaceState(null, "", `${location.pathname}?${params}`);
     document.documentElement.dataset.serverGame = game.game;
     uploader.current = createUploader(game.game, { generation: game.generation, sent: linesIn(game.recording) }, setUploadNotice);

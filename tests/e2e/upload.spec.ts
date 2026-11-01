@@ -6,18 +6,19 @@ import { rebuildRecording } from "../rebuild-recording";
 const FIRESTORE = "http://127.0.0.1:8299";
 const EMULATORS = /^http:\/\/127\.0\.0\.1:(8299|9299|5299)\//;
 
-const online = (page: Page) =>
-  page.addInitScript(() => {
-    localStorage.setItem("nethack.online", "1");
-    localStorage.removeItem("nethack.fixedInputs");
-  });
+const online = (page: Page) => page.addInitScript(() => localStorage.removeItem("nethack.fixedInputs"));
 
 const gameId = (page: Page) => page.evaluate(() => document.documentElement.dataset.serverGame!);
 
-async function untilPlaying(page: Page, name: string) {
+async function untilPlaying(page: Page, name: string, mode: "online" | "offline" = "online") {
   await page.goto("/");
   await page.getByLabel("Who are you?").fill(name);
-  await page.getByRole("button", { name: /^Play/ }).click();
+  if (mode === "online") {
+    await page.getByRole("button", { name: "Play Online" }).click();
+    await page.getByRole("button", { name: /^Start New Game/ }).click();
+  } else {
+    await page.getByRole("button", { name: "Play Offline" }).click();
+  }
   const picker = page.getByRole("dialog", { name: "Choose your character" });
   await picker.waitFor();
   await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: /Valkyrie/ }).click();
@@ -260,7 +261,7 @@ test("a game saved and restored carries on as the same game", async ({ page }) =
   await page.waitForURL((url) => !url.pathname.includes("/play"), { timeout: 15_000 });
 
   expect(await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name))).not.toContain("/save");
-  await page.goto(`/play/?name=${name}`);
+  await page.goto(`/play/?online&name=${name}`);
   await page.locator(".stats-title").waitFor({ timeout: 15_000 });
   await afterPrompts(page);
   expect(await gameId(page)).toBe(game);
@@ -282,10 +283,10 @@ test("a new game gets its own ID, and the old one stays in flight to come back t
   await page.waitForTimeout(1200);
   const before = rebuildRecording(await stored(page, old));
 
-  await page.goto(`/play/?name=${name}&new`);
+  await page.goto(`/play/?online&name=${name}&new`);
   await page.getByRole("dialog", { name: "Choose your character" }).waitFor({ timeout: 15_000 });
   await expect.poll(() => gameId(page)).not.toBe(old);
-  await page.goto(`/play/?name=${name}&game=${old}`);
+  await page.goto(`/play/?online&name=${name}&game=${old}`);
   await page.locator(".stats-title").waitFor({ timeout: 15_000 });
   await afterPrompts(page);
   expect(await gameId(page)).toBe(old);
@@ -306,7 +307,7 @@ test("a game playing in two tabs tells the one that loses, and its lines stay ou
 
   const other = await context.newPage();
   await online(other);
-  await other.goto(`/play/?name=${name}&game=${game}`);
+  await other.goto(`/play/?online&name=${name}&game=${game}`);
   await other.locator(".stats-title").waitFor({ timeout: 15_000 });
   await afterPrompts(other);
   await pass(other, 2);
@@ -426,14 +427,59 @@ test("an online game leaves the offline last-game replay alone", async ({ page }
 test("with the server out of reach, a new game waits and says so, then starts", async ({ page }) => {
   await online(page);
   await page.route(EMULATORS, (route) => route.abort());
-  await page.goto("/");
-  await page.getByLabel("Who are you?").fill(`Wa${Date.now() % 100000}`);
-  await page.getByRole("button", { name: /^Play/ }).click();
+  await page.goto(`/play/?online&new&name=Wa${Date.now() % 100000}`);
   const waiting = page.getByRole("status").filter({ hasText: "Waiting for the server" });
   await waiting.waitFor({ timeout: 15_000 });
   await page.unroute(EMULATORS);
   await page.getByRole("dialog", { name: "Choose your character" }).waitFor({ timeout: 20_000 });
   await expect(waiting).toHaveCount(0);
+});
+
+test("the landing page lists games in flight, goes back to one, and starts a new one in the zone chosen", async ({ page }) => {
+  await online(page);
+  const name = `Li${Date.now() % 100000}`;
+  await page.goto("/");
+  await page.getByLabel("Who are you?").fill(name);
+  await page.getByRole("button", { name: "Play Online" }).click();
+  await page.getByLabel("Time zone").selectOption({ label: "UTC+09:00" });
+  await page.getByRole("button", { name: `Start New Game as ${name}` }).click();
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  await picker.waitFor({ timeout: 15_000 });
+  await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: /Valkyrie/ }).click();
+  await picker.getByRole("listbox", { name: "Race" }).locator("button:not([disabled])").first().click();
+  for (const group of ["Gender", "Alignment"]) await picker.getByRole("radiogroup", { name: group }).locator("button:not([disabled])").first().click();
+  await page.keyboard.press("Enter");
+  await afterPrompts(page);
+  const game = await gameId(page);
+  await pass(page, 2);
+  await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(1200);
+
+  await page.goto("/");
+  await page.getByRole("button", { name: `Play Online as ${name}` }).click();
+  await page.getByRole("link", { name: new RegExp(name) }).click();
+  await page.locator(".stats-title").waitFor({ timeout: 15_000 });
+  await afterPrompts(page);
+  expect(await gameId(page)).toBe(game);
+  const text = await quit(page);
+  expect(text).toMatch(/ session new \S+ tz=\+09:00/);
+
+  await page.goto("/");
+  await page.getByRole("button", { name: `Play Online as ${name}` }).click();
+  await page.getByRole("button", { name: /^Start New Game/ }).waitFor();
+  await expect(page.getByRole("link", { name: new RegExp(name) })).toHaveCount(0);
+});
+
+test("the landing page says when it can't reach the server, and offline still plays", async ({ page }) => {
+  await online(page);
+  await page.route(EMULATORS, (route) => route.abort());
+  await page.goto("/");
+  await page.getByLabel("Who are you?").fill(`No${Date.now() % 100000}`);
+  await page.getByRole("button", { name: "Play Online" }).click();
+  await expect(page.getByRole("alert")).toContainText(/can't reach the server/i, { timeout: 15_000 });
+  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "Play Offline" }).click();
+  await page.getByRole("dialog", { name: "Choose your character" }).waitFor({ timeout: 15_000 });
 });
 
 test("a game plays on while its lines can't be sent, saying so, and they follow when they can", async ({ page }) => {
@@ -458,13 +504,13 @@ test("an offline game never reaches the server, and stays apart from an online o
   page.on("request", (r) => {
     if (EMULATORS.test(r.url())) reached.push(r.url());
   });
-  await untilPlaying(page, name);
+  await untilPlaying(page, name, "offline");
   await pass(page, 2);
   await page.waitForTimeout(1200);
   expect(reached).toEqual([]);
 
   await online(page);
-  await page.goto(`/play/?name=${name}`);
+  await page.goto(`/play/?online&name=${name}`);
   // a new character, not the offline game coming back
   await page.getByRole("dialog", { name: "Choose your character" }).waitFor({ timeout: 20_000 });
   expect(await gameId(page)).toBeTruthy();

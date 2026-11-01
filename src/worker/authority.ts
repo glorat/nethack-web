@@ -93,6 +93,6 @@ async function onlineAuthority(game: string, utcOffset: number, firstNow: number
 }
 
 export function createAuthority(choice: AuthorityChoice, files: Files, askSeed: AskSeed): Promise<Authority> {
-  if (import.meta.env.DEV && choice.kind === "online") return onlineAuthority(choice.game, choice.utcOffset, choice.now, askSeed);
+  if (choice.kind === "online") return onlineAuthority(choice.game, choice.utcOffset, choice.now, askSeed);
   return import.meta.env.DEV && choice.kind === "fixed" ? fixedAuthority(choice.inputs, files) : browserAuthority(files);
 }
