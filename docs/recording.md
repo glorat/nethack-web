@@ -50,6 +50,10 @@ The core's reads of the clock needn't match the `now` lines one for one, as they
 
 All times are the player's clock and are recorded as they were, even if that clock jumps.
 
+An online game's `seed`, `now` and `uuid` lines hold what the server gave. The page asks once in a session for the turn of the last `T` line (0 before the first), when the core first wants a seed in that turn, and each further seed is one more than the last, so a recording replays the same as any other. To validate one, each `seed` line is a logged answer for the game plus a count, not necessarily the turn of the line before it.
+
+An online game keeps nothing in the browser, and doesn't touch the last-game replay. Its recording goes up one batch at a time, each ending where the core waits, and it comes back from the server by replay: a game that stopped mid-session as under "Coming back after the page closed", one that was saved by replaying to get the save, then restoring it. Lines not yet sent when the page closes are lost, so the game goes back a little. A game that can't be replayed at all can't continue, and the player is told and offered a new one.
+
 ## Replaying
 
 `src/worker/replayer.ts` plays a recording again. Each session runs on a fresh core whose host answers from the recording, checking each `T`, `=` and `end` against the core. A restore starts from the files the replay itself saved. The replay stops with the line where the game went differently.

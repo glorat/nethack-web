@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { batchId, LogUploader, MAX_BATCH, rebuildRecording, type UploadDeps, type UploadState, type UploadStore, type WriteResult } from "../../src/port/upload";
+import { batchId, type LogPosition, LogUploader, MAX_BATCH, type UploadNotice, type WriteResult } from "../../src/port/upload";
+import { rebuildRecording } from "../rebuild-recording";
 
 const GAME = "game-1";
-const head = (n: number) => [`1 nhrec 1`, `1 session new 2026-01-26T12:00:00.000Z tz=+00:00`, `1 uuid ${GAME}`, ...Array.from({ length: n }, (_, i) => `1 k ${i}`)];
+const numbered = (n: number, from = 1) => Array.from({ length: n }, (_, i) => `1 k ${from + i}`);
 const text = (lines: string[]) => `${lines.join("\n")}\n`;
 
 class Server {
@@ -23,169 +24,173 @@ class Server {
   }
 }
 
-function memoryStore(): UploadStore & { states: Map<string, UploadState> } {
-  const states = new Map<string, UploadState>();
-  return {
-    states,
-    load: (game) => structuredClone(states.get(game) ?? null),
-    save: (game, state) => void (state ? states.set(game, structuredClone(state)) : states.delete(game)),
-    finishedGames: () => [...states].filter(([, s]) => s.finished !== undefined).map(([g]) => g),
-  };
-}
-
 let server: Server;
-let store: ReturnType<typeof memoryStore>;
-const deps = (): UploadDeps => ({ store, now: () => 1000, write: (_game, id, lines, sentAt) => server.write(id, lines, sentAt) });
+let notices: (UploadNotice | null)[];
+const uploader = (position: LogPosition = { generation: 1, sent: 0 }) =>
+  new LogUploader({ now: () => 1000, notice: (n) => notices.push(n), write: (_game, id, lines, sentAt) => server.write(id, lines, sentAt) }, GAME, position);
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.spyOn(console, "warn").mockImplementation(() => {});
   server = new Server();
-  store = memoryStore();
+  notices = [];
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
-test("lines are sent one batch a second after they stop coming", async () => {
-  const up = new LogUploader(deps());
-  up.add(head(1));
+test("lines are sent in one batch a second after the first of them", async () => {
+  const up = uploader();
+  up.add(numbered(2), true);
   await vi.advanceTimersByTimeAsync(500);
-  up.add(["1 k 1"]);
-  await vi.advanceTimersByTimeAsync(999);
+  up.add(numbered(1, 3), true);
+  await vi.advanceTimersByTimeAsync(499);
   expect(server.writes).toEqual([]);
   await vi.advanceTimersByTimeAsync(1);
   expect(server.writes).toEqual([batchId(1, 1)]);
-  expect(server.rebuilt()).toBe(text([...head(1), "1 k 1"]));
+  expect(server.rebuilt()).toBe(text(numbered(3)));
+  expect(server.batches.get(batchId(1, 1))!.sentAt).toBe(1000);
 });
 
-test("lines come through in order however they're split, with a batch per send", async () => {
-  const up = new LogUploader(deps());
-  up.add(head(0));
-  await vi.advanceTimersByTimeAsync(1000);
-  up.add(["1 k 0"]);
-  await vi.advanceTimersByTimeAsync(1000);
-  up.add(["1 k 1", "1 k 2"]);
-  await vi.advanceTimersByTimeAsync(1000);
-  expect(server.writes).toEqual([batchId(1, 1), batchId(1, 4), batchId(1, 5)]);
-  expect(server.rebuilt()).toBe(text(head(3)));
+test("steady play still sends", async () => {
+  const up = uploader();
+  for (let i = 1; i <= 10; i++) {
+    up.add([`1 k ${i}`], true);
+    await vi.advanceTimersByTimeAsync(300);
+  }
+  expect(server.writes.length).toBeGreaterThan(1);
 });
 
-test("a failed write is tried again, with lines since then going in a later batch", async () => {
-  const up = new LogUploader(deps());
+test("new lines don't put off a retry", async () => {
+  const up = uploader();
   server.next = ["down"];
-  up.add(head(0));
+  up.add(numbered(1), true);
   await vi.advanceTimersByTimeAsync(1000);
-  expect(server.batches.size).toBe(0);
-  up.add(["1 k 0"]);
-  await vi.advanceTimersByTimeAsync(1000);
-  await vi.advanceTimersByTimeAsync(10000);
-  expect(server.writes).toEqual([batchId(1, 1), batchId(1, 1), batchId(1, 4)]);
-  expect(server.rebuilt()).toBe(text(head(1)));
+  for (let i = 0; i < 6; i++) {
+    up.add(numbered(1, 2 + i), true);
+    await vi.advanceTimersByTimeAsync(1000);
+  }
+  expect(server.batches.size).toBeGreaterThan(0);
 });
 
-test("a batch stored whose answer was lost isn't taken for anything but that batch", async () => {
-  const up = new LogUploader(deps());
+test("a batch only ever ends where the core stopped to wait", async () => {
+  const up = uploader();
+  up.add(numbered(2), false);
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(server.writes).toEqual([]);
+  up.add([], true);
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(server.rebuilt()).toBe(text(numbered(2)));
+});
+
+test("a failed write says so, is tried again exactly, and later lines wait for a later batch", async () => {
+  const up = uploader();
+  server.next = ["down"];
+  up.add(numbered(2), true);
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(notices).toEqual(["unsent"]);
+  up.add(numbered(1, 3), true);
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(notices.at(-1)).toBeNull();
+  expect(server.batches.get(batchId(1, 1))!.lines).toBe(numbered(2).join("\n"));
+  expect(server.rebuilt()).toBe(text(numbered(3)));
+});
+
+test("a batch stored whose answer was lost counts as sent when tried again", async () => {
+  const up = uploader();
   server.next = ["lost"];
-  up.add(head(0));
+  up.add(numbered(2), true);
   await vi.advanceTimersByTimeAsync(1000);
-  up.add(["1 k 0"]);
+  await vi.advanceTimersByTimeAsync(5000);
+  up.add(numbered(1, 3), true);
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(notices.at(-1)).toBeNull();
+  expect(server.rebuilt()).toBe(text(numbered(3)));
+});
+
+test("a first write that finds its batch there means someone else is playing, and stops", async () => {
+  server.batches.set(batchId(1, 3), { lines: "1 k other", sentAt: 1 });
+  const up = uploader({ generation: 1, sent: 2 });
+  up.before(text(numbered(2)));
+  up.add(numbered(1, 3), true);
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(notices).toEqual(["elsewhere"]);
+  up.add(numbered(1, 4), true);
   await vi.advanceTimersByTimeAsync(10000);
-  expect(server.rebuilt()).toBe(text(head(1)));
+  expect(server.writes).toHaveLength(1);
 });
 
-test("a page closed with a batch on its way sends it again exactly, then the rest", async () => {
-  let up = new LogUploader(deps());
-  server.next = ["lost"];
-  up.add(head(0));
+test("a game that comes back carries on from what the server holds", async () => {
+  let up = uploader();
+  up.add(numbered(3), true);
   await vi.advanceTimersByTimeAsync(1000);
-  vi.clearAllTimers();
-
-  up = new LogUploader(deps());
-  up.before(text(head(5)));
+  up = uploader({ generation: 1, sent: 3 });
+  up.before(text(numbered(3)));
+  up.add(["1 back", ...numbered(1, 4)], true);
   await vi.advanceTimersByTimeAsync(1000);
-  expect(server.writes).toEqual([batchId(1, 1), batchId(1, 1), batchId(1, 4)]);
-  expect(server.rebuilt()).toBe(text(head(5)));
-});
-
-test("lines not sent before the page closed are sent when the game comes back", async () => {
-  let up = new LogUploader(deps());
-  up.add(head(2));
-  await vi.advanceTimersByTimeAsync(1000);
-  vi.clearAllTimers();
-
-  up = new LogUploader(deps());
-  up.before(text(head(4)));
-  up.add(["1 back x"]);
-  await vi.advanceTimersByTimeAsync(1000);
-  expect(server.rebuilt()).toBe(text([...head(4), "1 back x"]));
+  expect(server.writes).toEqual([batchId(1, 1), batchId(1, 4)]);
+  expect(server.rebuilt()).toBe(text([...numbered(3), "1 back", "1 k 4"]));
 });
 
 test("a recording cut back starts a generation, which replaces what came after the cut", async () => {
-  let up = new LogUploader(deps());
-  up.add(head(5));
+  let up = uploader();
+  up.add(numbered(5), true);
   await vi.advanceTimersByTimeAsync(1000);
-
-  up = new LogUploader(deps());
-  up.before(text(head(2)));
-  up.add(["1 back x", "1 k 99"]);
+  up = uploader({ generation: 1, sent: 5 });
+  up.before(text(numbered(3)));
+  up.add(["1 back"], true);
   await vi.advanceTimersByTimeAsync(1000);
-  expect([...server.batches.keys()].sort()).toEqual([batchId(1, 1), batchId(2, 6)]);
-  expect(server.rebuilt()).toBe(text([...head(2), "1 back x", "1 k 99"]));
+  expect(server.writes.at(-1)).toBe(batchId(2, 4));
+  expect(server.rebuilt()).toBe(text([...numbered(3), "1 back"]));
 });
 
-test("a cut back into a batch that may not have arrived sends the part of it that's kept", async () => {
-  let up = new LogUploader(deps());
-  up.add(head(0));
-  await vi.advanceTimersByTimeAsync(1000);
+test("a game that ended is sent at once, whole, and retried while the page lasts", async () => {
+  const up = uploader();
+  up.add(numbered(2), false);
   server.next = ["down"];
-  up.add(["1 k 0", "1 k 1", "1 k 2"]);
-  await vi.advanceTimersByTimeAsync(1000);
-  vi.clearAllTimers();
-
-  up = new LogUploader(deps());
-  up.before(text(head(1)));
-  await vi.advanceTimersByTimeAsync(1000);
-  expect(server.rebuilt()).toBe(text(head(1)));
-});
-
-test("a game that ended is sent at once, and if it can't be, on the next visit", async () => {
-  let up = new LogUploader(deps());
-  server.next = ["down"];
-  up.add(head(1));
-  up.finished(text([...head(1), "1 end over"]));
+  up.finished(text([...numbered(2), "1 end over"]));
   await vi.advanceTimersByTimeAsync(0);
-  expect(server.batches.size).toBe(0);
-  vi.clearAllTimers();
-  expect(store.finishedGames()).toEqual([GAME]);
-
-  up = new LogUploader(deps());
-  await vi.advanceTimersByTimeAsync(0);
-  expect(server.rebuilt()).toBe(text([...head(1), "1 end over"]));
-  expect(store.states.size).toBe(0);
+  expect(notices).toEqual(["unsent"]);
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(server.rebuilt()).toBe(text([...numbered(2), "1 end over"]));
 });
 
 test("a long backlog is split to fit a batch, and goes straight on", async () => {
-  const long = "x".repeat(MAX_BATCH / 2);
-  const up = new LogUploader(deps());
-  up.add([...head(0), long, long, long]);
+  const line = `1 l "${"x".repeat(100 * 1024)}"`;
+  const up = uploader();
+  up.add([line, line, line], true);
   await vi.advanceTimersByTimeAsync(1000);
-  expect(server.batches.size).toBeGreaterThan(1);
-  for (const b of server.batches.values()) expect(b.lines.length).toBeLessThanOrEqual(MAX_BATCH);
-  expect(server.rebuilt()).toBe(text([...head(0), long, long, long]));
+  expect(server.writes).toEqual([batchId(1, 1), batchId(1, 3)]);
+  expect(server.rebuilt()).toBe(text([line, line, line]));
 });
 
 test("a line too long for any batch stops the upload rather than being refused for good", async () => {
-  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-  const up = new LogUploader(deps());
-  up.add([...head(0), "x".repeat(MAX_BATCH + 1)]);
-  await vi.advanceTimersByTimeAsync(1000);
-  expect(server.writes).toEqual([batchId(1, 1)]);
-  expect(warn).toHaveBeenCalled();
-  warn.mockRestore();
-});
-
-test("a game that can never replay isn't sent", async () => {
-  const up = new LogUploader(deps());
-  up.add(["1 nhrec 1", "1 session unrecorded 2026-01-26T12:00:00.000Z tz=+00:00", "1 k 0"]);
-  up.add(["1 uuid other"]);
+  const up = uploader();
+  up.add(["x".repeat(MAX_BATCH + 1)], true);
   await vi.advanceTimersByTimeAsync(10000);
   expect(server.writes).toEqual([]);
+});
+
+test("a session's last lines go at once, and settling waits for them", async () => {
+  const up = uploader();
+  let settled = false;
+  up.add(["1 k 1"], true);
+  void up.settled().then(() => (settled = true));
+  await vi.advanceTimersByTimeAsync(10);
+  expect(settled).toBe(false);
+  up.add(["1 end save"], true);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(settled).toBe(true);
+  expect(server.rebuilt()).toBe(text(["1 k 1", "1 end save"]));
+});
+
+test("settling doesn't wait for an upload that has stopped", async () => {
+  server.batches.set(batchId(1, 1), { lines: "other", sentAt: 1 });
+  const up = uploader();
+  let settled = false;
+  up.add(["1 end save"], true);
+  void up.settled().then(() => (settled = true));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(settled).toBe(true);
 });

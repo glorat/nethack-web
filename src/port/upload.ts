@@ -1,8 +1,6 @@
-// Sends a game's recording to the server as it's written, one batch of lines at a time. The server's copy
-// is append-only and the client can't read it, so what has been sent is all kept here.
+// Sends an online game's recording to the server as it's written, one batch of lines at a time. The server's
+// copy is the only one, and the client can't change what's there, so it starts from what the server says it holds.
 
-const STATE_PREFIX = "nethack.upload.game.";
-const WANTED_KEY = "nethack.upload";
 const DEBOUNCE_MS = 1000;
 const RETRY_MS = 5000;
 /** The server's limit on a batch's text. */
@@ -10,95 +8,94 @@ export const MAX_BATCH = 256 * 1024;
 
 export type WriteResult = "stored" | "exists" | "failed";
 
-export interface UploadState {
+/** What the player should know: lines aren't getting through for now, or another tab has taken the game on. */
+export type UploadNotice = "unsent" | "elsewhere";
+
+export interface LogPosition {
   /** Goes up when the recording is cut back, so that lines numbered again get new IDs. */
   generation: number;
-  /** Lines the server is known to hold. */
+  /** Lines the server holds. */
   sent: number;
-  /** Lines after those in a batch that may or may not have arrived, which has to be sent again exactly as it was. */
-  inflight: number;
-  /** The whole recording of a game that has ended, which nothing else will give back once the page has gone. */
-  finished?: string;
-}
-
-export interface UploadStore {
-  load(game: string): UploadState | null;
-  save(game: string, state: UploadState | null): void;
-  /** Games that ended before all of their recording had been sent. */
-  finishedGames(): string[];
 }
 
 export interface UploadDeps {
-  store: UploadStore;
   /** "exists" for a batch already there, which keeps what it first held. */
   write(game: string, id: string, lines: string, sentAt: number): Promise<WriteResult>;
   now(): number;
+  notice(notice: UploadNotice | null): void;
 }
 
 export function batchId(generation: number, firstLine: number): string {
   return `${String(generation).padStart(4, "0")}-${String(firstLine).padStart(10, "0")}`;
 }
 
-/** The recording a game's batches make, sorted by ID: each starts at its line number, replacing anything already from there on. */
-export function rebuildRecording(batches: { id: string; lines: string }[]): string {
-  const lines: string[] = [];
-  for (const { id, lines: text } of batches) {
-    lines.length = Math.min(lines.length, Number(id.split("-")[1]) - 1);
-    lines.push(...text.split("\n"));
-  }
-  return lines.length ? `${lines.join("\n")}\n` : "";
-}
-
 function linesOf(text: string): string[] {
   return text.split("\n").filter((line, i, all) => line !== "" || i < all.length - 1);
 }
 
-function gameOf(lines: string[]): string | null | undefined {
-  for (const line of lines) {
-    // never replays, so isn't worth having
-    if (/^\d+ session (?:unrecorded|recover) /.test(line)) return null;
-    const uuid = /^\d+ uuid (\S+)$/.exec(line)?.[1];
-    if (uuid) return uuid;
-  }
-  return undefined;
-}
-
-class GameLog {
+export class LogUploader {
+  private lines: string[] = [];
+  /** Lines since the core last stopped to wait: a recording must end at a wait, for a replay to hand over there. */
+  private held: string[] = [];
+  private generation: number;
+  private sent: number;
+  /** Lines in the batch on its way, which go again exactly as they were if its answer doesn't come. */
+  private inflight = 0;
+  private retrying = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private busy = false;
   private stopped = false;
+  private waiters: (() => void)[] = [];
 
   constructor(
     private readonly deps: UploadDeps,
     private readonly game: string,
-    private lines: string[],
-    private state: UploadState,
-  ) {}
-
-  /** Opens a game's log from its recording so far, starting a new generation if that holds less than has been sent. */
-  static open(deps: UploadDeps, game: string, lines: string[]): GameLog {
-    const state = deps.store.load(game) ?? { generation: 1, sent: 0, inflight: 0 };
-    if (lines.length < state.sent + state.inflight) {
-      state.generation++;
-      state.sent = Math.min(state.sent, lines.length);
-      state.inflight = 0;
-    }
-    return new GameLog(deps, game, lines, state);
+    position: LogPosition,
+  ) {
+    this.generation = position.generation;
+    this.sent = position.sent;
   }
 
-  add(lines: string[]): void {
-    this.lines.push(...lines);
-    this.wait(DEBOUNCE_MS);
-  }
-
-  finish(text: string): void {
+  /** What the recording held when the game came back, which may be less than the server's if it was cut back. */
+  before(text: string): void {
     this.lines = linesOf(text);
-    this.state.finished = text;
-    this.deps.store.save(this.game, this.state);
+    if (this.lines.length < this.sent) {
+      this.generation++;
+      this.sent = this.lines.length;
+    }
+    this.wait(0);
+  }
+
+  add(lines: string[], atPrompt: boolean): void {
+    this.held.push(...lines);
+    if (!atPrompt || !this.held.length) return;
+    this.lines.push(...this.held);
+    this.held = [];
+    // a session's last lines, with the page about to go
+    if (/^\d+ end /.test(this.lines.at(-1)!)) this.wait(0);
+    // left running if it is, or steady play would never send
+    else if (!this.timer) this.wait(DEBOUNCE_MS);
+  }
+
+  /** Tries now, for a page that's closing. */
+  flushNow(): void {
     void this.flush();
   }
 
-  flushSoon(): void {
+  /** When everything so far has reached the server, or never will. */
+  settled(): Promise<void> {
+    if (this.done()) return Promise.resolve();
+    return new Promise((resolve) => this.waiters.push(resolve));
+  }
+
+  private done(): boolean {
+    return this.stopped || this.sent >= this.lines.length;
+  }
+
+  /** The whole recording, when the game ends. */
+  finished(text: string): void {
+    this.lines = linesOf(text);
+    this.held = [];
     this.wait(0);
   }
 
@@ -114,7 +111,7 @@ class GameLog {
   private fit(): number {
     let size = 0;
     let count = 0;
-    for (let i = this.state.sent; i < this.lines.length; i++) {
+    for (let i = this.sent; i < this.lines.length; i++) {
       size += this.lines[i].length + (count ? 1 : 0);
       if (size > MAX_BATCH) break;
       count++;
@@ -123,123 +120,37 @@ class GameLog {
   }
 
   private async flush(): Promise<void> {
-    if (this.busy || this.stopped) return;
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = null;
-    }
-    const { state } = this;
-    if (state.sent >= this.lines.length) {
-      if (state.finished !== undefined) this.deps.store.save(this.game, null);
-      return;
-    }
-    const count = state.inflight || this.fit();
+    if (this.busy || this.stopped || this.sent >= this.lines.length) return;
+    const count = this.inflight || this.fit();
     if (!count) {
       this.stopped = true;
-      console.warn(`upload stopped: line ${state.sent + 1} is longer than a batch can hold`);
+      console.warn(`upload stopped: line ${this.sent + 1} is longer than a batch can hold`);
+      this.waiters.splice(0).forEach((resolve) => resolve());
       return;
     }
-    state.inflight = count;
-    // before it goes: a page that closes now mustn't later send these lines in a different batch of the same ID
-    this.deps.store.save(this.game, state);
+    this.inflight = count;
     this.busy = true;
-    const text = this.lines.slice(state.sent, state.sent + count).join("\n");
-    const result = await this.deps.write(this.game, batchId(state.generation, state.sent + 1), text, this.deps.now());
+    const text = this.lines.slice(this.sent, this.sent + count).join("\n");
+    const result = await this.deps.write(this.game, batchId(this.generation, this.sent + 1), text, this.deps.now());
     this.busy = false;
     if (result === "failed") {
+      this.retrying = true;
+      this.deps.notice("unsent");
       this.wait(RETRY_MS);
       return;
     }
-    state.sent += count;
-    state.inflight = 0;
-    this.deps.store.save(this.game, state);
-    if (!this.timer) void this.flush();
+    // sent again, it's the answer that was lost; sent for the first time, someone else wrote these lines
+    if (result === "exists" && !this.retrying) {
+      this.stopped = true;
+      this.deps.notice("elsewhere");
+      this.waiters.splice(0).forEach((resolve) => resolve());
+      return;
+    }
+    this.retrying = false;
+    this.sent += count;
+    this.inflight = 0;
+    this.deps.notice(null);
+    if (this.done()) this.waiters.splice(0).forEach((resolve) => resolve());
+    else if (!this.timer) void this.flush();
   }
 }
-
-/** The page's end of the upload: gets the recording's lines, in order, and sends them on. */
-export class LogUploader {
-  private log: GameLog | null = null;
-  /** Lines from before the recording has named its game. */
-  private held: string[] = [];
-  private off = false;
-
-  constructor(private readonly deps: UploadDeps) {
-    for (const game of deps.store.finishedGames()) {
-      const text = deps.store.load(game)?.finished;
-      if (text !== undefined) GameLog.open(deps, game, linesOf(text)).flushSoon();
-    }
-  }
-
-  /** What the recording already held, for a game that has come back. */
-  before(text: string): void {
-    this.held = linesOf(text);
-    this.open()?.flushSoon();
-  }
-
-  add(lines: string[]): void {
-    if (this.off || !lines.length) return;
-    if (this.log) return this.log.add(lines);
-    this.held.push(...lines);
-    this.open()?.add([]);
-  }
-
-  /** The whole recording, when the game ends. */
-  finished(text: string): void {
-    if (this.off) return;
-    if (!this.log) {
-      this.held = linesOf(text);
-      this.open();
-    }
-    this.log?.finish(text);
-  }
-
-  private open(): GameLog | null {
-    const game = gameOf(this.held);
-    if (game === undefined) return null;
-    if (game === null) this.off = true;
-    else this.log = GameLog.open(this.deps, game, this.held);
-    this.held = [];
-    return this.log;
-  }
-}
-
-/** Whether a developer has asked for the game to be uploaded, by /play/?upload; ?upload=0 stops it. Never in a production build, until there's a server to send to. */
-export function uploadWanted(): boolean {
-  if (!import.meta.env.DEV) return false;
-  const asked = new URLSearchParams(location.search).get("upload");
-  try {
-    if (asked === "0") localStorage.removeItem(WANTED_KEY);
-    else if (asked !== null) localStorage.setItem(WANTED_KEY, "1");
-    return localStorage.getItem(WANTED_KEY) === "1";
-  } catch {
-    return asked !== null && asked !== "0";
-  }
-}
-
-export const localUploadStore: UploadStore = {
-  load(game) {
-    try {
-      const saved = localStorage.getItem(STATE_PREFIX + game);
-      return saved ? (JSON.parse(saved) as UploadState) : null;
-    } catch {
-      return null;
-    }
-  },
-  save(game, state) {
-    try {
-      if (state) localStorage.setItem(STATE_PREFIX + game, JSON.stringify(state));
-      else localStorage.removeItem(STATE_PREFIX + game);
-    } catch {}
-  },
-  finishedGames() {
-    try {
-      return Object.keys(localStorage)
-        .filter((k) => k.startsWith(STATE_PREFIX))
-        .map((k) => k.slice(STATE_PREFIX.length))
-        .filter((game) => localUploadStore.load(game)?.finished !== undefined);
-    } catch {
-      return [];
-    }
-  },
-};

@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth, signInAnonymously } from "firebase/auth";
 import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore/lite";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
+import type { OnlineDeps } from "../port/online";
 import type { WriteResult } from "../port/upload";
 
 // Not a secret: a web app's Firebase config is public, and security rules decide what it may do.
@@ -33,6 +34,18 @@ export async function whoami(): Promise<string> {
   const call = httpsCallable<unknown, { uid: string }>(functions, "user");
   return (await call({ method: "whoami", input: {} })).data.uid;
 }
+
+async function userRequest<Output>(method: string, input: object): Promise<Output> {
+  await signedIn();
+  return (await httpsCallable<unknown, Output>(functions, "user")({ method, input })).data;
+}
+
+export const startGame: OnlineDeps["startGame"] = (input) => userRequest("startGame", input);
+
+export const resumeGame: OnlineDeps["resumeGame"] = (input) => userRequest("resumeGame", input);
+
+export const seed = (input: { game: string; turn: number; sentAt: number }) =>
+  userRequest<{ seed: number; now: number; validTurns: number }>("seed", input);
 
 export async function writeBatch(game: string, id: string, lines: string, sentAt: number): Promise<WriteResult> {
   const uid = await signedIn();

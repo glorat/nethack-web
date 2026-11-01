@@ -1,27 +1,45 @@
-import { localUploadStore, LogUploader, type WriteResult } from "../port/upload";
+import { LogUploader, type LogPosition, type UploadDeps, type WriteResult } from "../port/upload";
+import { type OnlineDeps, OnlineSession } from "../port/online";
 
-export { uploadWanted } from "../port/upload";
+export { onlineWanted } from "../port/online";
 
-/** A failure here only delays the upload: the game never waits on it, and plays the same with no connection. */
-export function createUploader(): LogUploader {
+async function server() {
+  if (!import.meta.env.DEV) throw new Error("no server in a production build yet");
+  return import("./firebase");
+}
+
+export function createUploader(game: string, position: LogPosition, notice: UploadDeps["notice"]): LogUploader {
   let introduced = false;
-  return new LogUploader({
-    store: localUploadStore,
-    now: () => Date.now(),
-    async write(game, id, lines, sentAt): Promise<WriteResult> {
-      if (!import.meta.env.DEV) return "failed";
-      try {
-        const server = await import("./firebase");
-        const result = await server.writeBatch(game, id, lines, sentAt);
-        if (!introduced) {
-          introduced = true;
-          void server.whoami().then((uid) => (document.documentElement.dataset.serverUid = uid));
+  return new LogUploader(
+    {
+      now: () => Date.now(),
+      notice,
+      async write(game, id, lines, sentAt): Promise<WriteResult> {
+        try {
+          const firebase = await server();
+          const result = await firebase.writeBatch(game, id, lines, sentAt);
+          if (!introduced) {
+            introduced = true;
+            void firebase.whoami().then((uid) => (document.documentElement.dataset.serverUid = uid));
+          }
+          return result;
+        } catch (e) {
+          console.warn("upload failed", e);
+          return "failed";
         }
-        return result;
-      } catch (e) {
-        console.warn("upload failed", e);
-        return "failed";
-      }
+      },
     },
+    game,
+    position,
+  );
+}
+
+export function createOnlineSession(waiting: OnlineDeps["waiting"]): OnlineSession {
+  return new OnlineSession({
+    now: () => Date.now(),
+    waiting,
+    startGame: async (input) => (await server()).startGame(input),
+    resumeGame: async (input) => (await server()).resumeGame(input),
+    seed: async (input) => (await server()).seed(input),
   });
 }

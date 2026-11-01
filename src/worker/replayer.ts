@@ -457,7 +457,8 @@ export type BootCore = (
 
 /**
  * Plays the whole recording, session by session. Rejects with a ReplayError
- * where the game goes differently from how it was recorded.
+ * where the game goes differently from how it was recorded. Resolves with the
+ * files a last session that ended left behind.
  */
 export async function replay(
   text: string,
@@ -465,7 +466,7 @@ export async function replay(
   hooks: ReplayHooks,
   /** Is given the last session, for adding lines to as they come. */
   follow?: (last: RecordedSession) => void,
-): Promise<void> {
+): Promise<Map<string, Uint8Array> | null> {
   const { utcOffset, sessions } = parseRecording(text);
   follow?.(sessions[sessions.length - 1]);
   let files = new Map<string, Uint8Array>();
@@ -494,10 +495,11 @@ export async function replay(
     });
     // a failure also finishes the session, so it must win when both are settled
     const end = await Promise.race([host.failure, host.finished]).finally(() => host.stop());
-    if (!next) return;
+    if (!next) return end === "end" ? saveFiles(core) : null;
     if (next.kind === "restore") {
       if (end !== "end") throw new ReplayError(`session ${i + 1} wasn't saved, yet the next restores it`);
       files = saveFiles(core);
     }
   }
+  return null;
 }
