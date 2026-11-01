@@ -31,7 +31,7 @@ test("a new version waits out a game in progress, then the landing page moves to
   const [oldCache] = (await cacheNames(page))!;
 
   await page.getByLabel("Who are you?").fill(`Upd${Date.now() % 100000}`);
-  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("button", { name: "Play Offline" }).click();
   const picker = page.getByRole("dialog", { name: "Choose your character" });
   await expect(picker).toBeVisible({ timeout: 15_000 });
 
@@ -108,7 +108,7 @@ test("a second game tab, and one still at its start, hold off a new version", as
   await page.reload();
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   await page.getByLabel("Who are you?").fill(`Two${Date.now() % 100000}`);
-  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("button", { name: "Play Offline" }).click();
   await expect(page.getByRole("dialog", { name: "Choose your character" })).toBeVisible({ timeout: 15_000 });
   const second = await context.newPage();
   await second.goto(`${SITE}play/`);

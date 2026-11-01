@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { lastTurnIn, linesIn, type OnlineDeps, type OnlineGame, OnlineSession } from "../../src/port/online";
+import { chosenZone, lastTurnIn, linesIn, onlineAddress, onlineWanted, type OnlineDeps, type OnlineGame, OnlineSession, zoneChoices, zoneLabel } from "../../src/port/online";
 
 const START = { name: "Agnes", utcOffset: 3600, options: "name:Agnes", config: "rc", build: { version: "5.0.0", core: "abc" } };
 const inFlight = (recording: string, game = "old"): OnlineGame => ({ game, utcOffset: 0, options: "o", config: "c", recording, generation: 2, now: 4000 });
@@ -18,6 +18,7 @@ function fail() {
 }
 
 const deps = (): OnlineDeps => ({
+  listGames: async () => ({ games: [] }),
   now: () => 1000,
   waiting: (on) => waits.push(on),
   async startGame(input) {
@@ -157,4 +158,32 @@ test("the last turn is read from whole lines only", () => {
 test("lines are counted by their ends", () => {
   expect(linesIn("")).toBe(0);
   expect(linesIn("a\nb\n")).toBe(2);
+});
+
+test("the address says which mode and which game", () => {
+  expect(onlineWanted("?online&name=A")).toBe(true);
+  expect(onlineWanted("?name=A")).toBe(false);
+  expect(onlineAddress("/play/", "A b", { game: "g1" })).toBe("/play/?online=&name=A+b&game=g1");
+  expect(onlineAddress("/play/", "A", { utcOffset: -3600 })).toBe("/play/?online=&name=A&new=&tz=-3600");
+});
+
+test("the zone chosen beats the browser's, unless it makes no sense", () => {
+  expect(chosenZone("?tz=32400", 0)).toBe(32400);
+  expect(chosenZone("?tz=-3600", 0)).toBe(-3600);
+  expect(chosenZone("?tz=0", 3600)).toBe(0);
+  expect(chosenZone("?name=A", 3600)).toBe(3600);
+  expect(chosenZone("?tz=", 3600)).toBe(3600);
+  expect(chosenZone("?tz=east", 3600)).toBe(3600);
+});
+
+test("zones read as offsets, with the browser's among whole hours", () => {
+  expect(zoneLabel(0)).toBe("UTC+00:00");
+  expect(zoneLabel(-12600)).toBe("UTC−03:30");
+  expect(zoneLabel(19800)).toBe("UTC+05:30");
+  const zones = zoneChoices(19800);
+  expect(zones).toContain(19800);
+  expect(zones).toContain(-12 * 3600);
+  expect(zones).toContain(14 * 3600);
+  expect(zones).toEqual([...zones].sort((a, b) => a - b));
+  expect(zoneChoices(3600)).toHaveLength(27);
 });

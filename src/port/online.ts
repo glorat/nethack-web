@@ -1,7 +1,6 @@
 // An online game, from the page's side: the server holds it, and answers for what the core can't decide.
 // Offline games never come here. Asking waits as long as it takes, and never makes up an answer.
 
-const WANTED_KEY = "nethack.online";
 const RETRY_MS = 5000;
 /** The server has answered, and asking again won't change that. */
 const FINAL = /^functions\/(?:not-found|invalid-argument|permission-denied|unauthenticated)$/;
@@ -31,7 +30,16 @@ export interface OnlineGame {
   now: number;
 }
 
+export interface GameSummary {
+  game: string;
+  name: string;
+  startedAt: number;
+  lastPlayedAt: number;
+  turn: number | null;
+}
+
 export interface OnlineDeps {
+  listGames(input: { sentAt: number }): Promise<{ games: GameSummary[] }>;
   startGame(input: GameStart & { sentAt: number }): Promise<{ game: string; utcOffset: number; options: string; config: string; now: number }>;
   /** The game named, or the player's latest unfinished one under this name; null if there isn't one. */
   resumeGame(input: { game?: string; name: string; build: Build; sentAt: number }): Promise<OnlineGame | null>;
@@ -100,15 +108,40 @@ export class OnlineSession {
   }
 }
 
-/** Whether a developer has asked for online games, by /play/?online; ?online=0 stops it. Never in a production build, until there's a server. */
-export function onlineWanted(): boolean {
-  if (!import.meta.env.DEV) return false;
-  const asked = new URLSearchParams(location.search).get("online");
-  try {
-    if (asked === "0") localStorage.removeItem(WANTED_KEY);
-    else if (asked !== null) localStorage.setItem(WANTED_KEY, "1");
-    return localStorage.getItem(WANTED_KEY) === "1";
-  } catch {
-    return asked !== null && asked !== "0";
+/** Whether the address asks for an online game. */
+export function onlineWanted(search: string): boolean {
+  return new URLSearchParams(search).has("online");
+}
+
+/** An address for the game page: an online game with the player's choices, or `game` to go back to one. */
+export function onlineAddress(path: string, name: string, choice: { game: string } | { utcOffset: number }): string {
+  const params = new URLSearchParams({ online: "", name });
+  if ("game" in choice) params.set("game", choice.game);
+  else {
+    params.set("new", "");
+    params.set("tz", String(choice.utcOffset));
   }
+  return `${path}?${params}`;
+}
+
+export function chosenZone(search: string, browser: number): number {
+  const tz = new URLSearchParams(search).get("tz");
+  return tz !== null && Number.isInteger(Number(tz)) && tz !== "" ? Number(tz) : browser;
+}
+
+export function zoneLabel(seconds: number): string {
+  const minutes = Math.abs(seconds) / 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `UTC${seconds < 0 ? "−" : "+"}${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
+}
+
+/** Every whole hour, and the browser's own zone among them, in order. */
+export function zoneChoices(browser: number): number[] {
+  const hours = Array.from({ length: 27 }, (_, i) => (i - 12) * 3600);
+  return [...new Set([...hours, browser])].sort((a, b) => a - b);
+}
+
+/** The games a player can go back to; asking waits for no one, as the page can offer to try again. */
+export function loadGames(deps: Pick<OnlineDeps, "listGames" | "now">): Promise<GameSummary[]> {
+  return deps.listGames({ sentAt: deps.now() }).then((answer) => answer.games);
 }

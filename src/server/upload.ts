@@ -1,12 +1,9 @@
 import { LogUploader, type LogPosition, type UploadDeps, type WriteResult } from "../port/upload";
-import { type OnlineDeps, OnlineSession } from "../port/online";
+import { type GameSummary, loadGames, type OnlineDeps, OnlineSession } from "../port/online";
 
-export { onlineWanted } from "../port/online";
 
-async function server() {
-  if (!import.meta.env.DEV) throw new Error("no server in a production build yet");
-  return import("./firebase");
-}
+/** Only ever loaded for an online game, so offline play never touches it. */
+const server = () => import("./firebase");
 
 export function createUploader(game: string, position: LogPosition, notice: UploadDeps["notice"]): LogUploader {
   let introduced = false;
@@ -38,8 +35,11 @@ export function createOnlineSession(waiting: OnlineDeps["waiting"]): OnlineSessi
   return new OnlineSession({
     now: () => Date.now(),
     waiting,
+    listGames: async (input) => (await server()).listGames(input),
     startGame: async (input) => (await server()).startGame(input),
     resumeGame: async (input) => (await server()).resumeGame(input),
     seed: async (input) => (await server()).seed(input),
   });
 }
+
+export const listOnlineGames = (): Promise<GameSummary[]> => loadGames({ now: () => Date.now(), listGames: async (input) => (await server()).listGames(input) });

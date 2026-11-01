@@ -11,7 +11,7 @@ async function startGame(page: Page, name: string) {
 /** Goes through the landing page as this character, whatever name it remembers. */
 async function enterGame(page: Page, name: string) {
   await page.goto("/");
-  const play = page.getByRole("button", { name: /^Play/ });
+  const play = page.getByRole("button", { name: /^Play Offline/ });
   await play.waitFor();
   const change = page.getByRole("button", { name: "Change Name" });
   if (await change.isVisible()) await change.click();
@@ -136,7 +136,7 @@ test("Save & Quit goes to the landing page, and Play and a reload both bring the
 
   // Save & Quit doesn't ask again, as in Cocoa
   await page.keyboard.press("S");
-  const play = page.getByRole("button", { name: `Play as ${name}` });
+  const play = page.getByRole("button", { name: `Play Offline as ${name}` });
   await expect(play).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
 
@@ -169,7 +169,7 @@ test("the landing page opens without loading the game, and Back returns to it fr
   await untilPlaying(page);
   expect(new URL(page.url()).pathname).toBe("/play/");
   await page.goBack();
-  await expect(page.getByRole("button", { name: /^Play as Back/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Play Offline as Back/ })).toBeVisible();
 });
 
 test("the game page without a name goes to the landing page", async ({ page }) => {
@@ -995,7 +995,7 @@ test("the options file is edited in the browser and read when a game starts", as
   await expect(editor).toBeHidden();
 
   await page.getByLabel("Who are you?").fill(`Rc${Date.now() % 100000}`);
-  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("button", { name: "Play Offline" }).click();
   await untilPlaying(page);
   // the player's option wins over the game's, which still sets the rest, with no complaint
   await expect(page.locator(".stat-label", { hasText: /^T$/ })).toHaveCount(0);
@@ -1082,7 +1082,7 @@ test("when the game ends, a dialog offers a new game under the same name, or the
   // Escape goes to the landing page
   await quitGame();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: `Play as ${name}` })).toBeVisible();
+  await expect(page.getByRole("button", { name: `Play Offline as ${name}` })).toBeVisible();
 });
 
 test("the Help menu opens the game's help and the NetHack Wiki", async ({ page, context }) => {
@@ -1353,7 +1353,7 @@ test.describe("shadowing a game", () => {
     await startGame(page, name);
     for (let i = 0; i < 5; i++) await page.keyboard.press("s");
     await page.keyboard.press("S");
-    const play = page.getByRole("button", { name: `Play as ${name}` });
+    const play = page.getByRole("button", { name: `Play Offline as ${name}` });
     await expect(play).toBeVisible();
     await page.evaluate(
       (key) =>
