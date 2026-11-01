@@ -1,5 +1,4 @@
 /// <reference lib="webworker" />
-import { HeldEvents } from "../port/held-events";
 import type { Answer, GameEvent, GameRequest, StartOptions, UiMessage, WorkerMessage } from "../protocol";
 import { createAuthority } from "./authority";
 import { ReplayRunner } from "./replay-runner";
@@ -8,7 +7,7 @@ import { Shadow } from "./shadow";
 import { CONFIG_FILE, Game, type Input } from "./game";
 import { BonesDb } from "./bones";
 import { Recorder } from "./recorder";
-import { placeGameFiles, resumedHost, resumeGame, resumeToLastGood } from "./resume";
+import { placeGameFiles, resumeUnseen } from "./resume";
 import { describeSquare, type NetHackModule } from "./memory";
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -162,35 +161,21 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
   let replayFailed = false;
 
   async function resume(text: string, name: string): Promise<boolean> {
-    let held = new HeldEvents();
     const db = new BonesDb(module!.FS);
     try {
-      await resumeToLastGood(text, (text) => resumeGame(
-        text,
-        {
-          bones: (hash) => db.get(hash),
-          boot: replayBoot(createModule, assetBase, () => true),
-          bootLast: async (session, files, makeHost) => {
-            held = new HeldEvents();
-            let replayed: ReturnType<typeof makeHost> | null = null;
-            const m = await loadSaved(session.options, session.config, (why) => replayed?.stopped(why));
-            placeGameFiles(m, name, files);
-            replayed = makeHost(m);
-            recorder = startRecorder(m, session.options, session.config);
-            const carrying = new Game(
-              m,
-              resumedHost(replayed, text, recorder, () => {
-                // typed without seeing the map
-                inputs.length = 0;
-                send({ type: "events", events: held.all() });
-              }),
-            );
-            replayed.game = carrying;
-            runCore(m, carrying);
-          },
+      await resumeUnseen(text, {
+        boot: () => replayBoot(createModule, assetBase, () => true),
+        bones: (hash) => db.get(hash),
+        load: (session, stopped) => loadSaved(session.options, session.config, stopped),
+        place: (m, files) => placeGameFiles(m, name, files),
+        recorder: (m, session) => (recorder = startRecorder(m, session.options, session.config)),
+        run: runCore,
+        show: (events) => {
+          // typed without seeing the map
+          inputs.length = 0;
+          send({ type: "events", events });
         },
-        (events) => held.add(events),
-      ));
+      });
     } catch (e) {
       // the core after this has no resume, so it asks the player
       console.warn("couldn't replay the game", e);

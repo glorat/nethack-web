@@ -3,13 +3,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Answer, GameEvent, GameRequest, MapCell } from "../../src/protocol";
-import { HeldEvents } from "../../src/port/held-events";
 import { applyEvents, cellAt, initialState, type GameState } from "../../src/port/state";
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
 import { BonesDb } from "../../src/worker/bones";
 import { Recorder } from "../../src/worker/recorder";
 import { type BootCore, never, replay, ReplayError, saveFiles, writeSaveFiles } from "../../src/worker/replayer";
-import { placeGameFiles, resumedHost, resumeGame, resumeToLastGood } from "../../src/worker/resume";
+import { placeGameFiles, resumeUnseen } from "../../src/worker/resume";
 import { describeSquare, type EmscriptenFS, type NetHackModule } from "../../src/worker/memory";
 
 const ROOT = resolve(__dirname, "../..");
@@ -227,28 +226,17 @@ export class Session {
   }
 
   private async resume(options: SessionOptions, text: string, name: string): Promise<boolean> {
-    let held = new HeldEvents();
     const db = new BonesDb(this.m.FS);
     try {
-      await resumeToLastGood(text, async (text) => resumeGame(
-        text,
-        {
-          bones: (hash) => db.get(hash),
-          boot: (await headlessBoot())(() => true),
-          bootLast: async (session, files, makeHost) => {
-            held = new HeldEvents();
-            let replayed: ReturnType<typeof makeHost> | null = null;
-            const m = await this.load(options, session.options, session.config, this.persisted, (why) => replayed?.stopped(why));
-            placeGameFiles(m, name, files);
-            replayed = makeHost(m);
-            const host = resumedHost(replayed, text, this.recorder(options, m, session.options, session.config), () => this.liveHost!.post(held.all()));
-            const game = new Game(m, host);
-            replayed.game = game;
-            this.run(m, game);
-          },
-        },
-        (events) => held.add(events),
-      ));
+      await resumeUnseen(text, {
+        boot: async () => (await headlessBoot())(() => true),
+        bones: (hash) => db.get(hash),
+        load: (session, stopped) => this.load(options, session.options, session.config, this.persisted, stopped),
+        place: (m, files) => placeGameFiles(m, name, files),
+        recorder: (m, session) => this.recorder(options, m as Module, session.options, session.config),
+        run: (m, game) => this.run(m as Module, game),
+        show: (events) => this.liveHost!.post(events),
+      });
     } catch (e) {
       this.resumeFailure = e instanceof Error ? e.message : String(e);
       await this.playLive(options, this.persisted);
