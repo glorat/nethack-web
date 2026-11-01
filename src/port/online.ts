@@ -35,7 +35,6 @@ export interface GameSummary {
   name: string;
   startedAt: number;
   lastPlayedAt: number;
-  turn: number | null;
 }
 
 export interface OnlineDeps {

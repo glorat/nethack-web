@@ -567,7 +567,8 @@ export function App() {
     // a reload comes back to this game, not to whichever is latest
     params.set("game", game.game);
     params.delete("new");
-    params.delete("tz");
+    // New Game reloads this address, and keeps to the zone chosen
+    params.set("tz", String(game.utcOffset));
     history.replaceState(null, "", `${location.pathname}?${params}`);
     document.documentElement.dataset.serverGame = game.game;
     uploader.current = createUploader(game.game, { generation: game.generation, sent: linesIn(game.recording) }, setUploadNotice);
