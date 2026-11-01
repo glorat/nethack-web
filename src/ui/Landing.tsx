@@ -31,9 +31,12 @@ function OnlineChoice({ name, onBack }: { name: string; onBack: () => void }) {
     });
   };
   useEffect(load, []);
+  const panel = useRef<HTMLDivElement>(null);
+  // the button that opened this has gone, and focus with it
+  useEffect(() => panel.current?.focus(), [games, failed]);
   if (failed)
     return (
-      <div class="online-choice">
+      <div class="online-choice" ref={panel} tabIndex={-1}>
         <p role="alert">Can't reach the server. Online games need a connection; offline play still works.</p>
         <button type="button" class="primary" onClick={load}>
           Try Again
@@ -43,9 +46,17 @@ function OnlineChoice({ name, onBack }: { name: string; onBack: () => void }) {
         </button>
       </div>
     );
-  if (!games) return <p class="online-choice">Connecting…</p>;
+  if (!games)
+    return (
+      <div class="online-choice" ref={panel} tabIndex={-1}>
+        <p role="status">Connecting…</p>
+        <button type="button" onClick={onBack}>
+          Back
+        </button>
+      </div>
+    );
   return (
-    <div class="online-choice">
+    <div class="online-choice" ref={panel} tabIndex={-1}>
       {games.length ? (
         <>
           <h2>Your games in progress</h2>
@@ -54,7 +65,6 @@ function OnlineChoice({ name, onBack }: { name: string; onBack: () => void }) {
               <li key={g.game}>
                 <a href={onlineAddress(PLAY_PATH, g.name, { game: g.game })}>
                   <strong>{g.name}</strong>
-                  {g.turn === null ? "" : `, turn ${g.turn}`}
                   <small>Last played {playedOn(g.lastPlayedAt)}</small>
                 </a>
               </li>
@@ -90,6 +100,23 @@ export function Landing() {
   const [about, setAbout] = useState(false);
   const [choosingOnline, setChoosingOnline] = useState(false);
   const [offered] = useState(onlineOffered);
+  const playButton = useRef<HTMLButtonElement>(null);
+  const backFromOnline = () => {
+    setChoosingOnline(false);
+    setTimeout(() => playButton.current?.focus());
+  };
+  const playOffline = () => {
+    const n = playerName(name);
+    if (!n) return;
+    // where the browser won't keep the name, the address carries it to the game
+    location.assign(saveName(n) ? PLAY_PATH : `${PLAY_PATH}?name=${encodeURIComponent(n)}`);
+  };
+  const chooseOnline = () => {
+    const n = playerName(name);
+    if (!n) return;
+    saveName(n);
+    setChoosingOnline(true);
+  };
   const [offlineReady, setOfflineReady] = useState(false);
   // a reload would lose what's being typed
   const busy = useRef(false);
@@ -111,10 +138,9 @@ export function Landing() {
             class="start-card"
             onSubmit={(e) => {
               e.preventDefault();
-              const n = playerName(name);
-              if (!n) return;
-              // where the browser won't keep the name, the address carries it to the game
-              location.assign(saveName(n) ? PLAY_PATH : `${PLAY_PATH}?name=${encodeURIComponent(n)}`);
+              // Enter does what's highlighted
+              if (offered) chooseOnline();
+              else playOffline();
             }}
           >
             <h1>NetHack</h1>
@@ -124,7 +150,7 @@ export function Landing() {
                 : "The classic dungeon crawl, played entirely on your device. No account, no server, and no connection needed once it's loaded."}
             </p>
             {choosingOnline ? (
-              <OnlineChoice name={playerName(name)} onBack={() => setChoosingOnline(false)} />
+              <OnlineChoice name={playerName(name)} onBack={backFromOnline} />
             ) : (
               <>
                 {changing ? (
@@ -134,19 +160,11 @@ export function Landing() {
                   </>
                 ) : null}
                 {offered ? (
-                  <button
-                    type="button"
-                    class="primary"
-                    disabled={!valid}
-                    onClick={() => {
-                      saveName(playerName(name));
-                      setChoosingOnline(true);
-                    }}
-                  >
+                  <button type="submit" class="primary" disabled={!valid} ref={playButton}>
                     {changing ? "Play Online" : `Play Online as ${remembered}`}
                   </button>
                 ) : null}
-                <button type="submit" class={offered ? undefined : "primary"} disabled={!valid}>
+                <button type={offered ? "button" : "submit"} class={offered ? undefined : "primary"} disabled={!valid} onClick={offered ? playOffline : undefined}>
                   {changing ? "Play Offline" : `Play Offline as ${remembered}`}
                 </button>
                 {changing ? null : (
