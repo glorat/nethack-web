@@ -203,6 +203,8 @@ export interface StartOptions {
   config: string;
   /** A shadow is following, and needs what a game that comes back had already recorded. */
   shadowed?: boolean;
+  /** The recording is being sent to the server, which needs what a game that comes back had already recorded. */
+  uploading?: boolean;
   authority: AuthorityChoice;
 }
 
