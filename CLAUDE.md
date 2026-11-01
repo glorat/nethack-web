@@ -1,5 +1,22 @@
 # CLAUDE.md
 
+## Commands
+
+There is no linter. To run one test:
+
+```sh
+pnpm exec vitest run tests/headless/game.test.ts -t "<test name>"
+pnpm exec playwright test play.spec -g "<test name>"
+```
+
+## Rules of the code
+
+- `src/port/` holds no DOM code, so put logic there and test it there.
+- Anything from outside the core that can change a game must go through `Authority` (`src/worker/authority.ts`), or replays diverge.
+- Read `docs/recording.md` before changing `recorder.ts`, `replayer.ts`, `replay-runner.ts`, `shadow.ts` or `resume.ts`. A change to what gets recorded also affects how unfinished games come back.
+- The service worker only registers in a production build, so offline and update behaviour can't be checked on the dev server.
+- `docs/cocoa-parity.md` lists the Cocoa features still to port; tick items off in the commit that lands them.
+
 ## Repos and commits
 
 - `nethack/` is a submodule on the `glorat/NetHack` fork, branch `web`. Commit and push core changes there first, then commit the submodule pointer here, so the pointer never names a commit GitHub lacks.
@@ -24,7 +41,7 @@
 
 ## Tests
 
-- `pnpm test`: unit tests and headless scenarios on the real core in Node (about 1s). `pnpm run test:e2e`: Playwright (about 30s). Run both before committing; CI runs both too.
+- `pnpm test`: unit tests and headless scenarios on the real core in Node (about 6s). `pnpm run test:e2e`: Playwright (about 30s). Run both before committing; CI runs both too.
 - `pnpm run test:e2e:update`: how a new version of the service worker takes over (about 45s). Not part of `test:e2e` or CI, so run it after changing the service worker or the update flow.
 - Prefer a headless scenario (`tests/headless`, via `Session` in `harness.ts`) to an e2e test unless the behaviour lives in the UI.
 - Scenarios are deterministic: `seed` sets `NETHACK_SEED`, `date` fakes `Date`, `wizard: true` allows debug-mode commands, and `failPost` makes a window callback throw once.
