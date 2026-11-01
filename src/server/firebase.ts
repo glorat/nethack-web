@@ -9,19 +9,21 @@ import type { WriteResult } from "../port/upload";
 const app = initializeApp({
   apiKey: "AIzaSyBwQKEX0nHFghDaYRhTK8QilSvWZbtNCRA",
   authDomain: "nethack-web-server.firebaseapp.com",
-  // the emulators' project, which can't reach the real one: for now this only runs against them
-  projectId: "demo-nethack",
+  // a dev build uses the emulators' project, which can't reach the real one
+  projectId: import.meta.env.DEV ? "demo-nethack" : "nethack-web-server",
   storageBucket: "nethack-web-server.firebasestorage.app",
   messagingSenderId: "1055631746678",
   appId: "1:1055631746678:web:ad062b1b08d70120a06157",
 });
 
 const auth = getAuth(app);
-connectAuthEmulator(auth, "http://127.0.0.1:9299", { disableWarnings: true });
 const db = getFirestore(app);
-connectFirestoreEmulator(db, "127.0.0.1", 8299);
 const functions = getFunctions(app, "europe-west1");
-connectFunctionsEmulator(functions, "127.0.0.1", 5299);
+if (import.meta.env.DEV) {
+  connectAuthEmulator(auth, "http://127.0.0.1:9299", { disableWarnings: true });
+  connectFirestoreEmulator(db, "127.0.0.1", 8299);
+  connectFunctionsEmulator(functions, "127.0.0.1", 5299);
+}
 
 async function signedIn(): Promise<string> {
   await auth.authStateReady();
@@ -41,6 +43,8 @@ async function userRequest<Output>(method: string, input: object): Promise<Outpu
 }
 
 export const startGame: OnlineDeps["startGame"] = (input) => userRequest("startGame", input);
+
+export const listGames: OnlineDeps["listGames"] = (input) => userRequest("listGames", input);
 
 export const resumeGame: OnlineDeps["resumeGame"] = (input) => userRequest("resumeGame", input);
 
