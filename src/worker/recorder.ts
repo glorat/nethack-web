@@ -124,6 +124,8 @@ export interface RecorderStart {
   finished(text: string): void;
   /** Replays this game's unfinished recording and carries on from its end; true if this core has been replaced. */
   resume?(text: string, name: string): Promise<boolean>;
+  /** The recording so far when it's kept on the server, as nothing here will hold it. */
+  recording?: string;
   /** The wall clock for turn times; the core's own clock comes from the page's host. */
   wallClock?: () => number;
 }
@@ -212,10 +214,13 @@ export class Recorder implements GameHost {
     return now;
   }
 
-  randomSeed(): number {
+  randomSeed(): number | Promise<number> {
+    const write = (seed: number) => {
+      this.write(`seed ${seed}`);
+      return seed;
+    };
     const seed = this.inner.randomSeed();
-    this.write(`seed ${seed}`);
-    return seed;
+    return typeof seed === "number" ? write(seed) : seed.then(write);
   }
 
   uuid(): string {
@@ -241,6 +246,7 @@ export class Recorder implements GameHost {
    */
   carryOn(text: string, status: Record<string, string>): boolean {
     const dir = this.gameDir()!;
+    this.placeRecording(dir);
     const cut = readRecording(this.fs, dir) !== text;
     if (cut) this.rewrite(dir, text);
     const chunks = chunkNames(this.fs, dir);
@@ -259,6 +265,12 @@ export class Recorder implements GameHost {
     for (const line of this.early) this.append(line);
     this.early = [];
     return cut;
+  }
+
+  private placeRecording(dir: string): void {
+    if (!this.start.recording || chunkNames(this.fs, dir).length) return;
+    for (const d of [RECORDING_DIR, dir]) if (!this.fs.analyzePath(d).exists) this.fs.mkdir(d);
+    this.rewrite(dir, this.start.recording);
   }
 
   private rewrite(dir: string, text: string): void {
@@ -324,6 +336,7 @@ export class Recorder implements GameHost {
     const dir = this.gameDir();
     if (!dir) return;
     if (!this.fs.analyzePath(RECORDING_DIR).exists) this.fs.mkdir(RECORDING_DIR);
+    this.placeRecording(dir);
     const chunks = chunkNames(this.fs, dir);
     const time = new Date(this.wallClock()).toISOString();
     const resumed = this.m._nhweb_resumed();

@@ -19,6 +19,7 @@ export interface ClientHandlers {
   events(events: GameEvent[]): void;
   request(id: number, request: GameRequest): void;
   replay?(message: ReplayMessage): void;
+  seedWanted?(id: number): void;
 }
 
 /** Main-thread handle on the game worker. */
@@ -40,7 +41,8 @@ export class GameClient {
       } else if (msg.type === "debug_files") {
         this.debugFiles.get(msg.id)?.({ files: msg.files, bones: msg.bones });
         this.debugFiles.delete(msg.id);
-      } else if (msg.type !== "shadow_status") handlers.replay?.(msg);
+      } else if (msg.type === "seed_request") handlers.seedWanted?.(msg.id);
+      else if (msg.type !== "shadow_status") handlers.replay?.(msg);
     };
     this.worker.onerror = (ev) => handlers.events([{ type: "error", text: ev.message || "worker failed" }]);
   }
@@ -77,6 +79,10 @@ export class GameClient {
 
   answer(id: number, answer: Answer): void {
     this.send({ type: "answer", id, answer });
+  }
+
+  seedReply(id: number, seed: number, now: number): void {
+    this.send({ type: "seed_reply", id, seed, now });
   }
 
   /** What farlook would say about a map square; null outside play. */

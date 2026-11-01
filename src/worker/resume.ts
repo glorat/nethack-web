@@ -71,7 +71,7 @@ export class ResumedHost implements GameHost {
     return (this.live ?? this.replayed).utcOffset();
   }
 
-  randomSeed(): number {
+  randomSeed(): number | Promise<number> {
     return (this.live ?? this.replayed).randomSeed();
   }
 
@@ -115,12 +115,12 @@ export interface ResumeCores {
  * Replays `text` up to its end. Rejects, with /save untouched, if the game
  * goes differently; the core for the last session is then to be abandoned.
  */
-export function resumeGame(text: string, cores: ResumeCores, post: (events: GameEvent[]) => void): Promise<void> {
+export async function resumeGame(text: string, cores: ResumeCores, post: (events: GameEvent[]) => void): Promise<void> {
   const { sessions } = parseRecording(text);
   const last = sessions.length - 1;
   let at = 0;
   const boot: BootCore = (session: RecordedSession, files, host) => (at++ === last ? cores.bootLast : cores.boot)(session, files, host);
-  return replay(text, boot, { post, pace: () => Promise.resolve(), delay: () => Promise.resolve(), bones: cores.bones });
+  await replay(text, boot, { post, pace: () => Promise.resolve(), delay: () => Promise.resolve(), bones: cores.bones });
 }
 
 /**

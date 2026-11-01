@@ -79,6 +79,8 @@ export type GameEvent =
   | { type: "recorded_before"; text: string }
   /** The whole recording of a game that has ended. */
   | { type: "recording"; text: string }
+  /** An online game that can't be replayed, and so can't come back. */
+  | { type: "game_lost" }
   | { type: "error"; text: string };
 
 export type MenuHow = "none" | "one" | "any";
@@ -141,6 +143,8 @@ export type WorkerMessage =
   | { type: "description"; id: number; text: string | null }
   | { type: "debug_files"; id: number; files: Record<string, Uint8Array>; bones: Record<string, Uint8Array> }
   | { type: "shadow_status"; status: ShadowStatus }
+  /** The core wants a seed for an online game; answered with a "seed_reply" of the same id. */
+  | { type: "seed_request"; id: number }
   | ReplayMessage;
 
 /** How a second core following the game by its recording is getting on. */
@@ -192,7 +196,12 @@ export interface FixedInputs {
 }
 
 /** Who answers for what decides a game's outcome. */
-export type AuthorityChoice = { kind: "browser" } | { kind: "fixed"; inputs: FixedInputs };
+export type AuthorityChoice =
+  | { kind: "browser" }
+  | { kind: "fixed"; inputs: FixedInputs }
+  /** The server answers: the page asks it for each seed, and the time comes with the seed. */
+  /** `recording` is the game so far, from the server, for a game that's coming back. */
+  | { kind: "online"; game: string; utcOffset: number; recording: string; now: number };
 
 export interface StartOptions {
   /** Base URL that nethack.js and nethack.wasm are served from. */
@@ -203,8 +212,6 @@ export interface StartOptions {
   config: string;
   /** A shadow is following, and needs what a game that comes back had already recorded. */
   shadowed?: boolean;
-  /** The recording is being sent to the server, which needs what a game that comes back had already recorded. */
-  uploading?: boolean;
   authority: AuthorityChoice;
 }
 
@@ -223,5 +230,6 @@ export type UiMessage =
   | { type: "click"; x: number; y: number; button: number }
   | { type: "ascii_map"; on: boolean }
   | { type: "answer"; id: number; answer: Answer }
+  | { type: "seed_reply"; id: number; seed: number; now: number }
   /** Farlook's text for a map square; answered with a "description" message of the same id. */
   | { type: "describe"; id: number; x: number; y: number };

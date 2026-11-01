@@ -2,7 +2,7 @@
 import type { Answer, GameEvent, GameRequest, StartOptions, UiMessage, WorkerMessage } from "../protocol";
 import { createAuthority } from "./authority";
 import { ReplayRunner } from "./replay-runner";
-import { type BootCore, never, saveFiles, writeSaveFiles } from "./replayer";
+import { type BootCore, never, replay, ReplayError, saveFiles, writeSaveFiles } from "./replayer";
 import { Shadow } from "./shadow";
 import { CONFIG_FILE, Game, type Input } from "./game";
 import { BonesDb } from "./bones";
@@ -17,6 +17,7 @@ const SAVE_DIR = "/save";
 const inputs: Input[] = [];
 let inputWaiter: ((input: Input) => void) | null = null;
 const answerWaiters = new Map<number, (answer: Answer | null) => void>();
+const seedWaiters = new Map<number, (reply: { seed: number; now: number }) => void>();
 let nextRequestId = 1;
 let module: NetHackModule | null = null;
 let game: Game | null = null;
@@ -79,11 +80,18 @@ async function loadCore(assetBase: string): Promise<CreateModule> {
   return ((await import(/* @vite-ignore */ url)) as { default: CreateModule }).default;
 }
 
-async function start({ assetBase, options, config, shadowed, uploading, authority }: StartOptions): Promise<void> {
+function askSeed(): Promise<{ seed: number; now: number }> {
+  const id = nextRequestId++;
+  send({ type: "seed_request", id });
+  return new Promise((resolve) => seedWaiters.set(id, resolve));
+}
+
+async function start({ assetBase, options, config, shadowed, authority }: StartOptions): Promise<void> {
   const createModule = await loadCore(assetBase);
+  const fromServer = authority.kind === "online" ? authority : null;
 
   const host = {
-    ...(await createAuthority(authority, () => module!.FS)),
+    ...(await createAuthority(authority, () => module!.FS, askSeed)),
     post(events: GameEvent[]) {
       send({ type: "events", events });
     },
@@ -117,7 +125,8 @@ async function start({ assetBase, options, config, shadowed, uploading, authorit
           m.ENV.NETHACKOPTIONS = coreOptions;
           m.FS.writeFile(CONFIG_FILE, coreConfig);
           m.FS.mkdir(SAVE_DIR);
-          m.FS.mount(m.IDBFS, {}, SAVE_DIR);
+          // an online game is only ever kept on the server
+          if (!fromServer) m.FS.mount(m.IDBFS, {}, SAVE_DIR);
         },
       ],
     });
@@ -134,9 +143,10 @@ async function start({ assetBase, options, config, shadowed, uploading, authorit
       config: coreConfig,
       stream: (lines, atPrompt) => send({ type: "events", events: [{ type: "recorded", lines, atPrompt }] }),
       shadowed,
-      before: shadowed || uploading ? (text) => send({ type: "events", events: [{ type: "recorded_before", text }] }) : undefined,
+      before: shadowed || fromServer ? (text) => send({ type: "events", events: [{ type: "recorded_before", text }] }) : undefined,
       finished: (text) => send({ type: "events", events: [{ type: "recording", text }] }),
-      resume: replayFailed ? undefined : resume,
+      resume: replayFailed || fromServer ? undefined : resume,
+      recording: fromServer?.recording || undefined,
     });
 
   let cores = 0;
@@ -162,18 +172,19 @@ async function start({ assetBase, options, config, shadowed, uploading, authorit
 
   async function resume(text: string, name: string): Promise<boolean> {
     let shown: GameEvent[] = [];
-    const db = new BonesDb(module!.FS);
+    const db = fromServer ? null : new BonesDb(module!.FS);
     try {
       await resumeToLastGood(text, (text) => resumeGame(
         text,
         {
-          bones: (hash) => db.get(hash),
+          bones: (hash) => db?.get(hash),
           boot: replayBoot(createModule, assetBase, () => true),
           bootLast: async (session, files, makeHost) => {
             shown = [];
             let replayed: ReturnType<typeof makeHost> | null = null;
             const m = await loadSaved(session.options, session.config, (why) => replayed?.stopped(why));
-            placeGameFiles(m, name, files);
+            if (fromServer) writeSaveFiles(m, files);
+            else placeGameFiles(m, name, files);
             replayed = makeHost(m);
             recorder = startRecorder(m, session.options, session.config);
             const carrying = new Game(
@@ -191,6 +202,7 @@ async function start({ assetBase, options, config, shadowed, uploading, authorit
         (events) => shown.push(...events),
       ));
     } catch (e) {
+      if (fromServer) throw e;
       // the core after this has no resume, so it asks the player
       console.warn("couldn't replay the game", e);
       replayFailed = true;
@@ -199,8 +211,37 @@ async function start({ assetBase, options, config, shadowed, uploading, authorit
     return true;
   }
 
+  /** A game whose last session was saved: replayed to get that save, then restored as usual. */
+  const restoreSaved = async (text: string) => {
+    const files = await replay(text, replayBoot(createModule, assetBase, () => true), {
+      post: () => {},
+      pace: () => Promise.resolve(),
+      delay: () => Promise.resolve(),
+      bones: () => undefined,
+    });
+    const m = await loadSaved(options, config);
+    if (files) writeSaveFiles(m, files);
+    recorder = startRecorder(m, options, config);
+    runCore(m, new Game(m, recorder));
+  };
+
+  const comeBack = async (text: string) => {
+    if (!/(?:^|\n)\d+ end save\n$/.test(text)) return resume(text, "");
+    try {
+      await restoreSaved(text);
+    } catch (e) {
+      if (!(e instanceof ReplayError) || !e.lastGood) throw e;
+      console.warn("went back to the last good point of the game", e);
+      await resume(`${text.split("\n").slice(0, e.lastGood).join("\n")}\n`, "");
+    }
+  };
+
   send({ type: "events", events: [{ type: "ready" }] });
-  await playLive();
+  if (!fromServer?.recording) return playLive();
+  await comeBack(fromServer.recording).catch((e) => {
+    console.warn("couldn't bring the game back", e);
+    send({ type: "events", events: [{ type: "game_lost" }] });
+  });
 }
 
 /** The callbacks of the replay's cores, which hold the cores; dropped to let them go. */
@@ -363,6 +404,12 @@ self.onmessage = (ev: MessageEvent<UiMessage>) => {
       // messages only arrive while the core is paused in a callback, so the map is settled
       send({ type: "description", id: msg.id, text: module ? describeSquare(module, msg.x, msg.y) : null });
       break;
+    case "seed_reply": {
+      const resolve = seedWaiters.get(msg.id);
+      seedWaiters.delete(msg.id);
+      resolve?.(msg);
+      break;
+    }
     case "answer": {
       const resolve = answerWaiters.get(msg.id);
       answerWaiters.delete(msg.id);
