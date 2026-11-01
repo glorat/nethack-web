@@ -1,11 +1,13 @@
 import { defineConfig } from "@playwright/test";
 
 const update = !!process.env.E2E_UPDATE;
+const upload = !!process.env.E2E_UPLOAD;
 
 export default defineConfig({
   testDir: "tests/e2e",
   // slow, and only at risk from changes to the service worker: run with pnpm run test:e2e:update
-  testIgnore: update ? undefined : "update.spec.ts",
+  // upload.spec needs the emulators, from ../nethack-server: run with pnpm run test:e2e:upload
+  testIgnore: [...(update ? [] : ["update.spec.ts"]), ...(upload ? [] : ["upload.spec.ts"])],
   timeout: 60_000,
   use: {
     baseURL: "http://127.0.0.1:5199/",

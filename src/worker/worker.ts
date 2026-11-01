@@ -79,7 +79,7 @@ async function loadCore(assetBase: string): Promise<CreateModule> {
   return ((await import(/* @vite-ignore */ url)) as { default: CreateModule }).default;
 }
 
-async function start({ assetBase, options, config, shadowed, authority }: StartOptions): Promise<void> {
+async function start({ assetBase, options, config, shadowed, uploading, authority }: StartOptions): Promise<void> {
   const createModule = await loadCore(assetBase);
 
   const host = {
@@ -134,7 +134,7 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
       config: coreConfig,
       stream: (lines, atPrompt) => send({ type: "events", events: [{ type: "recorded", lines, atPrompt }] }),
       shadowed,
-      before: shadowed ? (text) => send({ type: "events", events: [{ type: "recorded_before", text }] }) : undefined,
+      before: shadowed || uploading ? (text) => send({ type: "events", events: [{ type: "recorded_before", text }] }) : undefined,
       finished: (text) => send({ type: "events", events: [{ type: "recording", text }] }),
       resume: replayFailed ? undefined : resume,
     });

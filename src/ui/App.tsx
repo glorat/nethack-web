@@ -12,6 +12,7 @@ import { buildDebugPackage, debugPackageName, namedBones } from "../port/debug-p
 import { downloadRecording, downloadText, keepLastGame, lastGame, lastTurn } from "../port/recording";
 import { gameAuthority } from "../port/fixedinputs";
 import { shadowWanted } from "../port/shadow";
+import { createUploader, uploadWanted } from "../server/upload";
 import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port/tilesets";
 import { loadTileSheet, type TileSheet } from "../tiles";
 import { beep, wakeBeep } from "./beep";
@@ -175,6 +176,7 @@ export function App() {
   const shadowRecording = useRef("");
   const [shadowStatus, setShadowStatus] = useState<ShadowStatus | null>(null);
   const [shadowing] = useState(() => !replay && shadowWanted());
+  const [uploader] = useState(() => (!replay && uploadWanted() ? createUploader() : null));
   const [sheet, setSheet] = useState<TileSheet | null>(null);
   const [state, setState] = useState(initialState);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -312,8 +314,13 @@ export function App() {
               try {
                 localStorage.setItem(OPTIONS_KEY, savedOptionsFile(e.text, BASE_OPTIONS));
               } catch {}
-            if (e.type === "recording") setRecorded({ text: e.text, kept: keepLastGame(e.text) });
+            if (e.type === "recording") {
+              setRecorded({ text: e.text, kept: keepLastGame(e.text) });
+              uploader?.finished(e.text);
+            }
+            if (e.type === "recorded") uploader?.add(e.lines);
             if (e.type === "recorded_before") {
+              uploader?.before(e.text);
               shadowRecording.current = e.text;
               shadow.current?.before(e.text);
             }
@@ -511,6 +518,7 @@ export function App() {
       options: `name:${name}`,
       config: configFile(`${BASE_OPTIONS}${ascii ? ",ascii_map" : ""}`, savedOptions()),
       shadowed: shadowing,
+      uploading: !!uploader,
       authority: gameAuthority(),
     });
   };
