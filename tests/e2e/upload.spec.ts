@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { expect, type Page, test } from "@playwright/test";
 import { rebuildRecording } from "../../src/port/upload";
 
@@ -92,6 +93,39 @@ async function expectUploaded(page: Page, game: string, text: string): Promise<S
   await expect.poll(async () => rebuildRecording(await stored(page, game)), { timeout: 30_000 }).toBe(text);
   return stored(page, game);
 }
+
+/** Sweeps everything on the emulators, as the server's schedule would, and reads the game back. */
+function sweepAndRead(game: string): { recording: string; batches: number; segments: number; finished?: boolean } {
+  return JSON.parse(execFileSync("node", ["scripts/sweep-and-read.mjs", game], { cwd: "../nethack-server/functions", encoding: "utf8" }));
+}
+
+test("a game swept during and after play can be rebuilt from its archive and replayed", async ({ page }) => {
+  const game = await setUp(page);
+  await untilPlaying(page, `Sw${Date.now() % 100000}`);
+  await pass(page, 3);
+  await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  const during = sweepAndRead(game);
+  expect(during.finished).toBe(false);
+  expect(during.segments).toBe(1);
+  const swept = (await stored(page, game)).length;
+  expect(swept).toBeGreaterThan(0);
+
+  await pass(page, 3);
+  const text = await quit(page);
+  await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(swept);
+  await expect.poll(() => page.evaluate((game) => localStorage.getItem(`nethack.upload.game.${game}`), game), { timeout: 15_000 }).toBeNull();
+  const after = sweepAndRead(game);
+  expect(after.recording).toBe(text);
+  expect(after.finished).toBe(true);
+  expect(after.segments).toBe(2);
+
+  await page.evaluate((rebuilt) => localStorage.setItem("nethack.lastGame", rebuilt), after.recording);
+  await page.goto("/play/?replay");
+  const bar = page.getByRole("toolbar", { name: "Replay" });
+  await bar.getByLabel("Speed").selectOption({ label: "Max" });
+  await expect(bar).toContainText("End of the recording", { timeout: 20_000 });
+  await expect(bar).not.toContainText("no longer available");
+});
 
 test("a whole game can be rebuilt from the server and replayed", async ({ page }) => {
   const game = await setUp(page);
