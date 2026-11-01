@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Answer, GameEvent, GameRequest, MapCell } from "../../src/protocol";
+import { HeldEvents } from "../../src/port/held-events";
 import { applyEvents, cellAt, initialState, type GameState } from "../../src/port/state";
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
 import { BonesDb } from "../../src/worker/bones";
@@ -226,7 +227,7 @@ export class Session {
   }
 
   private async resume(options: SessionOptions, text: string, name: string): Promise<boolean> {
-    let shown: GameEvent[] = [];
+    let held = new HeldEvents();
     const db = new BonesDb(this.m.FS);
     try {
       await resumeToLastGood(text, async (text) => resumeGame(
@@ -235,18 +236,18 @@ export class Session {
           bones: (hash) => db.get(hash),
           boot: (await headlessBoot())(() => true),
           bootLast: async (session, files, makeHost) => {
-            shown = [];
+            held = new HeldEvents();
             let replayed: ReturnType<typeof makeHost> | null = null;
             const m = await this.load(options, session.options, session.config, this.persisted, (why) => replayed?.stopped(why));
             placeGameFiles(m, name, files);
             replayed = makeHost(m);
-            const host = resumedHost(replayed, text, this.recorder(options, m, session.options, session.config), () => this.liveHost!.post(shown));
+            const host = resumedHost(replayed, text, this.recorder(options, m, session.options, session.config), () => this.liveHost!.post(held.all()));
             const game = new Game(m, host);
             replayed.game = game;
             this.run(m, game);
           },
         },
-        (events) => shown.push(...events),
+        (events) => held.add(events),
       ));
     } catch (e) {
       this.resumeFailure = e instanceof Error ? e.message : String(e);

@@ -67,7 +67,7 @@ A recording holds only the hash, so a replay needs a database that has those bon
 
 ## Coming back after the page closed
 
-A game left unfinished comes back by replay when it can. When the core finds the game's lock and asks about the old game, `src/worker/resume.ts` plays the recording on new cores without showing it, the last session on a core reading the real `/save`. When the lines run out, the recorder takes over on that same core and the page is shown the last session's events. Nothing reaches IndexedDB until then.
+A game left unfinished comes back by replay when it can. When the core finds the game's lock and asks about the old game, `src/worker/resume.ts` plays the recording on new cores without showing it, the last session on a core reading the real `/save`. When the lines run out, the recorder takes over on that same core and the page is taken straight to where the last session had got to: the map, status and latest messages, with any bell along the way left out. Nothing reaches IndexedDB until then.
 
 If the replay goes differently, the recording is cut back to its last line known good, and the game comes back from there and says so. An ASCII map switched in the part cut off stays as the page has it, while the core goes back to how it was, until it's next switched. A failed `=` goes back to the `=` before it, as sums take no account of the status line; anything else goes back to the last sum or `=` that passed.
 

@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import { HeldEvents } from "../port/held-events";
 import type { Answer, GameEvent, GameRequest, StartOptions, UiMessage, WorkerMessage } from "../protocol";
 import { createAuthority } from "./authority";
 import { ReplayRunner } from "./replay-runner";
@@ -161,7 +162,7 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
   let replayFailed = false;
 
   async function resume(text: string, name: string): Promise<boolean> {
-    let shown: GameEvent[] = [];
+    let held = new HeldEvents();
     const db = new BonesDb(module!.FS);
     try {
       await resumeToLastGood(text, (text) => resumeGame(
@@ -170,7 +171,7 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
           bones: (hash) => db.get(hash),
           boot: replayBoot(createModule, assetBase, () => true),
           bootLast: async (session, files, makeHost) => {
-            shown = [];
+            held = new HeldEvents();
             let replayed: ReturnType<typeof makeHost> | null = null;
             const m = await loadSaved(session.options, session.config, (why) => replayed?.stopped(why));
             placeGameFiles(m, name, files);
@@ -181,14 +182,14 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
               resumedHost(replayed, text, recorder, () => {
                 // typed without seeing the map
                 inputs.length = 0;
-                send({ type: "events", events: shown });
+                send({ type: "events", events: held.all() });
               }),
             );
             replayed.game = carrying;
             runCore(m, carrying);
           },
         },
-        (events) => shown.push(...events),
+        (events) => held.add(events),
       ));
     } catch (e) {
       // the core after this has no resume, so it asks the player
