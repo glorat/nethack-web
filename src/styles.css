@@ -342,3 +342,14 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   display: block;
   opacity: 0.7;
 }
+
+.start-card {
+  overflow-wrap: anywhere;
+}
+.online-choice:focus {
+  outline: none;
+}
+.online-choice select {
+  padding: 6px 8px;
+  font: inherit;
+}

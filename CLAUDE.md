@@ -43,7 +43,7 @@ pnpm exec playwright test play.spec -g "<test name>"
 
 - `pnpm test`: unit tests and headless scenarios on the real core in Node (about 6s). `pnpm run test:e2e`: Playwright (about 30s). Run both before committing; CI runs both too.
 - `pnpm run test:e2e:update`: how a new version of the service worker takes over (about 45s). Not part of `test:e2e` or CI, so run it after changing the service worker or the update flow.
-- Online games: dev builds use the emulators from `../nethack-server`, and production builds the real project. Firebase is only loaded for an online game, so offline play never touches it.
+- Online games: dev builds use the emulators from `../nethack-server`, and production builds the real project. The page only loads Firebase for an online game, so offline play never talks to it, though the service worker caches the file with everything else.
 - `pnpm run test:e2e:upload`: online games against the emulators from `../nethack-server` (about 60s). Not part of `test:e2e` or CI, so run it after changing `src/port/upload.ts`, `src/port/online.ts`, `src/server/` or what gets recorded.
 - Prefer a headless scenario (`tests/headless`, via `Session` in `harness.ts`) to an e2e test unless the behaviour lives in the UI.
 - Scenarios are deterministic: `seed` sets `NETHACK_SEED`, `date` fakes `Date`, `wizard: true` allows debug-mode commands, and `failPost` makes a window callback throw once.

@@ -5,7 +5,8 @@ const PROD = "http://127.0.0.1:5198/";
 test("the production build plays offline after one visit", async ({ page, context }) => {
   const firebase: string[] = [];
   page.on("request", (r) => {
-    if (/googleapis|firebase/.test(new URL(r.url()).hostname)) firebase.push(r.url());
+    const { hostname, pathname } = new URL(r.url());
+    if (/googleapis|firebase|cloudfunctions/.test(hostname) || /\/firebase-/.test(pathname)) firebase.push(r.url());
   });
   await page.goto(PROD);
   await expect(page.getByRole("button", { name: /^Play Online/ })).toHaveCount(0);

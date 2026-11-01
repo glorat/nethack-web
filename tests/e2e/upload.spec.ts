@@ -96,6 +96,7 @@ interface Logged {
   seed?: number;
   now?: number;
   validTurns?: number;
+  utcOffset?: number;
 }
 
 /** A game's request log, oldest first, read as the server would. */
@@ -117,6 +118,7 @@ async function requests(page: Page, game: string): Promise<Logged[]> {
         seed: number(output.mapValue?.fields.seed),
         now: number(output.mapValue?.fields.now),
         validTurns: number(output.mapValue?.fields.validTurns),
+        utcOffset: number(input.mapValue?.fields.utcOffset),
       };
     });
 }
@@ -464,10 +466,38 @@ test("the landing page lists games in flight, goes back to one, and starts a new
   const text = await quit(page);
   expect(text).toMatch(/ session new \S+ tz=\+09:00/);
 
+  // New Game reloads this page
+  await page.reload();
+  await expect.poll(async () => [undefined, game].includes(await gameId(page))).toBe(false);
+  expect((await requests(page, await gameId(page)))[0].utcOffset).toBe(32400);
+
   await page.goto("/");
   await page.getByRole("button", { name: `Play Online as ${name}` }).click();
   await page.getByRole("button", { name: /^Start New Game/ }).waitFor();
   await expect(page.getByRole("link", { name: new RegExp(name) })).toHaveCount(0);
+});
+
+test("the landing page can be left while the server hangs, and focus follows the choice", async ({ page }) => {
+  await page.route(/\/europe-west1\/user$/, () => {});
+  await page.goto("/");
+  const name = page.getByLabel("Who are you?");
+  await name.fill(`Ha${Date.now() % 100000}`);
+  await name.press("Enter");
+  await expect(page.getByRole("status").filter({ hasText: "Connecting" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.activeElement?.className)).toBe("online-choice");
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByRole("button", { name: /^Play Online/ })).toBeFocused();
+  await expect(page.getByRole("button", { name: /^Play Offline/ })).toBeVisible();
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
+test("a long name fits on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/");
+  await page.getByLabel("Who are you?").fill("W".repeat(31));
+  await page.getByRole("button", { name: "Play Online" }).click();
+  await page.getByRole("button", { name: /^Start New Game/ }).waitFor();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth && !!document.querySelector(".landing") && document.querySelector(".landing")!.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test("the landing page says when it can't reach the server, and offline still plays", async ({ page }) => {
