@@ -129,7 +129,7 @@ async function expectUploaded(page: Page, game: string, text: string): Promise<S
 }
 
 /** Sweeps everything on the emulators, as the server's schedule would, and reads the game back. */
-function sweepAndRead(game: string): { recording: string; batches: number; segments: number; finished?: boolean } {
+function sweepAndRead(game: string): { recording: string; batches: number; segments: number; finished?: boolean; validation?: Record<string, unknown> } {
   return JSON.parse(execFileSync("node", ["scripts/sweep-and-read.mjs", game], { cwd: "../nethack-server/functions", encoding: "utf8" }));
 }
 
@@ -424,6 +424,56 @@ test("an online game leaves the offline last-game replay alone", async ({ page }
   await quit(page);
   expect(await page.evaluate(() => localStorage.getItem("nethack.lastGame"))).toBe("offline game");
   await expect(page.getByRole("dialog", { name: "The game is over" }).getByRole("button", { name: /replay/i })).toHaveCount(0);
+});
+
+const ALL_MATCH = { seeds: true, times: true, id: true, timeZone: true, config: true };
+
+test("a real game, reloaded, saved and restored, validates on the server's core as matching everything", async ({ page }) => {
+  await online(page);
+  const name = `Va${Date.now() % 100000}`;
+  await untilPlaying(page, name);
+  const game = await gameId(page);
+  await pass(page, 3);
+  await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await page.locator(".stats-title").waitFor({ timeout: 15_000 });
+  await afterPrompts(page);
+  await pass(page, 3);
+  await page.keyboard.press("#");
+  await page.keyboard.type("save");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("y");
+  await page.waitForURL((url) => !url.pathname.includes("/play"), { timeout: 15_000 });
+  await page.goto(`/play/?online&name=${name}&game=${game}`);
+  await page.locator(".stats-title").waitFor({ timeout: 15_000 });
+  await afterPrompts(page);
+  await pass(page, 3);
+  const text = await quit(page);
+  await expectUploaded(page, game, text);
+
+  const { validation } = sweepAndRead(game);
+  expect(validation).toMatchObject({ replayed: true, matches: ALL_MATCH, cutBacks: 0 });
+  expect(validation!.resumes).toBeGreaterThanOrEqual(2);
+});
+
+test("a real game that was cut back still validates, with the cut-back noted", async ({ page }) => {
+  await online(page);
+  await untilPlaying(page, `Vc${Date.now() % 100000}`);
+  const game = await gameId(page);
+  await pass(page, 5);
+  await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(1200);
+  await changeRecording(page, (text) => breakSum(text, 3));
+  await page.reload();
+  await expect(page.locator(".messages")).toContainText(/gone back a little/i, { timeout: 15_000 });
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await pass(page, 2);
+  const text = await quit(page);
+  await expectUploaded(page, game, text);
+
+  const { validation } = sweepAndRead(game);
+  expect(validation).toMatchObject({ replayed: true, matches: ALL_MATCH, cutBacks: 1 });
 });
 
 test("with the server out of reach, a new game waits and says so, then starts", async ({ page }) => {
