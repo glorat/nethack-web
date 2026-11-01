@@ -17,13 +17,13 @@ afterEach(() => {
   for (const r of running.splice(0)) r.stop();
 });
 
-async function runner(turnsPerSecond: number) {
+async function runner(turnsPerSecond: number, onEvents = () => {}) {
   const seen: { progress: ReplayProgress; prompt: GameRequest | null } = {
     progress: { turn: 0, playing: true, seeking: false, ended: null },
     prompt: null,
   };
   const r = new ReplayRunner(TEXT, await headlessBoot(), {
-    events: () => {},
+    events: onEvents,
     replay: (m) => {
       if (m.type === "replay_progress") seen.progress = m.progress;
       if (m.type === "replay_prompt") seen.prompt = m.request;
@@ -35,7 +35,11 @@ async function runner(turnsPerSecond: number) {
 }
 
 test("at full speed, a pause takes hold at once, not at the session's end", async () => {
-  const { r, seen } = await runner(Infinity);
+  // a page slow to draw: the core alone can finish the session within one of the runner's yields
+  const { r, seen } = await runner(Infinity, () => {
+    const until = Date.now() + 2;
+    while (Date.now() < until);
+  });
   await until(() => seen.progress.turn > 5);
   r.control({ action: "pause" });
   await until(() => r.idle);
