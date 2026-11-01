@@ -79,7 +79,7 @@ The web build never reads the high score list during play, only to rank a finish
 
 ## Watching a recording
 
-In the browser, `/play/?replay` plays the last finished game, which each game over replaces, and only the end screen offers a button for it. Recordings aren't versioned: one that no longer plays, as after an upgrade that changed the game, or that's corrupted, is reported only as no longer available. `src/worker/replay-runner.ts` plays it at a chosen number of turns a second, flashing each prompt the player answered at 1× and slower, and seeks by playing again from the start without showing the way.
+In the browser, `/play/?replay` plays the last finished game, which each game over replaces, and only the end screen offers a button for it. Recordings aren't versioned: one that no longer plays, as after an upgrade that changed the game, or that's corrupted, is reported only as no longer available. `src/worker/replay-runner.ts` plays it at a chosen number of turns a second, flashing each prompt the player answered at 1× and slower. Faster, it sends the page what happened about every 30 ms, without the bells, as a browser can't redraw the map for every event at speed. It seeks by playing again from the start without showing the way.
 
 `tests/headless/golden/` holds long recorded games that every test run replays, so a change that alters how the game plays fails there. `GOLDEN=write pnpm test golden` records them afresh, after a change meant to alter play.
 

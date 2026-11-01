@@ -10,6 +10,8 @@ const FLASH_MS = 700;
 const DELAY_MS = 50;
 // at full speed the core never gives the worker back otherwise, so controls would wait for the session's end
 const YIELD_EVERY_MS = 30;
+// a browser can't redraw the map for every event at speed, and falls far behind trying
+const SEND_EVERY_MS = 30;
 
 export interface RunnerPage {
   events(events: GameEvent[]): void;
@@ -29,6 +31,9 @@ export class ReplayRunner {
   private waiting: (() => void)[] = [];
   private yielded = 0;
   private sleeping = 0;
+  /** What the page hasn't been sent yet, at speeds that send only now and then. */
+  private held: GameEvent[] = [];
+  private sent = 0;
 
   constructor(
     private readonly text: string,
@@ -61,6 +66,7 @@ export class ReplayRunner {
   }
 
   control(control: ReplayControl): void {
+    this.sendHeld();
     switch (control.action) {
       case "play":
         if (this.ended) {
@@ -89,7 +95,7 @@ export class ReplayRunner {
     const waiting = this.waiting;
     this.waiting = [];
     for (const wake of waiting) wake();
-    this.progress();
+    this.sendProgress();
   }
 
   private begin(): void {
@@ -117,7 +123,9 @@ export class ReplayRunner {
   private post(run: number, events: GameEvent[]): void {
     if (run !== this.run) return;
     this.state = applyEvents(this.state, events);
-    if (this.seekTo === null) this.page.events(events);
+    if (this.seekTo !== null) return;
+    if (this.turnsPerSecond > FLASH_UP_TO) this.held.push(...events.filter((e) => e.type !== "bell"));
+    else this.page.events(events);
   }
 
   private async delay(run: number): Promise<void> {
@@ -138,10 +146,12 @@ export class ReplayRunner {
       this.progress();
     }
     if (this.seekTo !== null || !Number.isFinite(this.turnsPerSecond)) {
+      if (this.seekTo === null && Date.now() - this.sent >= SEND_EVERY_MS) this.send();
       await this.breathe();
       if (run !== this.run) return never();
       if (this.seekTo !== null) return;
     } else if (at.turn !== undefined) {
+      if (this.turnsPerSecond > FLASH_UP_TO) this.send();
       await this.sleep(1000 / this.turnsPerSecond);
       if (run !== this.run) return never();
     }
@@ -157,6 +167,7 @@ export class ReplayRunner {
   }
 
   private async untilPlaying(run: number): Promise<void> {
+    if (!this.playing) this.send();
     while (!this.playing) {
       await new Promise<void>((resolve) => this.waiting.push(resolve));
       if (run !== this.run) return never();
@@ -193,7 +204,23 @@ export class ReplayRunner {
     this.progress();
   }
 
+  private sendHeld(): void {
+    if (!this.held.length) return;
+    this.page.events(this.held);
+    this.held = [];
+  }
+
+  private send(): void {
+    this.sendHeld();
+    this.sendProgress();
+    this.sent = Date.now();
+  }
+
   private progress(): void {
+    if (this.seekTo !== null || !this.playing || this.ended || this.turnsPerSecond <= FLASH_UP_TO) this.send();
+  }
+
+  private sendProgress(): void {
     this.page.replay({
       type: "replay_progress",
       progress: { turn: this.turn, playing: this.playing, seeking: this.seekTo !== null, ended: this.ended },
