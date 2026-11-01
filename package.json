@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:e2e:update": "E2E_UPDATE=1 playwright test update.spec"
+    "test:e2e:update": "E2E_UPDATE=1 playwright test update.spec",
+    "test:e2e:upload": "pnpm --dir ../nethack-server run build && pnpm --dir ../nethack-server exec firebase emulators:exec --project demo-nethack --only auth,firestore,functions --log-verbosity QUIET \"cd ../nethack-web && E2E_UPLOAD=1 pnpm exec playwright test upload.spec\""
   },
   "dependencies": {
     "firebase": "^13.1.0",
