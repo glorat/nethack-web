@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { sortKey } from "../../src/port/sort";
 import { clipAround } from "../../src/ui/scroll";
+import { Session } from "../headless/harness";
 
 /** Answers the character-creation prompts until the map is showing. */
 async function startGame(page: Page, name: string) {
@@ -1436,4 +1437,81 @@ test.describe("shadowing a game", () => {
     expect(Object.keys(held.files).length).toBeGreaterThan(0);
     expect(Object.keys(held.files).every((f) => f === `0${name}` || f.startsWith(`0${name}.`))).toBe(true);
   });
+});
+
+/** Real bones from a debug-mode death on the first level, made on the core in Node as the headless bones tests make them. */
+async function firstLevelBones(): Promise<Map<string, Uint8Array>> {
+  const g = await (await Session.start({ name: "Ghost", wizard: true, keepWizardBones: true, pageSeed: 5, seedsVary: true })).skipText();
+  await g.send("\x17");
+  await g.getlin("wand of death");
+  while (g.prompt && g.prompt.kind !== "poskey") await (g.prompt.kind === "text" ? g.dismiss() : g.yn("n"));
+  await g.send("z");
+  await g.yn(g.state.inventory.find((i) => /wand/.test(i.text))!.accelerator);
+  await g.yn(".");
+  while (!g.ended) {
+    const p = g.prompt;
+    if (p?.kind === "yn") await g.yn(/^die\?|bones/i.test(p.query) ? "y" : "n");
+    else if (p?.kind === "text") await g.dismiss();
+    else if (p?.kind === "menu") await g.answer({ kind: "menu", selection: [] });
+    else throw new Error(`unexpected ${JSON.stringify(p)}`);
+  }
+  return new Map([...g.saves()].filter(([k]) => k.startsWith("bones/")));
+}
+
+/** Puts files under /save where the next game page will read them. */
+const putSaves = (page: Page, files: Map<string, Uint8Array>) =>
+  page.evaluate(
+    (entries) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open("/save");
+        open.onerror = reject;
+        open.onsuccess = () => {
+          const tx = open.result.transaction("FILE_DATA", "readwrite");
+          const store = tx.objectStore("FILE_DATA");
+          store.put({ timestamp: new Date(), mode: 0o40777 }, "/save/bones");
+          for (const [path, data] of entries) store.put({ timestamp: new Date(), mode: 0o100666, contents: new Uint8Array(data) }, `/save/${path}`);
+          tx.oncomplete = () => resolve();
+          tx.onerror = reject;
+        };
+      }),
+    [...files].map(([path, data]) => [path, [...data]] as [string, number[]]),
+  );
+
+test("a game that met bones comes back after the page closes, by its replay reading them", async ({ page }) => {
+  test.setTimeout(120_000);
+  const bones = await firstLevelBones();
+  expect([...bones.keys()]).toContain("bones/bonD0.1");
+  // a game first, so this browser has its /save to put the bones in
+  await startGame(page, `Bo${Date.now() % 100000}`);
+
+  // a game looks for bones on one level in three, by the dice, so seeds are tried until one does
+  let name = "";
+  for (let seed = 100; seed < 130 && !name; seed++) {
+    await page.goto("/");
+    await page.evaluate((seed) => {
+      const inputs = JSON.parse(localStorage.getItem("nethack.fixedInputs")!);
+      localStorage.setItem("nethack.fixedInputs", JSON.stringify({ ...inputs, seed }));
+    }, seed);
+    await putSaves(page, bones);
+    const tried = `Bo${seed}x${Date.now() % 1000}`;
+    await startGame(page, tried);
+    await untilCommand(page);
+    if (/^\d+ bones bonD0\.1 [0-9a-f]{64}$/m.test(await recording(page, tried))) name = tried;
+  }
+  expect(name, "no seed looked for the bones").not.toBe("");
+
+  // saved and restored, so the session that met the bones replays on a core of its own, not the one carrying on
+  const title = await page.locator(".stats-title").innerText();
+  await page.keyboard.press("S");
+  await page.getByRole("button", { name: `Continue Offline as ${name}` }).click();
+  await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
+  await untilPlaying(page);
+  // no moves: whatever left the bones may be close by
+  await expect.poll(() => recording(page, name)).toMatch(/^\d+ session restore /m);
+
+  await page.reload();
+  await page.locator(".app[data-commanding]").waitFor({ timeout: 30_000 });
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator(".stats-title")).toHaveText(title);
+  expect(await recording(page, name)).toMatch(/^\d+ back /m);
 });

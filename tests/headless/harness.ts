@@ -1,7 +1,7 @@
 // Plays the real WASM core in Node, one step at a time, for tests.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Answer, GameEvent, GameRequest, MapCell } from "../../src/protocol";
 import { applyEvents, cellAt, initialState, type GameState } from "../../src/port/state";
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
@@ -11,7 +11,7 @@ import { type BootCore, never, replay, ReplayError, saveFiles, writeSaveFiles } 
 import { placeGameFiles, resumeUnseen } from "../../src/worker/resume";
 import { describeSquare, type EmscriptenFS, type NetHackModule } from "../../src/worker/memory";
 
-const ROOT = resolve(__dirname, "../..");
+const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 
 // a Monday at first quarter, so no full or new moon and no Friday the 13th change luck
 const DEFAULT_DATE = "2026-01-26T12:00:00Z";
