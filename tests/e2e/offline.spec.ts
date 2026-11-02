@@ -6,7 +6,7 @@ test("the production build plays offline after one visit", async ({ page, contex
   const firebase: string[] = [];
   page.on("request", (r) => {
     const { hostname, pathname } = new URL(r.url());
-    if (/googleapis|firebase|cloudfunctions/.test(hostname) || /\/firebase-/.test(pathname)) firebase.push(r.url());
+    if (/googleapis|firebase|cloudfunctions|gstatic/.test(hostname) || /\/firebase-|recaptcha/.test(pathname)) firebase.push(r.url());
   });
   await page.goto(PROD);
   await expect(page.getByRole("button", { name: /^Play Online/ })).toHaveCount(0);
