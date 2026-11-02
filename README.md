@@ -17,6 +17,8 @@ NetHack and this web port are under the NetHack General Public License ([LICENSE
   window port (`win/shim/winshim.c`) on top of it.
 - `src/protocol.ts`: the messages between the worker and the UI.
 - `src/port/`: UI-side game state, without DOM code.
+- `src/online/`, `src/offline/`: what belongs to one mode only, from the worker's
+  side to the page's. Everything else is shared by both.
 - `index.html`, `src/landing.tsx`: the landing page at `/`, which loads none of the game.
 - `play/index.html`, `src/main.tsx`: the game at `/play/`.
 - `src/ui/`: map, stats, equipment, messages, inventory, and dialogs.
