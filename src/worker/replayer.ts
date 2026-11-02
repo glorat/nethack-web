@@ -46,11 +46,68 @@ export interface Line {
   rest: string;
 }
 
+/** Where each line a recording's sessions replay starts in its text, and its line number, for all its sessions. */
+interface LineIndex {
+  text: string;
+  starts: Uint32Array;
+  ats: Uint32Array;
+  count: number;
+}
+
+/**
+ * A session's lines, kept as where each starts in the recording's text and
+ * read again as the replay reaches it: as parsed objects, a long game's lines
+ * take several times the text's own size.
+ */
+export class SessionLines {
+  private count = 0;
+  /** Lines added as a recording still being written goes on. */
+  private added: Line[] = [];
+
+  constructor(
+    private readonly index: LineIndex,
+    private readonly from: number,
+  ) {}
+
+  get length(): number {
+    return this.count + this.added.length;
+  }
+
+  get(i: number): Line | undefined {
+    if (i >= this.count) return this.added[i - this.count];
+    const { text, starts, ats } = this.index;
+    const start = starts[this.from + i];
+    const end = text.indexOf("\n", start);
+    return parseLine(text.slice(start, end < 0 ? undefined : end), ats[this.from + i]);
+  }
+
+  first(tag: string): Line | undefined {
+    for (let i = 0; i < this.length; i++) {
+      const line = this.get(i);
+      if (line?.tag === tag) return line;
+    }
+    return undefined;
+  }
+
+  push(line: Line): void {
+    this.added.push(line);
+  }
+
+  /** The next line of the recording, already read; sessions take theirs in order. */
+  take(start: number, at: number): void {
+    const index = this.index;
+    index.starts[index.count] = start;
+    index.ats[index.count] = at;
+    index.count++;
+    this.count++;
+  }
+}
+
 export interface RecordedSession {
   kind: "new" | "restore" | "unrecorded";
   options: string;
   config: string;
-  lines: Line[];
+  recorded: SessionLines;
 }
 
 export interface Recording {
@@ -67,12 +124,20 @@ export function parseLine(raw: string, at: number): Line {
   return { at, tag: m[2], rest: m[3] ?? "" };
 }
 
+/** Reads every line, so one that can't be read fails here, before any replay. */
 export function parseRecording(text: string): Recording {
   const sessions: RecordedSession[] = [];
   let utcOffset: number | null = null;
-  for (const [i, raw] of text.split("\n").entries()) {
-    if (!raw) continue;
-    const line = parseLine(raw, i + 1);
+  let lines = 1;
+  for (let i = text.indexOf("\n"); i >= 0; i = text.indexOf("\n", i + 1)) lines++;
+  const index: LineIndex = { text, starts: new Uint32Array(lines), ats: new Uint32Array(lines), count: 0 };
+  for (let start = 0, i = 0; start < text.length; i++) {
+    const newline = text.indexOf("\n", start);
+    const end = newline < 0 ? text.length : newline;
+    const lineStart = start;
+    start = end + 1;
+    if (end === lineStart) continue;
+    const line = parseLine(text.slice(lineStart, end), i + 1);
     const session = sessions[sessions.length - 1];
     if (line.tag === "nhrec") {
       if (Number(line.rest) !== FORMAT) throw new ReplayError(`recording format ${line.rest}, not ${FORMAT}`);
@@ -82,7 +147,7 @@ export function parseRecording(text: string): Recording {
         throw new ReplayError(`unknown session: ${line.rest}`);
       const tz = /tz=(\S+)/.exec(line.rest)?.[1];
       if (tz && utcOffset === null) utcOffset = zoneSeconds(tz);
-      sessions.push({ kind, options: "", config: "", lines: [] });
+      sessions.push({ kind, options: "", config: "", recorded: new SessionLines(index, index.count) });
     } else if (!session) {
       throw new ReplayError(`line ${line.at} comes before any session`);
     } else if (line.tag === "opt") {
@@ -90,7 +155,7 @@ export function parseRecording(text: string): Recording {
     } else if (line.tag === "rc") {
       session.config = JSON.parse(line.rest);
     } else if (line.tag !== "alone") {
-      session.lines.push(line);
+      session.recorded.take(lineStart, line.at);
     }
   }
   if (!sessions.length) throw new ReplayError("no game in the recording");
@@ -238,7 +303,7 @@ export class ReplayHost implements GameHost {
     if (!line) return;
     const how = this.m._nhweb_game_over() ? "over" : "save";
     if (line.rest !== how) return this.fail(line, `the game ended by ${how}`);
-    const after = this.session.lines[this.at];
+    const after = this.session.recorded.get(this.at);
     if (after) return this.fail(after, "comes after the session's end");
     this.stopWith("end");
   }
@@ -261,12 +326,13 @@ export class ReplayHost implements GameHost {
   /** The next recorded time; as the core's reads of the clock aren't the game, one with none left to take gets the last. */
   now(): number {
     let ahead = this.at;
-    while (this.session.lines[ahead] && this.session.lines[ahead].tag !== "now" && MARKS.has(this.session.lines[ahead].tag)) ahead++;
-    if (this.session.lines[ahead]?.tag === "now") {
+    let line = this.session.recorded.get(ahead);
+    while (line && line.tag !== "now" && MARKS.has(line.tag)) line = this.session.recorded.get(++ahead);
+    if (line?.tag === "now") {
       const line = this.take("now");
       if (line) this.clock = Number(line.rest);
     }
-    return this.clock ?? Number(this.session.lines.find((l) => l.tag === "now")?.rest ?? 0);
+    return this.clock ?? Number(this.session.recorded.first("now")?.rest ?? 0);
   }
 
   randomSeed(): number {
@@ -312,13 +378,13 @@ export class ReplayHost implements GameHost {
   private async next(tags: string[], request?: GameRequest): Promise<Line> {
     let turn: number | undefined;
     for (;;) {
-      for (let line = this.session.lines[this.at]; line && MARKS.has(line.tag); line = this.session.lines[this.at]) {
+      for (let line = this.session.recorded.get(this.at); line && MARKS.has(line.tag); line = this.session.recorded.get(this.at)) {
         this.at++;
         if (line.tag === "T") turn = Number(line.rest.split(" ")[0]);
         if (this.guard(() => this.mark(line), line) === null) break;
       }
       if (this.done) return never();
-      if (this.session.lines[this.at] || !this.hooks.more) break;
+      if (this.at < this.session.recorded.length || !this.hooks.more) break;
       await this.hooks.more();
     }
     try {
@@ -333,7 +399,7 @@ export class ReplayHost implements GameHost {
   private take(...tags: string[]): Line | null {
     for (;;) {
       if (this.done) return null;
-      const line = this.session.lines[this.at];
+      const line = this.session.recorded.get(this.at);
       if (!line) {
         this.stopWith("out");
         return null;
