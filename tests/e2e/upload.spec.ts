@@ -130,7 +130,9 @@ async function expectUploaded(page: Page, game: string, text: string): Promise<S
 
 /** Sweeps everything on the emulators, as the server's schedule would, and reads the game back. */
 function sweepAndRead(game: string): { recording: string; batches: number; segments: number; finished?: boolean; validation?: Record<string, unknown>; xlog?: string; result?: Record<string, unknown> } {
-  return JSON.parse(execFileSync("node", ["lib/scripts/sweep-and-read.js", game], { cwd: "../nethack-server/functions", encoding: "utf8" }));
+  const out = execFileSync("node", ["lib/scripts/sweep-and-read.js", game], { cwd: "../nethack-server/functions", encoding: "utf8" });
+  // the server's own logging goes to stdout too, ahead of the answer
+  return JSON.parse(out.trim().split("\n").at(-1)!);
 }
 
 test("a game swept during and after play can be rebuilt from its archive and replayed", async ({ page }) => {
