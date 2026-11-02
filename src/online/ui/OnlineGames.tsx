@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import { PLAY_PATH } from "../../port/name";
+import { shownName } from "../account";
 import { ascended, type FinishedGame, outcome, watchAddress } from "../results";
 import { listFinishedGames } from "../server/api";
 
@@ -37,7 +38,7 @@ function Row(g: FinishedGame) {
       <strong>{result?.points !== undefined ? result.points.toLocaleString() : "–"}</strong>
       <span>{outcome(g)}</span>
       <small>{endedOn(endedAt)}</small>
-      <a href={watchAddress(PLAY_PATH, game)} aria-label={`Watch ${name}'s game of ${endedOn(endedAt)}`}>
+      <a href={watchAddress(PLAY_PATH, game)} aria-label={`Watch ${shownName(name)}'s game of ${endedOn(endedAt)}`}>
         Watch
       </a>
     </li>

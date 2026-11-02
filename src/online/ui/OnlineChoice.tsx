@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { PLAY_PATH } from "../../port/name";
-import { listOnlineGames } from "../server/api";
+import { type Profile, shownName } from "../account";
+import { listOnlineGames, loadProfile } from "../server/api";
 import { type GameSummary, onlineAddress } from "../session";
 import { zoneChoices, zoneLabel } from "../zones";
 
@@ -10,18 +11,25 @@ function playedOn(at: number): string {
   return new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
-/** Where an online game starts: the player's games still in flight, or a new one. */
-export function OnlineChoice({ name, onBack }: { name: string; onBack: () => void }) {
+/** Where an online game starts: the player's games still in flight, or a new one, named by the server. */
+export function OnlineChoice({ onBack }: { onBack: () => void }) {
   const [games, setGames] = useState<GameSummary[] | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [failed, setFailed] = useState(false);
   const [zone, setZone] = useState(browserZone);
   const load = () => {
     setFailed(false);
     setGames(null);
-    listOnlineGames().then(setGames, (e) => {
-      console.warn("couldn't list online games", e);
-      setFailed(true);
-    });
+    Promise.all([listOnlineGames(), loadProfile()]).then(
+      ([games, profile]) => {
+        setProfile(profile);
+        setGames(games);
+      },
+      (e) => {
+        console.warn("couldn't list online games", e);
+        setFailed(true);
+      },
+    );
   };
   useEffect(load, []);
   const panel = useRef<HTMLDivElement>(null);
@@ -39,7 +47,7 @@ export function OnlineChoice({ name, onBack }: { name: string; onBack: () => voi
         </button>
       </div>
     );
-  if (!games)
+  if (!games || !profile)
     return (
       <div class="online-choice" ref={panel} tabIndex={-1}>
         <p role="status">Connecting…</p>
@@ -57,7 +65,7 @@ export function OnlineChoice({ name, onBack }: { name: string; onBack: () => voi
             {games.map((g) => (
               <li key={g.game}>
                 <a href={onlineAddress(PLAY_PATH, g.name, { game: g.game })}>
-                  <strong>{g.name}</strong>
+                  <strong>{shownName(g.name)}</strong>
                   <small>Last played {playedOn(g.lastPlayedAt)}</small>
                 </a>
               </li>
@@ -75,8 +83,9 @@ export function OnlineChoice({ name, onBack }: { name: string; onBack: () => voi
         ))}
       </select>
       <p class="start-sub">Sets the date and hour in your game, which the moon and some monsters care about. It can't change once the game has started.</p>
-      <button type="button" class="primary" onClick={() => location.assign(onlineAddress(PLAY_PATH, name, { utcOffset: zone }))}>
-        Start New Game as {name}
+      {profile.handle ? null : <p class="start-sub">Until you sign in and choose a handle, your characters are anonymous.</p>}
+      <button type="button" class="primary" onClick={() => location.assign(onlineAddress(PLAY_PATH, profile.name, { utcOffset: zone }))}>
+        {profile.handle ? `Start New Game as ${profile.handle}` : "Start New Game"}
       </button>
       <button type="button" onClick={onBack}>
         Back

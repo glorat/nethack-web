@@ -31,6 +31,7 @@ async function fakeServer(page: Page): Promise<Map<string, string | undefined>> 
     const now = Math.floor(Date.now() / 1000);
     const answers: Record<string, object> = {
       listGames: { games: [] },
+      profile: { signedIn: false, handle: null, name: "an_player", request: null },
       startGame: { game: "game", utcOffset: 0, options: input?.options, config: input?.config, now },
       seed: { seed: 1, now, validTurns: 1000 },
     };

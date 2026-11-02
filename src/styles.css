@@ -268,6 +268,11 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .landing { height: 100%; overflow-y: auto; }
 .landing-bar { display: flex; align-items: center; justify-content: space-between; padding: 4px 16px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
 .landing-title { font-weight: 600; }
+.landing-bar-end { display: flex; align-items: center; gap: 8px; }
+.landing-bar-end .account:not(button) { color: var(--muted); }
+.handle-prompt { display: flex; flex-direction: column; gap: 8px; max-width: 480px; }
+.handle-prompt small { color: var(--muted); }
+.handle-prompt button { align-self: flex-start; }
 .landing-main { display: flex; flex-direction: column; gap: 16px; max-width: 1120px; margin: 0 auto; padding: 24px 16px; }
 .landing-hero { display: flex; gap: 16px; align-items: stretch; }
 .landing-hero .start-card { flex: none; }
