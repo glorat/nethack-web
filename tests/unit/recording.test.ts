@@ -11,8 +11,8 @@ test("text holding any character reads back as it was written", () => {
   for (const text of ['say "hi"\\', "line break ", "", " "]) {
     const line = answerLine(request, { kind: "getlin", text });
     const recording = parseRecording(`${head}5 ${line}\r\n`);
-    expect(recording.sessions[0].lines[0].tag).toBe("l");
-    expect(parseAnswer(request, recording.sessions[0].lines[0].rest)).toEqual({ kind: "getlin", text });
+    expect(recording.sessions[0].recorded.get(0)?.tag).toBe("l");
+    expect(parseAnswer(request, recording.sessions[0].recorded.get(0)!.rest)).toEqual({ kind: "getlin", text });
   }
   expect(parseRecording(head).utcOffset).toBe(11 * 3600);
 });
@@ -82,8 +82,8 @@ test("a game that can't replay doesn't replace the last game that can", () => {
 });
 
 test("the clock answers with each recorded time in turn, then the last", () => {
-  const lines = [5, 6].map((n, i) => ({ at: i + 1, tag: "now", rest: String(n) }));
-  const session = { kind: "new" as const, options: "", config: "", lines };
+  const { sessions } = parseRecording(`${head}5 now 5\n6 now 6\n`);
+  const session = sessions[0];
   const host = new ReplayHost(session, {} as NetHackModule, 0, { post() {}, pace: () => Promise.resolve() });
   expect([host.now(), host.now(), host.now()]).toEqual([5, 6, 6]);
 });

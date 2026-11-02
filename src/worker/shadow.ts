@@ -104,7 +104,7 @@ export class Shadow {
     for (const raw of lines) {
       const line = parseLine(raw, ++this.lineCount);
       if (line.tag === "end") this.sawEnd = true;
-      if (!SKIPPED.has(line.tag)) this.session?.lines.push(line);
+      if (!SKIPPED.has(line.tag)) this.session?.recorded.push(line);
     }
     const wake = this.wake;
     this.wake = null;
