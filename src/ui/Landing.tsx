@@ -2,12 +2,11 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { WIKI_URL } from "../port/describe";
 import { playerName, PLAY_PATH, savedName, saveName } from "../port/name";
 import { type GameSummary, onlineAddress, onlineWanted } from "../online/session";
-import { zoneChoices, zoneLabel } from "../online/zones";
+import { OnlineChoice } from "../online/ui/OnlineChoice";
 import { saveOptions, savedOptions } from "../port/options";
 import { lastMode } from "../port/last-mode";
 import { offlineGameUnder } from "../offline/progress";
-import { lastGame } from "../offline/last-game";
-import { ascended, savedScores, scoreDate } from "../offline/scores";
+import { DeviceGames } from "../offline/ui/DeviceGames";
 import { listOnlineGames } from "../online/server/api";
 import { updateWhenIdle } from "../sw/register";
 import { AboutDialog } from "./dialogs/AboutDialog";
@@ -15,113 +14,6 @@ import { OptionsDialog } from "./dialogs/OptionsDialog";
 
 /** Online stays out of sight in a production build until it's ready for players; `?online` shows it, for trying it there. */
 const onlineOffered = () => import.meta.env.DEV || onlineWanted(location.search);
-
-const browserZone = () => -new Date().getTimezoneOffset() * 60;
-
-function playedOn(at: number): string {
-  return new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
-
-/** Where an online game starts: the player's games still in flight, or a new one. */
-function OnlineChoice({ name, onBack }: { name: string; onBack: () => void }) {
-  const [games, setGames] = useState<GameSummary[] | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [zone, setZone] = useState(browserZone);
-  const load = () => {
-    setFailed(false);
-    setGames(null);
-    listOnlineGames().then(setGames, (e) => {
-      console.warn("couldn't list online games", e);
-      setFailed(true);
-    });
-  };
-  useEffect(load, []);
-  const panel = useRef<HTMLDivElement>(null);
-  // the button that opened this has gone, and focus with it
-  useEffect(() => panel.current?.focus(), [games, failed]);
-  if (failed)
-    return (
-      <div class="online-choice" ref={panel} tabIndex={-1}>
-        <p role="alert">Can't reach the server. Online games need a connection; offline play still works.</p>
-        <button type="button" class="primary" onClick={load}>
-          Try Again
-        </button>
-        <button type="button" onClick={onBack}>
-          Back
-        </button>
-      </div>
-    );
-  if (!games)
-    return (
-      <div class="online-choice" ref={panel} tabIndex={-1}>
-        <p role="status">Connecting…</p>
-        <button type="button" onClick={onBack}>
-          Back
-        </button>
-      </div>
-    );
-  return (
-    <div class="online-choice" ref={panel} tabIndex={-1}>
-      {games.length ? (
-        <>
-          <h2>Your games in progress</h2>
-          <ul class="online-games">
-            {games.map((g) => (
-              <li key={g.game}>
-                <a href={onlineAddress(PLAY_PATH, g.name, { game: g.game })}>
-                  <strong>{g.name}</strong>
-                  <small>Last played {playedOn(g.lastPlayedAt)}</small>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
-      <h2>New game</h2>
-      <label for="zone">Time zone</label>
-      <select id="zone" value={zone} onChange={(e) => setZone(Number((e.target as HTMLSelectElement).value))}>
-        {zoneChoices(browserZone()).map((z) => (
-          <option key={z} value={z}>
-            {zoneLabel(z)}
-          </option>
-        ))}
-      </select>
-      <p class="start-sub">Sets the date and hour in your game, which the moon and some monsters care about. It can't change once the game has started.</p>
-      <button type="button" class="primary" onClick={() => location.assign(onlineAddress(PLAY_PATH, name, { utcOffset: zone }))}>
-        Start New Game as {name}
-      </button>
-      <button type="button" onClick={onBack}>
-        Back
-      </button>
-    </div>
-  );
-}
-
-/** What this browser remembers of finished games. Offline games only, as online ones are the server's. */
-function DeviceGames() {
-  const [scores] = useState(() => savedScores().slice(0, 5));
-  const [replayable] = useState(() => lastGame() !== null);
-  if (!scores.length && !replayable) return null;
-  return (
-    <section class="landing-panel landing-device">
-      <h2>{scores.length ? "Your best games on this device" : "On this device"}</h2>
-      {scores.length ? (
-        <ol class="device-scores">
-          {scores.map((s, i) => (
-            <li key={i} class={ascended(s) ? "ascended" : undefined}>
-              <strong>{s.points.toLocaleString()}</strong>
-              <span>
-                {s.name} ({s.role}-{s.race}): {s.death}
-              </span>
-              <small>{scoreDate(s)}</small>
-            </li>
-          ))}
-        </ol>
-      ) : null}
-      {replayable ? <a href={`${PLAY_PATH}?replay`}>Watch your last game</a> : null}
-    </section>
-  );
-}
 
 export function Landing() {
   const [remembered] = useState(savedName);
