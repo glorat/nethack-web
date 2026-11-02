@@ -282,6 +282,17 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .landing-panel kbd { font: 12px var(--mono); }
 .landing-warning { color: #e3b341; }
 .landing-ready { margin: 0; color: var(--hp); }
+.landing-device a, .landing-footer a { color: var(--accent); }
+.device-scores { list-style: none; margin: 0 0 8px; padding: 0; }
+.device-scores li { display: grid; grid-template-columns: 7em 1fr auto; gap: 8px; padding: 4px 0; overflow-wrap: anywhere; }
+.device-scores strong { font-variant-numeric: tabular-nums; }
+.device-scores small { color: var(--muted); }
+.device-scores .ascended span { color: var(--hp); }
+.start-links { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.start-links button { padding: 6px 0; background: none; border: none; color: var(--muted); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
+.start-links button:hover { color: var(--text, inherit); }
+.landing-footer { max-width: 1120px; margin: 0 auto; padding: 8px 16px 24px; color: var(--muted); font-size: 12px; }
+.landing-footer p { margin: 4px 0; }
 .landing-panel ul { margin-top: 8px; }
 
 /* start screen */
@@ -299,6 +310,8 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .landing-hero { flex-direction: column; }
   .landing-hero .start-card { width: 100%; }
   .landing-panels { grid-template-columns: 1fr; }
+  .device-scores li { grid-template-columns: 6.5em 1fr; }
+  .device-scores small { grid-column: 2; }
   .inventory, .inv-resize, .show-inventory { display: none; }
   .top { height: auto; flex-wrap: wrap; }
 }

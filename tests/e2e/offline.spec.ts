@@ -37,5 +37,5 @@ test("a production build offers online games only when the address asks", async 
   await page.goto(PROD);
   await expect(page.getByRole("button", { name: /^Play Offline/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Play Online/ })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Play online" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Online or offline?" })).toHaveCount(0);
 });

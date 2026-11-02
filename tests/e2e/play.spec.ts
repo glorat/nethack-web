@@ -11,7 +11,7 @@ async function startGame(page: Page, name: string) {
 /** Goes through the landing page as this character, whatever name it remembers. */
 async function enterGame(page: Page, name: string) {
   await page.goto("/");
-  const play = page.getByRole("button", { name: /^Play Offline/ });
+  const play = page.getByRole("button", { name: /^(Play|Continue) Offline/ });
   await play.waitFor();
   const change = page.getByRole("button", { name: "Change Name" });
   if (await change.isVisible()) await change.click();
@@ -136,7 +136,7 @@ test("Save & Quit goes to the landing page, and Play and a reload both bring the
 
   // Save & Quit doesn't ask again, as in Cocoa
   await page.keyboard.press("S");
-  const play = page.getByRole("button", { name: `Play Offline as ${name}` });
+  const play = page.getByRole("button", { name: `Continue Offline as ${name}` });
   await expect(play).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
 
@@ -169,7 +169,7 @@ test("the landing page opens without loading the game, and Back returns to it fr
   await untilPlaying(page);
   expect(new URL(page.url()).pathname).toBe("/play/");
   await page.goBack();
-  await expect(page.getByRole("button", { name: /^Play Offline as Back/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Continue Offline as Back/ })).toBeVisible();
 });
 
 test("the game page without a name goes to the landing page", async ({ page }) => {
@@ -1083,6 +1083,56 @@ test("when the game ends, a dialog offers a new game under the same name, or the
   await quitGame();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: `Play Offline as ${name}` })).toBeVisible();
+
+  await page.getByRole("link", { name: "Watch your last game" }).click();
+  await expect(page.locator(".stats-title")).toBeVisible({ timeout: 15_000 });
+  expect(new URL(page.url()).search).toBe("?replay");
+});
+
+test("a saved game is what the landing page offers first, and a new visitor sees no games of their own", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /best games/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Watch your last game" })).toHaveCount(0);
+  const name = `First${Date.now() % 100000}`;
+  await startGame(page, name);
+  await page.keyboard.press("S");
+  const first = page.locator("form button").first();
+  await expect(first).toHaveText(`Continue Offline as ${name}`);
+  await first.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
+});
+
+test("the high score file a finished game leaves shows on the landing page", async ({ page }) => {
+  await startGame(page, `Best${Date.now() % 100000}`);
+  const quit = async () => {
+    await page.keyboard.press("#");
+    await page.keyboard.type("quit");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("y");
+    await untilGameOver(page);
+  };
+  await quit();
+  // a fresh hero scores nothing, which the core wouldn't list, so the file gets an earlier game's line
+  await page.evaluate(
+    (line) =>
+      new Promise((resolve, reject) => {
+        const open = indexedDB.open("/save");
+        open.onsuccess = () => {
+          const contents = new TextEncoder().encode(line);
+          const put = open.result.transaction("FILE_DATA", "readwrite").objectStore("FILE_DATA").put({ timestamp: new Date(), mode: 33188, contents }, "/save/record");
+          put.onsuccess = resolve;
+          put.onerror = reject;
+        };
+      }),
+    "5.0.0 1234 0 3 3 0 16 1 20261102 20261101 0 Val Hum Fem Law Agnes,killed by a newt\n",
+  );
+  await page.keyboard.press("Enter");
+  await untilPlaying(page);
+  await quit();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("heading", { name: "Your best games on this device" })).toBeVisible();
+  await expect(page.locator(".device-scores li")).toContainText("Agnes (Val-Hum): killed by a newt");
 });
 
 test("the Help menu opens the game's help and the NetHack Wiki", async ({ page, context }) => {
@@ -1353,7 +1403,7 @@ test.describe("shadowing a game", () => {
     await startGame(page, name);
     for (let i = 0; i < 5; i++) await page.keyboard.press("s");
     await page.keyboard.press("S");
-    const play = page.getByRole("button", { name: `Play Offline as ${name}` });
+    const play = page.getByRole("button", { name: `Continue Offline as ${name}` });
     await expect(play).toBeVisible();
     await page.evaluate(
       (key) =>

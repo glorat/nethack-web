@@ -144,7 +144,15 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
       stream: (lines, atPrompt) => send({ type: "events", events: [{ type: "recorded", lines, atPrompt }] }),
       shadowed,
       before: shadowed || fromServer ? (text) => send({ type: "events", events: [{ type: "recorded_before", text }] }) : undefined,
-      finished: (text) => send({ type: "events", events: [{ type: "recording", text }] }),
+      finished: (text) => {
+        send({ type: "events", events: [{ type: "recording", text }] });
+        if (fromServer) return;
+        try {
+          send({ type: "events", events: [{ type: "scores", text: m.FS.readFile(`${SAVE_DIR}/record`, { encoding: "utf8" }) as string }] });
+        } catch {
+          // a game scoring nothing may leave no file
+        }
+      },
       resume: replayFailed || fromServer ? undefined : resume,
       recording: fromServer?.recording || undefined,
     });

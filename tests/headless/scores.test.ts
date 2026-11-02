@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { parseScores } from "../../src/port/scores";
 import { replayRecording, Session } from "./harness";
 
 /** Quits a game, declining the questions at its end. */
@@ -40,6 +41,11 @@ async function doppelgangers(saves?: Map<string, Uint8Array>) {
   }
   return g;
 }
+
+test("the landing page can read the high score file the core writes", async () => {
+  const record = (await scores()).get("record")!;
+  expect(parseScores(new TextDecoder().decode(record))).toEqual([expect.objectContaining({ name: "Scorer", death: "quit", points: expect.any(Number) })]);
+});
 
 test("what's on the high score list makes no difference to play", async () => {
   const without = await doppelgangers();
