@@ -52,7 +52,7 @@ export const listFinishedGames = async (): Promise<FinishedGame[]> => (await (aw
 export const finishedGameRecording = async (game: string): Promise<string | null> =>
   (await (await server()).gameRecording({ game, sentAt: Date.now() }))?.recording ?? null;
 
-/** Whether the player is signed in, their handle, and what a new game would call them. */
+/** Whether the player is signed in, their handle, and their latest request for one. */
 export const loadProfile = async (): Promise<Profile> => (await server()).profile();
 
 export const signInWithGoogle = async (): Promise<void> => (await server()).signInWithGoogle();

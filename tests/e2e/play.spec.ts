@@ -185,7 +185,7 @@ test("the landing page asks the server nothing for someone whose last game was o
     localStorage.setItem("nethack-web.lastMode", "offline");
   });
   await page.reload();
-  await expect(page.getByRole("button", { name: "Play Offline as Mixed" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Play Online as Mixed/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign In with Google" })).toBeVisible();
   await page.waitForTimeout(1000);
   expect(server).toEqual([]);

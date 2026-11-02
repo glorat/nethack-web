@@ -41,7 +41,7 @@ export function HandlePrompt({ profile, onProfile }: { profile: Profile; onProfi
       }}
     >
       <h2>Choose your handle</h2>
-      <p>Your public name on the server, and the name of every online character you start. It can't be changed for now.</p>
+      <p>Your public name on the server, shown with your online games and scores whatever you call your characters. It can't be changed for now.</p>
       <label for="handle">Handle</label>
       <input id="handle" value={handle} maxLength={20} autoComplete="off" onInput={(e) => setHandle((e.target as HTMLInputElement).value)} aria-describedby="handle-hint" />
       <small id="handle-hint">{HANDLE_HINT}</small>
