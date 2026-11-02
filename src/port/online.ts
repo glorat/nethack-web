@@ -107,6 +107,18 @@ export class OnlineSession {
   }
 }
 
+/** App Check said no, as opposed to not being reached. The SDK won't ask again for a day after any such answer. */
+export function appCheckRefused(e: unknown): boolean {
+  const { code, customData } = (e ?? {}) as { code?: string; customData?: { httpStatus?: unknown } };
+  const status = Number(customData?.httpStatus);
+  return (code === "appCheck/initial-throttle" || code === "appCheck/throttled") && status >= 400 && status < 500;
+}
+
+/** The landing page, saying why an online game ended there. */
+export function refusedAddress(path: string): string {
+  return `${path}?online&refused`;
+}
+
 /** Whether the address asks for an online game. */
 export function onlineWanted(search: string): boolean {
   return new URLSearchParams(search).has("online");

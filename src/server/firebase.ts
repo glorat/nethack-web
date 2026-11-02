@@ -1,9 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
+import { getToken, initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { connectAuthEmulator, getAuth, signInAnonymously } from "firebase/auth";
 import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore/lite";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
-import type { OnlineDeps } from "../port/online";
+import { appCheckRefused, type OnlineDeps, refusedAddress } from "../port/online";
 import type { WriteResult } from "../port/upload";
 
 // Not a secret: a web app's Firebase config is public, and security rules decide what it may do.
@@ -17,36 +17,13 @@ const app = initializeApp({
   appId: "1:1055631746678:web:ad062b1b08d70120a06157",
 });
 
-/**
- * If reCAPTCHA can't load, the SDK's wait for it never ends and every Firebase call waits too.
- * A rejection makes the SDK carry on without a token, which is enough while enforcement is off.
- */
-function givingUpAfter(ms: number, provider: ReCaptchaEnterpriseProvider): ReCaptchaEnterpriseProvider {
-  // getToken isn't in the SDK's types; tests/e2e/app-check.spec.ts fails if it stops being called
-  const internal = provider as unknown as { getToken(...args: unknown[]): Promise<unknown> };
-  const getToken = internal.getToken.bind(provider);
-  let gaveUp = false;
-  internal.getToken = async (...args) => {
-    if (gaveUp) throw new Error("reCAPTCHA is unavailable");
-    let timer: ReturnType<typeof setTimeout>;
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => {
-        gaveUp = true;
-        reject(new Error("reCAPTCHA is unavailable"));
-      }, ms);
-    });
-    return Promise.race([getToken(...args), timeout]).finally(() => clearTimeout(timer));
-  };
-  return provider;
-}
-
 // a dev build's emulators don't check tokens, and this would call out to Google
-if (!import.meta.env.DEV) {
-  initializeAppCheck(app, {
-    provider: givingUpAfter(5000, new ReCaptchaEnterpriseProvider("6LdcDAwuAAAAAA81qI1LoGLPgWlCU6hMogns6GWM")),
-    isTokenAutoRefreshEnabled: true,
-  });
-}
+const appCheck = import.meta.env.DEV
+  ? null
+  : initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider("6LdcDAwuAAAAAA81qI1LoGLPgWlCU6hMogns6GWM"),
+      isTokenAutoRefreshEnabled: true,
+    });
 
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -57,7 +34,22 @@ if (import.meta.env.DEV) {
   connectFunctionsEmulator(functions, "127.0.0.1", 5299);
 }
 
+/**
+ * Nothing goes to the server without a token. Until there's one this waits, for as long as reCAPTCHA takes. A refusal
+ * won't change by retrying, so it ends the page; anything else throws, for the caller's usual retry.
+ */
+async function holdingToken(): Promise<void> {
+  if (!appCheck) return;
+  try {
+    await getToken(appCheck);
+  } catch (e) {
+    if (appCheckRefused(e)) location.replace(refusedAddress(import.meta.env.BASE_URL));
+    throw e;
+  }
+}
+
 async function signedIn(): Promise<string> {
+  await holdingToken();
   await auth.authStateReady();
   return (auth.currentUser ?? (await signInAnonymously(auth)).user).uid;
 }

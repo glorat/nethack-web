@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { chosenZone, lastTurnIn, linesIn, onlineAddress, onlineWanted, type OnlineDeps, type OnlineGame, OnlineSession, zoneChoices, zoneLabel } from "../../src/port/online";
+import { appCheckRefused, chosenZone, lastTurnIn, linesIn, onlineAddress, onlineWanted, type OnlineDeps, type OnlineGame, OnlineSession, zoneChoices, zoneLabel } from "../../src/port/online";
 
 const START = { name: "Agnes", utcOffset: 3600, options: "name:Agnes", config: "rc", build: { version: "5.0.0", core: "abc" } };
 const inFlight = (recording: string, game = "old"): OnlineGame => ({ game, utcOffset: 0, options: "o", config: "c", recording, generation: 2, now: 4000 });
@@ -186,4 +186,15 @@ test("zones read as offsets, with the browser's among whole hours", () => {
   expect(zones).toContain(14 * 3600);
   expect(zones).toEqual([...zones].sort((a, b) => a - b));
   expect(zoneChoices(3600)).toHaveLength(27);
+});
+
+test.each([
+  ["appCheck/initial-throttle", 403, true],
+  ["appCheck/throttled", 403, true],
+  ["appCheck/initial-throttle", 503, false],
+  ["appCheck/fetch-network-error", undefined, false],
+  ["appCheck/recaptcha-error", undefined, false],
+  ["functions/unauthenticated", 403, false],
+])("App Check's %s with status %s counts as refused: %s", (code, httpStatus, refused) => {
+  expect(appCheckRefused({ code, customData: { httpStatus } })).toBe(refused);
 });
