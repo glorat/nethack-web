@@ -79,6 +79,8 @@ export type GameEvent =
   | { type: "recorded_before"; text: string }
   /** The whole recording of a game that has ended. */
   | { type: "recording"; text: string }
+  /** An offline game has ended, and this is the high score file it left. */
+  | { type: "scores"; text: string }
   /** An online game that can't be replayed, and so can't come back. */
   | { type: "game_lost" }
   | { type: "error"; text: string };

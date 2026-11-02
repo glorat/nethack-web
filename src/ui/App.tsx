@@ -9,6 +9,8 @@ import { applyEvents, initialState, nextBatch } from "../port/state";
 import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, textSizeFromOptions } from "../port/textsize";
 import type { Answer, GameRequest, ReplayProgress, ShadowStatus } from "../protocol";
 import { buildDebugPackage, debugPackageName, namedBones } from "../port/debug-package";
+import { keepLastMode, offlineGameEnded, offlineGameStarted } from "../port/progress";
+import { keepScores } from "../port/scores";
 import { downloadRecording, downloadText, keepLastGame, lastGame, lastTurn } from "../port/recording";
 import { gameAuthority } from "../port/fixedinputs";
 import { shadowWanted } from "../port/shadow";
@@ -181,6 +183,7 @@ export function App() {
   const [shadowing] = useState(() => !replay && shadowWanted());
   const [online] = useState(() => !replay && onlineWanted(location.search));
   const session = useRef<OnlineSession | null>(null);
+  const playingName = useRef("");
   const uploader = useRef<LogUploader | null>(null);
   const [serverWaiting, setServerWaiting] = useState(false);
   const [uploadNotice, setUploadNotice] = useState<UploadNotice | null>(null);
@@ -331,6 +334,8 @@ export function App() {
               setRecorded({ text: e.text, kept: !online && keepLastGame(e.text) });
               uploader.current?.finished(e.text);
             }
+            if (e.type === "scores") keepScores(e.text);
+            if (e.type === "game_over" && e.text !== SAVED_FAREWELL && !replay && !online) offlineGameEnded(playingName.current);
             if (e.type === "recorded") {
               session.current?.recorded(e.lines.join("\n"));
               uploader.current?.add(e.lines, e.atPrompt);
@@ -552,6 +557,11 @@ export function App() {
     const assetBase = new URL(import.meta.env.BASE_URL, location.href).href;
     const options = `name:${name}`;
     const config = configFile(`${BASE_OPTIONS}${ascii ? ",ascii_map" : ""}`, savedOptions());
+    if (!replay) keepLastMode(online ? "online" : "offline");
+    if (!online) {
+      playingName.current = name;
+      offlineGameStarted(name);
+    }
     if (!online) return client.start({ assetBase, options, config, shadowed: shadowing, authority: gameAuthority() });
     session.current = createOnlineSession(setServerWaiting);
     const params = new URLSearchParams(location.search);

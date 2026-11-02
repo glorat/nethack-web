@@ -510,6 +510,9 @@ test("the landing page lists games in flight, goes back to one, and starts a new
   await page.waitForTimeout(1200);
 
   await page.goto("/");
+  const first = page.locator("form button").first();
+  await expect(first).toHaveText(`Continue Online as ${name}`);
+  await expect(first).toHaveClass(/primary/);
   await page.getByRole("button", { name: `Play Online as ${name}` }).click();
   await page.getByRole("link", { name: new RegExp(name) }).click();
   await page.locator(".stats-title").waitFor({ timeout: 15_000 });

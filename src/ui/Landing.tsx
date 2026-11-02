@@ -3,6 +3,9 @@ import { WIKI_URL } from "../port/describe";
 import { playerName, PLAY_PATH, savedName, saveName } from "../port/name";
 import { type GameSummary, onlineAddress, onlineWanted, zoneChoices, zoneLabel } from "../port/online";
 import { saveOptions, savedOptions } from "../port/options";
+import { lastMode, offlineGameUnder } from "../port/progress";
+import { lastGame } from "../port/recording";
+import { ascended, savedScores, scoreDate } from "../port/scores";
 import { listOnlineGames } from "../server/upload";
 import { updateWhenIdle } from "../sw/register";
 import { AboutDialog } from "./dialogs/AboutDialog";
@@ -92,6 +95,32 @@ function OnlineChoice({ name, onBack }: { name: string; onBack: () => void }) {
   );
 }
 
+/** What this browser remembers of finished games. Offline games only, as online ones are the server's. */
+function DeviceGames() {
+  const [scores] = useState(() => savedScores().slice(0, 5));
+  const [replayable] = useState(() => lastGame() !== null);
+  if (!scores.length && !replayable) return null;
+  return (
+    <section class="landing-panel landing-device">
+      <h2>{scores.length ? "Your best games on this device" : "On this device"}</h2>
+      {scores.length ? (
+        <ol class="device-scores">
+          {scores.map((s, i) => (
+            <li key={i} class={ascended(s) ? "ascended" : undefined}>
+              <strong>{s.points.toLocaleString()}</strong>
+              <span>
+                {s.name} ({s.role}-{s.race}): {s.death}
+              </span>
+              <small>{scoreDate(s)}</small>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+      {replayable ? <a href={`${PLAY_PATH}?replay`}>Watch your last game</a> : null}
+    </section>
+  );
+}
+
 export function Landing() {
   const [remembered] = useState(savedName);
   const [changing, setChanging] = useState(!remembered);
@@ -100,6 +129,19 @@ export function Landing() {
   const [about, setAbout] = useState(false);
   const [choosingOnline, setChoosingOnline] = useState(false);
   const [offered] = useState(onlineOffered);
+  const [latestOnline, setLatestOnline] = useState<GameSummary | null>(null);
+  const [returning] = useState(lastMode);
+  useEffect(() => {
+    // anyone else's visit doesn't touch the server
+    if (!offered || returning !== "online") return;
+    listOnlineGames().then(
+      (games) => setLatestOnline(games.reduce<GameSummary | null>((a, g) => (a && a.lastPlayedAt >= g.lastPlayedAt ? a : g), null)),
+      (e) => console.warn("couldn't list online games", e),
+    );
+  }, []);
+  const offlineInProgress = !changing && offlineGameUnder(remembered);
+  const continueOnline = latestOnline && !changing ? () => location.assign(onlineAddress(PLAY_PATH, latestOnline.name, { game: latestOnline.game })) : null;
+  const mainAction = continueOnline ?? (offlineInProgress || !offered ? "offline" : "online");
   const playButton = useRef<HTMLButtonElement>(null);
   const backFromOnline = () => {
     setChoosingOnline(false);
@@ -139,16 +181,13 @@ export function Landing() {
             onSubmit={(e) => {
               e.preventDefault();
               // Enter does what's highlighted
-              if (offered) chooseOnline();
+              if (continueOnline) continueOnline();
+              else if (mainAction === "online") chooseOnline();
               else playOffline();
             }}
           >
             <h1>NetHack</h1>
-            <p class="start-sub">
-              {offered
-                ? "The classic dungeon crawl, in your browser. Play online to have your games kept for you, or offline with no connection at all."
-                : "The classic dungeon crawl, played entirely on your device. No account, no server, and no connection needed once it's loaded."}
-            </p>
+            <p class="start-sub">The classic dungeon crawl with painted tiles, in your browser. Nothing to install, and it plays even with no connection.</p>
             {choosingOnline ? (
               <OnlineChoice name={playerName(name)} onBack={backFromOnline} />
             ) : (
@@ -159,70 +198,68 @@ export function Landing() {
                     <input id="name" value={name} autofocus maxLength={31} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
                   </>
                 ) : null}
-                {offered ? (
-                  <button type="submit" class="primary" disabled={!valid} ref={playButton}>
-                    {changing ? "Play Online" : `Play Online as ${remembered}`}
+                {continueOnline && latestOnline ? (
+                  <button type="submit" class="primary">
+                    Continue Online as {latestOnline.name}
                   </button>
                 ) : null}
-                <button type={offered ? "button" : "submit"} class={offered ? undefined : "primary"} disabled={!valid} onClick={offered ? playOffline : undefined}>
-                  {changing ? "Play Offline" : `Play Offline as ${remembered}`}
-                </button>
-                {changing ? null : (
-                  <button type="button" onClick={() => setChanging(true)}>
-                    Change Name
+                {[
+                  offered ? (
+                    <button key="online" type={mainAction === "online" ? "submit" : "button"} class={mainAction === "online" ? "primary" : undefined} disabled={!valid} ref={playButton} onClick={mainAction === "online" ? undefined : chooseOnline}>
+                      {changing ? "Play Online" : `Play Online as ${remembered}`}
+                    </button>
+                  ) : null,
+                  <button key="offline" type={mainAction === "offline" ? "submit" : "button"} class={mainAction === "offline" ? "primary" : undefined} disabled={!valid} onClick={mainAction === "offline" ? undefined : playOffline}>
+                    {changing ? "Play Offline" : `${offlineInProgress ? "Continue" : "Play"} Offline as ${remembered}`}
+                  </button>,
+                ].sort((a, b) => Number(b?.key === mainAction) - Number(a?.key === mainAction))}
+                <div class="start-links">
+                  {changing ? null : (
+                    <button type="button" onClick={() => setChanging(true)}>
+                      Change Name
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setEditingOptions(true)}>
+                    Edit Options File...
                   </button>
-                )}
-                <button type="button" onClick={() => setEditingOptions(true)}>
-                  Edit Options File...
-                </button>
+                </div>
               </>
             )}
             {offlineReady ? <p class="landing-ready">✓ Ready to play offline</p> : null}
           </form>
           <img class="landing-shot" src={`${import.meta.env.BASE_URL}screenshot.jpg`} alt="A NetHack game: the dungeon map in painted tiles, with stats, equipment, messages and inventory around it" />
         </section>
+        <DeviceGames />
         <section class="landing-panels">
-          {offered ? (
-            <div class="landing-panel">
-              <h2>Play online</h2>
-              <p>We keep your games for you, so there's nothing to lose by closing the tab.</p>
-              <ul>
-                <li>Start as many games as you like, and pick any of them up again.</li>
-                <li>You need a connection while you play. If it drops, you may lose your last few moves.</li>
-                <li>Your games stay linked to this browser for now, and clearing this site's data loses access to them.</li>
-                <li>We keep a record of every game. Shared high scores and more are on the way, and fair play will count.</li>
-              </ul>
-            </div>
-          ) : null}
           <div class="landing-panel">
-            <h2>Play offline</h2>
-            <p>The whole game runs on this device. Nothing is uploaded anywhere, and you don't need an account or a connection.</p>
-            <ul>
-              <li>Your first visit downloads the game, about 10 MB. After that it opens and plays with no connection, even on a plane.</li>
-              <li>You can close the tab at any time. Your game comes back when you next press Play Offline under that name.</li>
-              <li>Saved games stay in this browser on this device, and clearing this site's data deletes them.</li>
-              <li>No shared high scores.</li>
-            </ul>
-          </div>
-          <div class="landing-panel">
-            <h2>Playing</h2>
+            <h2>New to NetHack?</h2>
             <ul>
               <li>Move with the arrow keys or <kbd>h j k l</kbd>, and <kbd>y u b n</kbd> for diagonals.</li>
               <li>Click the map to walk somewhere, and right-click to look at it.</li>
               <li>Every command is in the menus, with its key beside it.</li>
               <li><kbd>?</kbd> opens the game's help, and <kbd>S</kbd> saves and brings you back here.</li>
             </ul>
-            <p>New to the game? The <a href={WIKI_URL} target="_blank" rel="noopener">NetHack Wiki</a> covers everything.</p>
+            <p>The <a href={WIKI_URL} target="_blank" rel="noopener">NetHack Wiki</a> covers everything.</p>
           </div>
           <div class="landing-panel">
-            <h2>About this site</h2>
-            <p>This is an unofficial web port, not affiliated with the NetHack DevTeam. The official NetHack is at <a href="https://www.nethack.org/" target="_blank" rel="noopener">nethack.org</a>.</p>
+            <h2>{offered ? "Online or offline?" : "Where your game is kept"}</h2>
+            {offered ? (
+              <p>
+                <strong>Online</strong> games are kept for you, so start as many as you like and pick any of them up again. You need a connection, and may lose your last few moves if it drops. They stay linked to this browser for now, so clearing this site's data loses access to them. Shared high scores are on the way, for online games only.
+              </p>
+            ) : null}
             <p>
-              Please report problems with this site on <a href="https://github.com/glorat/nethack-web/issues" target="_blank" rel="noopener">its issue tracker</a>, not to the DevTeam. Its <a href="https://github.com/glorat/nethack-web" target="_blank" rel="noopener">source code</a> and the game are under the <a href={`${import.meta.env.BASE_URL}license.txt`} target="_blank" rel="noopener">NetHack General Public License</a>. It also includes <a href={`${import.meta.env.BASE_URL}third-party-licenses.txt`} target="_blank" rel="noopener">other open source software</a>.
+              <strong>Offline</strong> games run entirely on this device, and nothing is uploaded. The first visit downloads about 10 MB, and after that you can play with no connection. Close the tab at any time and your game comes back under the same name. Clearing this site's data deletes it.
             </p>
           </div>
         </section>
       </main>
+      <footer class="landing-footer">
+        <p>NetHack {__NETHACK_VERSION__}. An unofficial web port, not affiliated with the NetHack DevTeam. The official NetHack is at <a href="https://www.nethack.org/" target="_blank" rel="noopener">nethack.org</a>.</p>
+        <p>
+          Report problems on <a href="https://github.com/glorat/nethack-web/issues" target="_blank" rel="noopener">this site's issue tracker</a>, not to the DevTeam. <a href="https://github.com/glorat/nethack-web" target="_blank" rel="noopener">Source code</a>, <a href={`${import.meta.env.BASE_URL}license.txt`} target="_blank" rel="noopener">NetHack General Public License</a>, and <a href={`${import.meta.env.BASE_URL}third-party-licenses.txt`} target="_blank" rel="noopener">other open source software</a>.
+        </p>
+      </footer>
       {editingOptions ? (
         <OptionsDialog
           text={savedOptions()}
