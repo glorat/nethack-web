@@ -1,6 +1,6 @@
 // The bones this browser keeps; a host's to answer the core with. See docs/recording.md.
-import type { NetHackModule } from "./memory";
-import { sha256 } from "./sha256";
+import type { NetHackModule } from "../worker/memory";
+import { sha256 } from "../worker/sha256";
 
 const DIR = "/save/bones";
 

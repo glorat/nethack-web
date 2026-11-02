@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import type { Answer, GameEvent, GameRequest, MapCell } from "../../src/protocol";
 import { applyEvents, cellAt, initialState, type GameState } from "../../src/port/state";
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
-import { BonesDb } from "../../src/worker/bones";
+import { BonesDb } from "../../src/offline/bones";
 import { Recorder } from "../../src/worker/recorder";
 import { type BootCore, never, replay, ReplayError, saveFiles, writeSaveFiles } from "../../src/worker/replayer";
 import { placeGameFiles, resumeUnseen } from "../../src/worker/resume";

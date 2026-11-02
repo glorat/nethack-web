@@ -3,8 +3,8 @@ import { getToken, initializeAppCheck, ReCaptchaEnterpriseProvider } from "fireb
 import { connectAuthEmulator, getAuth, signInAnonymously } from "firebase/auth";
 import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore/lite";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
-import { appCheckRefused, type OnlineDeps, refusedAddress } from "../port/online";
-import type { WriteResult } from "../port/upload";
+import { appCheckRefused, type OnlineDeps, refusedAddress } from "../session";
+import type { WriteResult } from "../upload";
 
 // Not a secret: a web app's Firebase config is public, and security rules decide what it may do.
 const app = initializeApp({

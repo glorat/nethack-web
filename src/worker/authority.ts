@@ -1,7 +1,7 @@
 // What decides a game's outcome from outside the core. Who answers can change
 // while the rest of the host, the page and its storage, stays the same.
 import type { AuthorityChoice, FixedInputs } from "../protocol";
-import { BonesDb } from "./bones";
+import { BonesDb } from "../offline/bones";
 import type { NetHackModule } from "./memory";
 
 export interface Authority {

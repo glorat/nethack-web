@@ -1,6 +1,8 @@
 // An online game, from the page's side: the server holds it, and answers for what the core can't decide.
 // Offline games never come here. Asking waits as long as it takes, and never makes up an answer.
 
+import { lastTurnIn } from "../port/recording";
+
 const RETRY_MS = 5000;
 /** The server has answered, and asking again won't change that. */
 const FINAL = /^functions\/(?:not-found|invalid-argument|permission-denied|unauthenticated)$/;
@@ -46,16 +48,6 @@ export interface OnlineDeps {
   now(): number;
   /** Whether play is held up waiting for the server. */
   waiting(on: boolean): void;
-}
-
-export function lastTurnIn(text: string): number | null {
-  // not ^ with the m flag, which also matches after a U+2028 in typed text
-  const found = [...text.matchAll(/(?:^|\n)\d+ T (\d+)/g)].at(-1);
-  return found ? Number(found[1]) : null;
-}
-
-export function linesIn(text: string): number {
-  return text ? text.split("\n").length - 1 : 0;
 }
 
 export class OnlineSession {
@@ -133,23 +125,6 @@ export function onlineAddress(path: string, name: string, choice: { game: string
     params.set("tz", String(choice.utcOffset));
   }
   return `${path}?${params}`;
-}
-
-export function chosenZone(search: string, browser: number): number {
-  const tz = new URLSearchParams(search).get("tz");
-  return tz !== null && Number.isInteger(Number(tz)) && tz !== "" ? Number(tz) : browser;
-}
-
-export function zoneLabel(seconds: number): string {
-  const minutes = Math.abs(seconds) / 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `UTC${seconds < 0 ? "−" : "+"}${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
-}
-
-/** Every whole hour, and the browser's own zone among them, in order. */
-export function zoneChoices(browser: number): number[] {
-  const hours = Array.from({ length: 27 }, (_, i) => (i - 12) * 3600);
-  return [...new Set([...hours, browser])].sort((a, b) => a - b);
 }
 
 /** The games a player can go back to; asking waits for no one, as the page can offer to try again. */

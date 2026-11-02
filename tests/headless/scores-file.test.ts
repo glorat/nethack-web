@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { ascended, parseScores, scoreDate } from "../../src/port/scores";
+import { ascended, parseScores, scoreDate } from "../../src/offline/scores";
 
 const LINE = "5.0.0 1234 0 3 3 0 16 1 20261102 20261101 0 Val Hum Fem Law Agnes,killed by a newt, while sleeping";
 
