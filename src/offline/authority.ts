@@ -16,7 +16,7 @@ export async function browserAuthority(files: Files): Promise<Authority> {
   // taken once, so a game doesn't change zone as daylight saving starts or ends
   const utcOffset = -new Date().getTimezoneOffset() * 60;
   return {
-    alone: await soleTab(),
+    alone: await soleTab("nethack-game"),
     now: () => Math.floor(Date.now() / 1000),
     utcOffset: () => utcOffset,
     randomSeed: () => crypto.getRandomValues(new Uint32Array(1))[0],

@@ -600,3 +600,21 @@ test("an offline game never reaches the server, and stays apart from an online o
   await page.getByRole("dialog", { name: "Choose your character" }).waitFor({ timeout: 20_000 });
   expect(await gameId(page)).toBeTruthy();
 });
+
+test("an online game in another tab doesn't hold up an offline game coming back", async ({ page, context }) => {
+  const name = `Lk${Date.now() % 100000}`;
+  await untilPlaying(page, name, "offline");
+  await pass(page, 2);
+  await page.waitForTimeout(1200);
+  await page.close();
+
+  const onlineTab = await context.newPage();
+  await online(onlineTab);
+  await onlineTab.addInitScript(() => localStorage.removeItem("nethack-web.name"));
+  await untilPlaying(onlineTab, `${name}x`);
+
+  const offline = await context.newPage();
+  await offline.goto(`/play/?name=${name}`);
+  await offline.locator(".app[data-commanding]").waitFor({ timeout: 20_000 });
+  await expect(offline.getByRole("dialog")).toHaveCount(0);
+});

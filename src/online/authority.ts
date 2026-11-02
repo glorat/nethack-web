@@ -5,7 +5,7 @@ import type { AskSeed } from "../worker/mode";
 export async function onlineAuthority(game: string, utcOffset: number, firstNow: number, askSeed: AskSeed): Promise<Authority> {
   let now = firstNow;
   return {
-    alone: await soleTab(),
+    alone: await soleTab("nethack-online-game"),
     now: () => now,
     utcOffset: () => utcOffset,
     async randomSeed() {
