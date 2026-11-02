@@ -12,6 +12,7 @@ pnpm exec playwright test play.spec -g "<test name>"
 ## Rules of the code
 
 - `src/port/` holds no DOM code, so put logic there and test it there.
+- Code for one mode goes in `src/online/` or `src/offline/`. Neither imports the other, and common code imports neither, except the files that choose a mode; `tests/unit/mode-boundaries.test.ts` checks this.
 - Anything from outside the core that can change a game must go through `Authority` (`src/worker/authority.ts`), or replays diverge.
 - Read `docs/recording.md` before changing `recorder.ts`, `replayer.ts`, `replay-runner.ts`, `shadow.ts` or `resume.ts`. A change to what gets recorded also affects how unfinished games come back.
 - The service worker only registers in a production build, so offline and update behaviour can't be checked on the dev server.

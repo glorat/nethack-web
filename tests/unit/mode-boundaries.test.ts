@@ -4,7 +4,7 @@ const files = import.meta.glob<string>("../../src/**/*.{ts,tsx}", { query: "?raw
 /** The only common files that may choose a mode. */
 const CHOOSERS = new Set(["ui/App.tsx", "ui/Landing.tsx", "worker/worker.ts", "worker/authority.ts"]);
 
-const modeOf = (path: string) => /^(online|offline)\//.exec(path)?.[1] ?? null;
+const modeOf = (path: string) => /^(online|offline)(?:\/|$)/.exec(path)?.[1] ?? null;
 
 function crossings(): string[] {
   return Object.entries(files).flatMap(([key, text]) => {
