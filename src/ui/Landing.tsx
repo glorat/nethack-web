@@ -3,8 +3,9 @@ import { WIKI_URL } from "../port/describe";
 import { playerName, PLAY_PATH, savedName, saveName } from "../port/name";
 import { type GameSummary, onlineAddress, onlineWanted } from "../online/session";
 import { OnlineChoice } from "../online/ui/OnlineChoice";
+import { OnlineGames } from "../online/ui/OnlineGames";
 import { saveOptions, savedOptions } from "../port/options";
-import { lastMode } from "../port/last-mode";
+import { lastMode, playedOnline } from "../port/last-mode";
 import { offlineGameUnder } from "../offline/progress";
 import { DeviceGames } from "../offline/ui/DeviceGames";
 import { listOnlineGames } from "../online/server/api";
@@ -130,6 +131,7 @@ export function Landing() {
           </form>
           <img class="landing-shot" src={`${import.meta.env.BASE_URL}screenshot.jpg`} alt="A NetHack game: the dungeon map in painted tiles, with stats, equipment, messages and inventory around it" />
         </section>
+        {offered && playedOnline() && !refused ? <OnlineGames /> : null}
         <DeviceGames />
         <section class="landing-panels">
           <div class="landing-panel">
