@@ -2,8 +2,9 @@
 
 export function lastTurnIn(text: string): number | null {
   // not ^ with the m flag, which also matches after a U+2028 in typed text
-  const found = [...text.matchAll(/(?:^|\n)\d+ T (\d+)/g)].at(-1);
-  return found ? Number(found[1]) : null;
+  let last: string | undefined;
+  for (const found of text.matchAll(/(?:^|\n)\d+ T (\d+)/g)) last = found[1];
+  return last === undefined ? null : Number(last);
 }
 
 export function linesIn(text: string): number {

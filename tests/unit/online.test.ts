@@ -193,6 +193,9 @@ test("zones read as offsets, with the browser's among whole hours", () => {
 test.each([
   ["appCheck/initial-throttle", 403, true],
   ["appCheck/throttled", 403, true],
+  ["appCheck/throttled", 404, true],
+  ["appCheck/throttled", 429, false],
+  ["appCheck/initial-throttle", 408, false],
   ["appCheck/initial-throttle", 503, false],
   ["appCheck/fetch-network-error", undefined, false],
   ["appCheck/recaptcha-error", undefined, false],

@@ -99,11 +99,11 @@ export class OnlineSession {
   }
 }
 
-/** App Check said no, as opposed to not being reached. The SDK won't ask again for a day after any such answer. */
+/** App Check said no, as opposed to not being reached. The SDK won't ask again for a day after a 403 or 404; other answers it retries. */
 export function appCheckRefused(e: unknown): boolean {
   const { code, customData } = (e ?? {}) as { code?: string; customData?: { httpStatus?: unknown } };
   const status = Number(customData?.httpStatus);
-  return (code === "appCheck/initial-throttle" || code === "appCheck/throttled") && status >= 400 && status < 500;
+  return (code === "appCheck/initial-throttle" || code === "appCheck/throttled") && (status === 403 || status === 404);
 }
 
 /** The landing page, saying why an online game ended there. */
