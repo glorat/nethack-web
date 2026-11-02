@@ -173,6 +173,23 @@ test("the landing page opens without loading the game, and Back returns to it fr
   await expect(page.getByRole("button", { name: /^Continue Offline as Back/ })).toBeVisible();
 });
 
+test("the landing page asks the server nothing for someone whose last game was offline", async ({ page }) => {
+  const server: string[] = [];
+  page.on("request", (r) => {
+    const { host, pathname } = new URL(r.url());
+    if (/:(9299|8299|5299|9399)$|googleapis|firebase|gstatic|recaptcha/.test(host) || /server\/firebase|deps\/firebase/.test(pathname)) server.push(r.url());
+  });
+  await page.goto("/");
+  await page.evaluate(() => {
+    localStorage.setItem("nethack-web.name", "Mixed");
+    localStorage.setItem("nethack-web.lastMode", "offline");
+  });
+  await page.reload();
+  await expect(page.getByRole("button", { name: /^Play Online as Mixed/ })).toBeVisible();
+  await page.waitForTimeout(1000);
+  expect(server).toEqual([]);
+});
+
 test("the game page without a name goes to the landing page", async ({ page }) => {
   await page.goto("/play/");
   await expect(page.getByLabel("Who are you?")).toBeVisible();

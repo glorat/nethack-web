@@ -516,7 +516,7 @@ test("the landing page lists games in flight, goes back to one, and starts a new
   await expect(first).toHaveText(`Continue Online as ${name}`);
   await expect(first).toHaveClass(/primary/);
   await page.getByRole("button", { name: `Play Online as ${name}` }).click();
-  await page.getByRole("link", { name: new RegExp(name) }).click();
+  await page.locator(".online-games").getByRole("link", { name: new RegExp(name) }).click();
   await page.locator(".stats-title").waitFor({ timeout: 15_000 });
   await afterPrompts(page);
   expect(await gameId(page)).toBe(game);
@@ -531,7 +531,7 @@ test("the landing page lists games in flight, goes back to one, and starts a new
   await page.goto("/");
   await page.getByRole("button", { name: `Play Online as ${name}` }).click();
   await page.getByRole("button", { name: /^Start New Game/ }).waitFor();
-  await expect(page.getByRole("link", { name: new RegExp(name) })).toHaveCount(0);
+  await expect(page.locator(".online-games").getByRole("link", { name: new RegExp(name) })).toHaveCount(0);
 });
 
 test("the landing page can be left while the server hangs, and focus follows the choice", async ({ page }) => {
