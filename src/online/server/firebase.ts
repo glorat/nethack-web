@@ -1,9 +1,10 @@
 import { initializeApp } from "firebase/app";
 import { getToken, initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
-import { connectAuthEmulator, getAuth, signInAnonymously } from "firebase/auth";
+import { connectAuthEmulator, getAuth, GoogleAuthProvider, linkWithPopup, signInAnonymously, signInWithCredential } from "firebase/auth";
 import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore/lite";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 import { appCheckRefused, type OnlineDeps, refusedAddress } from "../session";
+import type { Profile } from "../account";
 import type { FinishedGame } from "../results";
 import type { WriteResult } from "../upload";
 
@@ -49,10 +50,17 @@ async function holdingToken(): Promise<void> {
   }
 }
 
+let anonymousSignIn: Promise<string> | null = null;
+
 async function signedIn(): Promise<string> {
   await holdingToken();
   await auth.authStateReady();
-  return (auth.currentUser ?? (await signInAnonymously(auth)).user).uid;
+  if (auth.currentUser) return auth.currentUser.uid;
+  // requests made together must not each make a player of their own
+  anonymousSignIn ??= signInAnonymously(auth)
+    .then((c) => c.user.uid)
+    .finally(() => (anonymousSignIn = null));
+  return anonymousSignIn;
 }
 
 /** Who the server says this player is. */
@@ -66,6 +74,31 @@ async function userRequest<Output>(method: string, input: object): Promise<Outpu
   await signedIn();
   return (await httpsCallable<unknown, Output>(functions, "user")({ method, input })).data;
 }
+
+/**
+ * Links a Google account to the anonymous player here, so their uid and games carry over. An account that's already
+ * someone's is signed in to instead, leaving this browser's anonymous games with the anonymous uid.
+ */
+export async function signInWithGoogle(): Promise<void> {
+  await signedIn();
+  const provider = new GoogleAuthProvider();
+  const current = auth.currentUser!;
+  if (current.isAnonymous) {
+    try {
+      await linkWithPopup(current, provider);
+    } catch (e) {
+      const credential = GoogleAuthProvider.credentialFromError(e as Parameters<typeof GoogleAuthProvider.credentialFromError>[0]);
+      if ((e as { code?: string }).code !== "auth/credential-already-in-use" || !credential) throw e;
+      await signInWithCredential(auth, credential);
+    }
+  }
+  // the server reads how the player signed in from the token, which has to say so now
+  await auth.currentUser?.getIdToken(true);
+}
+
+export const profile = () => userRequest<Profile>("profile", {});
+
+export const requestHandle = (input: { handle: string; sentAt: number }) => userRequest<{ status: "awaiting approval" }>("requestHandle", input);
 
 export const startGame: OnlineDeps["startGame"] = (input) => userRequest("startGame", input);
 

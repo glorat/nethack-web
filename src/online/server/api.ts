@@ -1,7 +1,7 @@
 import { LogUploader, type LogPosition, type UploadDeps, type WriteResult } from "../upload";
+import type { Profile } from "../account";
 import type { FinishedGame } from "../results";
 import { type GameSummary, loadGames, type OnlineDeps, OnlineSession } from "../session";
-
 
 /** Only ever loaded for an online game, so offline play never touches it. */
 const server = () => import("./firebase");
@@ -51,3 +51,13 @@ export const listFinishedGames = async (): Promise<FinishedGame[]> => (await (aw
 /** A finished game's recording, or null if the server won't give one. */
 export const finishedGameRecording = async (game: string): Promise<string | null> =>
   (await (await server()).gameRecording({ game, sentAt: Date.now() }))?.recording ?? null;
+
+/** Whether the player is signed in, their handle, and what a new game would call them. */
+export const loadProfile = async (): Promise<Profile> => (await server()).profile();
+
+export const signInWithGoogle = async (): Promise<void> => (await server()).signInWithGoogle();
+
+/** Asks for a handle, which the server grants or not in its own time; the profile says which. */
+export const askForHandle = async (handle: string): Promise<void> => {
+  await (await server()).requestHandle({ handle, sentAt: Date.now() });
+};

@@ -41,8 +41,9 @@ export interface GameSummary {
 
 export interface OnlineDeps {
   listGames(input: { sentAt: number }): Promise<{ games: GameSummary[] }>;
+  /** The server names the character, in the options it answers with. */
   startGame(input: GameStart & { sentAt: number }): Promise<{ game: string; utcOffset: number; options: string; config: string; now: number }>;
-  /** The game named, or the player's latest unfinished one under this name; null if there isn't one. */
+  /** The game named, or the player's latest unfinished one under the server's name for them; null if there isn't one. */
   resumeGame(input: { game?: string; name: string; build: Build; sentAt: number }): Promise<OnlineGame | null>;
   seed(input: { game: string; turn: number; sentAt: number }): Promise<{ seed: number; now: number; validTurns: number }>;
   now(): number;

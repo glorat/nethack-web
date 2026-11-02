@@ -1,6 +1,8 @@
 // A player's finished online games, as the server lists them. Its replay of a game is the result, so until that has
 // run a game has no score.
 
+import { shownName } from "./account";
+
 export interface GameResult {
   points?: number;
   turns?: number;
@@ -24,7 +26,9 @@ export interface FinishedGame {
 }
 
 /** What a row says of a game: its character and how it ended, or why there's no score. */
-export function outcome({ name, checked, result }: FinishedGame): string {
+export function outcome(game: FinishedGame): string {
+  const { checked, result } = game;
+  const name = shownName(game.name);
   if (!result) return checked ? `${name}: the server couldn't score this game` : `${name}: scored once the server has replayed the game, within a few hours`;
   const character = [result.role, result.race].filter(Boolean).join("-");
   const turn = result.turns !== undefined ? `, turn ${result.turns.toLocaleString()}` : "";

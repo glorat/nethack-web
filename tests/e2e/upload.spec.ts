@@ -456,8 +456,10 @@ test("a real game, reloaded, saved and restored, validates on the server's core 
 
   const { validation, xlog, result } = sweepAndRead(game);
   expect(validation).toMatchObject({ replayed: true, matches: ALL_MATCH, cutBacks: 0 });
-  expect(xlog).toContain(`name=${name}\t`);
-  expect(result).toMatchObject({ name, death: "quit", role: "Val", player: expect.any(String), endedAt: expect.stringMatching(/Z$/) });
+  // the server names the character, and a player with no handle after their uid
+  const named = `an_${await page.evaluate(() => document.documentElement.dataset.serverUid)}`;
+  expect(xlog).toContain(`name=${named}\t`);
+  expect(result).toMatchObject({ name: named, death: "quit", role: "Val", player: expect.any(String), endedAt: expect.stringMatching(/Z$/) });
   expect(validation!.resumes).toBeGreaterThanOrEqual(2);
 });
 
@@ -498,7 +500,7 @@ test("the landing page lists games in flight, goes back to one, and starts a new
   await page.getByLabel("Who are you?").fill(name);
   await page.getByRole("button", { name: "Play Online" }).click();
   await page.getByLabel("Time zone").selectOption({ label: "UTC+09:00" });
-  await page.getByRole("button", { name: `Start New Game as ${name}` }).click();
+  await page.getByRole("button", { name: "Start New Game" }).click();
   const picker = page.getByRole("dialog", { name: "Choose your character" });
   await picker.waitFor({ timeout: 15_000 });
   await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: /Valkyrie/ }).click();
@@ -513,10 +515,10 @@ test("the landing page lists games in flight, goes back to one, and starts a new
 
   await page.goto("/");
   const first = page.locator("form button").first();
-  await expect(first).toHaveText(`Continue Online as ${name}`);
+  await expect(first).toHaveText("Continue Online");
   await expect(first).toHaveClass(/primary/);
-  await page.getByRole("button", { name: `Play Online as ${name}` }).click();
-  await page.locator(".online-games").getByRole("link", { name: new RegExp(name) }).click();
+  await page.getByRole("button", { name: "Play Online" }).click();
+  await page.locator(".online-games").getByRole("link", { name: /^Anonymous/ }).click();
   await page.locator(".stats-title").waitFor({ timeout: 15_000 });
   await afterPrompts(page);
   expect(await gameId(page)).toBe(game);
@@ -529,9 +531,9 @@ test("the landing page lists games in flight, goes back to one, and starts a new
   expect((await requests(page, await gameId(page)))[0].utcOffset).toBe(32400);
 
   await page.goto("/");
-  await page.getByRole("button", { name: `Play Online as ${name}` }).click();
+  await page.getByRole("button", { name: "Play Online" }).click();
   await page.getByRole("button", { name: /^Start New Game/ }).waitFor();
-  await expect(page.locator(".online-games").getByRole("link", { name: new RegExp(name) })).toHaveCount(0);
+  await expect(page.locator(".online-games").getByRole("link")).toHaveCount(0);
 });
 
 test("the landing page can be left while the server hangs, and focus follows the choice", async ({ page }) => {
@@ -631,7 +633,8 @@ test("a finished online game is listed on the landing page, scored once validate
   await expect.poll(async () => (await stored(page, game)).map((b) => b.lines).join("\n"), { timeout: 10_000 }).toMatch(/\d+ end over/);
 
   await page.goto("/");
-  const row = page.locator(".online-scores li", { hasText: name });
+  // a player with no handle plays anonymously
+  const row = page.locator(".online-scores li", { hasText: "Anonymous" });
   await expect(row).toContainText("scored once the server has replayed the game", { timeout: 20_000 });
 
   expect(sweepAndRead(game).result).toBeTruthy();
@@ -640,11 +643,74 @@ test("a finished online game is listed on the landing page, scored once validate
 
   await row.getByRole("link", { name: "Watch" }).click();
   await expect(page.getByText(/Turn \d+ of \d+/)).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator(".stats-title")).toContainText(name);
+  await expect(page.locator(".stats-title")).toContainText(/^An_/);
 });
 
 test("a game the server won't give to watch says so", async ({ page }) => {
   await online(page);
   await page.goto(`/play/?replay&online&game=${crypto.randomUUID()}`);
   await expect(page.getByText("This game can't be watched.")).toBeVisible({ timeout: 20_000 });
+});
+
+/** Signs in through the Auth emulator's stand-in for Google's popup, as a new account. */
+async function signInWithGoogle(page: Page, email: string) {
+  const [popup] = await Promise.all([page.waitForEvent("popup"), page.getByRole("button", { name: "Sign In with Google" }).click()]);
+  // the widget wires its buttons up only once it has loaded
+  await popup.waitForLoadState();
+  await popup.getByRole("button", { name: /add new account/i }).click();
+  await popup.getByLabel(/email/i).fill(email);
+  // signing in reloads the page
+  await Promise.all([page.waitForEvent("load"), popup.getByRole("button", { name: /sign in with google/i }).click()]);
+}
+
+test("signing in keeps the anonymous player's games, and the handle chosen names the next character", async ({ page }) => {
+  await online(page);
+  await untilPlaying(page, `Si${Date.now() % 100000}`);
+  const game = await gameId(page);
+  await pass(page, 2);
+  await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(1200);
+
+  await page.goto("/");
+  await signInWithGoogle(page, `${crypto.randomUUID()}@example.com`);
+  await expect(page.locator(".landing-bar")).toContainText("Signed in");
+  const handle = `Hd${crypto.randomUUID().slice(0, 8).replaceAll("-", "")}`;
+  await page.getByLabel("Handle").fill(handle);
+  await page.getByRole("button", { name: "Request Handle" }).click();
+  await expect(page.locator(".landing-bar")).toContainText(`Signed in as ${handle}`);
+  await expect(page.getByLabel("Handle")).toHaveCount(0);
+
+  // the same uid, so the game played before signing in is still there to go back to
+  await expect(page.locator("form button").first()).toHaveText("Continue Online");
+  await page.getByRole("button", { name: `Play Online as ${handle}` }).click();
+  await page.getByRole("button", { name: `Start New Game as ${handle}` }).click();
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  await picker.waitFor({ timeout: 15_000 });
+  await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: /Valkyrie/ }).click();
+  await picker.getByRole("listbox", { name: "Race" }).locator("button:not([disabled])").first().click();
+  for (const group of ["Gender", "Alignment"]) await picker.getByRole("radiogroup", { name: group }).locator("button:not([disabled])").first().click();
+  await page.keyboard.press("Enter");
+  await afterPrompts(page);
+  await expect(page.locator(".stats-title")).toContainText(handle);
+});
+
+test("a handle someone else has is refused, and another can be chosen", async ({ browser }) => {
+  const handle = `Tk${crypto.randomUUID().slice(0, 8).replaceAll("-", "")}`;
+  for (const [i, outcome] of [[0, "granted"], [1, "taken"]] as const) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.addInitScript(() => localStorage.setItem("nethack-web.lastMode", "online"));
+    await page.goto("/");
+    await signInWithGoogle(page, `${crypto.randomUUID()}@example.com`);
+    await page.getByLabel("Handle").fill(handle);
+    await page.getByRole("button", { name: "Request Handle" }).click();
+    if (outcome === "granted") await expect(page.locator(".landing-bar")).toContainText(`Signed in as ${handle}`);
+    else {
+      await expect(page.getByRole("alert")).toHaveText(`${handle} is taken. Choose another.`);
+      await page.getByLabel("Handle").fill(`${handle}b`);
+      await page.getByRole("button", { name: "Request Handle" }).click();
+      await expect(page.locator(".landing-bar")).toContainText(`Signed in as ${handle}b`);
+    }
+    await context.close();
+  }
 });
