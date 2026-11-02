@@ -13,7 +13,7 @@ pnpm exec playwright test play.spec -g "<test name>"
 
 - `src/port/` holds no DOM code, so put logic there and test it there.
 - Code for one mode goes in `src/online/` or `src/offline/`. Neither imports the other, and common code imports neither, except the files that choose a mode; `tests/unit/mode-boundaries.test.ts` checks this.
-- Anything from outside the core that can change a game must go through `Authority` (`src/worker/authority.ts`), or replays diverge.
+- Anything from outside the core that can change a game must go through `Authority` (`src/worker/authority.ts`, with each mode's in `src/online/` and `src/offline/`), or replays diverge.
 - Read `docs/recording.md` before changing `recorder.ts`, `replayer.ts`, `replay-runner.ts`, `shadow.ts` or `resume.ts`. A change to what gets recorded also affects how unfinished games come back.
 - The service worker only registers in a production build, so offline and update behaviour can't be checked on the dev server.
 - `docs/cocoa-parity.md` lists the Cocoa features still to port; tick items off in the commit that lands them.
@@ -48,5 +48,5 @@ pnpm exec playwright test play.spec -g "<test name>"
 - `pnpm run test:e2e:upload`: online games against the emulators from `../nethack-server` (about 60s). Not part of `test:e2e` or CI, so run it after changing `src/online/` or what gets recorded.
 - Prefer a headless scenario (`tests/headless`, via `Session` in `harness.ts`) to an e2e test unless the behaviour lives in the UI.
 - Scenarios are deterministic: `seed` sets `NETHACK_SEED`, `date` fakes `Date`, `wizard: true` allows debug-mode commands, and `failPost` makes a window callback throw once.
-- Playwright games on the dev server are deterministic too: `playwright.config.ts` sets `nethack.fixedInputs`, which fixes the seeds, clock, time zone and game id (`src/worker/authority.ts`). The tests choose their character, as the picker's default is random.
+- Playwright games on the dev server are deterministic too: `playwright.config.ts` sets `nethack.fixedInputs`, which fixes the seeds, clock, time zone and game id (`src/offline/authority.ts`). The tests choose their character, as the picker's default is random.
 - When fixing a bug, check its test fails without the fix.

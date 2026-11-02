@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 
 const files = import.meta.glob<string>("../../src/**/*.{ts,tsx}", { query: "?raw", import: "default", eager: true });
 /** The only common files that may choose a mode. */
-const CHOOSERS = new Set(["ui/App.tsx", "ui/Landing.tsx", "worker/worker.ts", "worker/authority.ts"]);
+const CHOOSERS = new Set(["ui/App.tsx", "ui/Landing.tsx", "worker/worker.ts"]);
 
 const modeOf = (path: string) => /^(online|offline)(?:\/|$)/.exec(path)?.[1] ?? null;
 
