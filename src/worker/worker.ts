@@ -1,16 +1,16 @@
 /// <reference lib="webworker" />
 import type { Answer, GameEvent, GameRequest, StartOptions, UiMessage, WorkerMessage } from "../protocol";
 import type { AuthorityChoice } from "../protocol";
-import { browserAuthority, fixedAuthority } from "../offline/authority";
-import { type AskSeed, onlineAuthority } from "../online/authority";
-import type { Authority, Files } from "./authority";
+import { offlineWorker } from "../offline/worker";
+import { onlineWorker } from "../online/worker";
+import type { WorkerMode } from "./mode";
 import { ReplayRunner } from "./replay-runner";
 import { type BootCore, never, replay, ReplayError, saveFiles, writeSaveFiles } from "./replayer";
 import { Shadow } from "./shadow";
 import { CONFIG_FILE, Game, type Input } from "./game";
 import { BonesDb } from "../offline/bones";
 import { Recorder } from "./recorder";
-import { placeGameFiles, resumeUnseen } from "./resume";
+import { resumeUnseen } from "./resume";
 import { describeSquare, type NetHackModule } from "./memory";
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -83,10 +83,7 @@ async function loadCore(assetBase: string): Promise<CreateModule> {
   return ((await import(/* @vite-ignore */ url)) as { default: CreateModule }).default;
 }
 
-function createAuthority(choice: AuthorityChoice, files: Files, askSeed: AskSeed): Promise<Authority> {
-  if (choice.kind === "online") return onlineAuthority(choice.game, choice.utcOffset, choice.now, askSeed);
-  return import.meta.env.DEV && choice.kind === "fixed" ? fixedAuthority(choice.inputs, files) : browserAuthority(files);
-}
+const workerMode = (choice: AuthorityChoice): WorkerMode => (choice.kind === "online" ? onlineWorker(choice) : offlineWorker(choice));
 
 function askSeed(): Promise<{ seed: number; now: number }> {
   const id = nextRequestId++;
@@ -96,10 +93,10 @@ function askSeed(): Promise<{ seed: number; now: number }> {
 
 async function start({ assetBase, options, config, shadowed, authority }: StartOptions): Promise<void> {
   const createModule = await loadCore(assetBase);
-  const fromServer = authority.kind === "online" ? authority : null;
+  const mode = workerMode(authority);
 
   const host = {
-    ...(await createAuthority(authority, () => module!.FS, askSeed)),
+    ...(await mode.authority(() => module!.FS, askSeed)),
     post(events: GameEvent[]) {
       send({ type: "events", events });
     },
@@ -133,8 +130,7 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
           m.ENV.NETHACKOPTIONS = coreOptions;
           m.FS.writeFile(CONFIG_FILE, coreConfig);
           m.FS.mkdir(SAVE_DIR);
-          // an online game is only ever kept on the server
-          if (!fromServer) m.FS.mount(m.IDBFS, {}, SAVE_DIR);
+          if (mode.keptHere) m.FS.mount(m.IDBFS, {}, SAVE_DIR);
         },
       ],
     });
@@ -151,18 +147,14 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
       config: coreConfig,
       stream: (lines, atPrompt) => send({ type: "events", events: [{ type: "recorded", lines, atPrompt }] }),
       shadowed,
-      before: shadowed || fromServer ? (text) => send({ type: "events", events: [{ type: "recorded_before", text }] }) : undefined,
+      before: shadowed || mode.wantsRecordingSoFar ? (text) => send({ type: "events", events: [{ type: "recorded_before", text }] }) : undefined,
       finished: (text) => {
         send({ type: "events", events: [{ type: "recording", text }] });
-        if (fromServer) return;
-        try {
-          send({ type: "events", events: [{ type: "scores", text: m.FS.readFile(`${SAVE_DIR}/record`, { encoding: "utf8" }) as string }] });
-        } catch {
-          // a game scoring nothing may leave no file
-        }
+        const scores = mode.scores(m);
+        if (scores !== null) send({ type: "events", events: [{ type: "scores", text: scores }] });
       },
-      resume: replayFailed || fromServer ? undefined : resume,
-      recording: fromServer?.recording || undefined,
+      resume: replayFailed || !mode.keptHere ? undefined : resume,
+      recording: mode.recording || undefined,
     });
 
   let cores = 0;
@@ -187,13 +179,13 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
   let replayFailed = false;
 
   async function resume(text: string, name: string): Promise<boolean> {
-    const db = fromServer ? null : new BonesDb(module!.FS);
+    const bones = mode.bones(() => module!.FS);
     try {
       await resumeUnseen(text, {
         boot: () => replayBoot(createModule, assetBase, () => true),
-        bones: (hash) => db?.get(hash),
+        bones,
         load: (session, stopped) => loadSaved(session.options, session.config, stopped),
-        place: (m, files) => (fromServer ? writeSaveFiles(m, files) : placeGameFiles(m, name, files)),
+        place: (m, files) => mode.place(m, name, files),
         recorder: (m, session) => (recorder = startRecorder(m, session.options, session.config)),
         run: runCore,
         show: (events) => {
@@ -203,7 +195,7 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
         },
       });
     } catch (e) {
-      if (fromServer) throw e;
+      if (!mode.keptHere) throw e;
       // the core after this has no resume, so it asks the player
       console.warn("couldn't replay the game", e);
       replayFailed = true;
@@ -238,8 +230,8 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
   };
 
   send({ type: "events", events: [{ type: "ready" }] });
-  if (!fromServer?.recording) return playLive();
-  await comeBack(fromServer.recording).catch((e) => {
+  if (!mode.recording) return playLive();
+  await comeBack(mode.recording).catch((e) => {
     console.warn("couldn't bring the game back", e);
     send({ type: "events", events: [{ type: "game_lost" }] });
   });
