@@ -620,3 +620,31 @@ test("an online game in another tab doesn't hold up an offline game coming back"
   await offline.locator(".app[data-commanding]").waitFor({ timeout: 20_000 });
   await expect(offline.getByRole("dialog")).toHaveCount(0);
 });
+
+test("a finished online game is listed on the landing page, scored once validated, and can be watched", async ({ page }) => {
+  await online(page);
+  const name = `Fi${Date.now() % 100000}`;
+  await untilPlaying(page, name);
+  const game = await gameId(page);
+  await pass(page, 2);
+  await quit(page);
+  await expect.poll(async () => (await stored(page, game)).map((b) => b.lines).join("\n"), { timeout: 10_000 }).toMatch(/\d+ end over/);
+
+  await page.goto("/");
+  const row = page.locator(".online-scores li", { hasText: name });
+  await expect(row).toContainText("scored once the server has replayed the game", { timeout: 20_000 });
+
+  expect(sweepAndRead(game).result).toBeTruthy();
+  await page.reload();
+  await expect(row).toContainText(/\(Val-\w+\): quit, turn \d+/, { timeout: 20_000 });
+
+  await row.getByRole("link", { name: "Watch" }).click();
+  await expect(page.getByText(/Turn \d+ of \d+/)).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".stats-title")).toContainText(name);
+});
+
+test("a game the server won't give to watch says so", async ({ page }) => {
+  await online(page);
+  await page.goto(`/play/?replay&online&game=${crypto.randomUUID()}`);
+  await expect(page.getByText("This game can't be watched.")).toBeVisible({ timeout: 20_000 });
+});

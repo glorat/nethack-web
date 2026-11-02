@@ -4,6 +4,7 @@ import { connectAuthEmulator, getAuth, signInAnonymously } from "firebase/auth";
 import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore/lite";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 import { appCheckRefused, type OnlineDeps, refusedAddress } from "../session";
+import type { FinishedGame } from "../results";
 import type { WriteResult } from "../upload";
 
 // Not a secret: a web app's Firebase config is public, and security rules decide what it may do.
@@ -71,6 +72,10 @@ export const startGame: OnlineDeps["startGame"] = (input) => userRequest("startG
 export const listGames: OnlineDeps["listGames"] = (input) => userRequest("listGames", input);
 
 export const resumeGame: OnlineDeps["resumeGame"] = (input) => userRequest("resumeGame", input);
+
+export const finishedGames = (input: { sentAt: number }) => userRequest<{ games: FinishedGame[] }>("finishedGames", input);
+
+export const gameRecording = (input: { game: string; sentAt: number }) => userRequest<{ recording: string } | null>("gameRecording", input);
 
 export const seed = (input: { game: string; turn: number; sentAt: number }) =>
   userRequest<{ seed: number; now: number; validTurns: number }>("seed", input);

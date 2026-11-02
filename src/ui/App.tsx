@@ -16,6 +16,8 @@ import { downloadRecording, downloadText, lastTurnIn } from "../port/recording";
 import { shadowWanted } from "../port/shadow";
 import { onlineWanted } from "../online/session";
 import { onlineMode, type ServerNotice } from "../online/ui/mode";
+import { watchedGame } from "../online/results";
+import { finishedGameRecording } from "../online/server/api";
 import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port/tilesets";
 import { loadTileSheet, type TileSheet } from "../tiles";
 import { beep, wakeBeep } from "./beep";
@@ -166,8 +168,21 @@ interface Pending {
 }
 
 export function App() {
-  // the address asks for a replay of the last finished game, in place of playing
-  const [replay] = useState(() => (new URLSearchParams(location.search).has("replay") ? { text: lastGame() } : null));
+  // the address asks for a replay, in place of playing: of the last finished game here, or of an online game from the server
+  const [watched] = useState(() => watchedGame(location.search));
+  const [replay, setReplay] = useState<{ text: string | null; loading?: boolean } | null>(() =>
+    !new URLSearchParams(location.search).has("replay") ? null : watched ? { text: null, loading: true } : { text: lastGame() },
+  );
+  useEffect(() => {
+    if (!watched) return;
+    finishedGameRecording(watched).then(
+      (text) => setReplay({ text }),
+      (e) => {
+        console.warn("couldn't fetch the game to watch", e);
+        setReplay({ text: null });
+      },
+    );
+  }, []);
   const [replayProgress, setReplayProgress] = useState<ReplayProgress>({ turn: 0, playing: true, seeking: false, ended: null });
   const [replaySpeed, setReplaySpeed] = useState(REPLAY_SPEEDS[0].turnsPerSecond);
   const replayLastTurn = useMemo(() => ((replay?.text && lastTurnIn(replay.text)) || 0), [replay]);
@@ -539,8 +554,11 @@ export function App() {
 
   useEffect(() => {
     if (replay) {
-      if (!replay.text) location.replace(LANDING_PATH);
-      else if (sheet && !playing) {
+      if (replay.loading) return;
+      // one from the server that can't be had says so instead
+      if (!replay.text) {
+        if (!watched) location.replace(LANDING_PATH);
+      } else if (sheet && !playing) {
         setPlaying(true);
         client.replay(new URL(import.meta.env.BASE_URL, location.href).href, replay.text, replaySpeed);
       }
@@ -552,7 +570,7 @@ export function App() {
       if (shadowing) shadow.current = new ShadowClient(new URL(import.meta.env.BASE_URL, location.href).href, setShadowStatus);
       void start(name);
     }
-  }, [sheet]);
+  }, [sheet, replay]);
 
   // replace: Back from the landing page shouldn't start another game
   useEffect(() => {
@@ -589,7 +607,7 @@ export function App() {
         {
           title: "New Game",
           disabled: !replay && state.gameOver === null,
-          run: () => (replay ? location.assign(PLAY_PATH) : location.reload()),
+          run: () => (replay ? location.assign(watched ? LANDING_PATH : PLAY_PATH) : location.reload()),
         },
       ],
     },
@@ -652,6 +670,13 @@ export function App() {
   ];
 
   if (state.error) return <div class="fatal">{state.error}</div>;
+  if (watched && replay && !replay.loading && !replay.text) {
+    return (
+      <div class="fatal">
+        This game can't be watched. <a href={LANDING_PATH}>Back to the home page</a>
+      </div>
+    );
+  }
   if (gameLost) {
     return (
       <div class="fatal">

@@ -1,4 +1,5 @@
 import { LogUploader, type LogPosition, type UploadDeps, type WriteResult } from "../upload";
+import type { FinishedGame } from "../results";
 import { type GameSummary, loadGames, type OnlineDeps, OnlineSession } from "../session";
 
 
@@ -43,3 +44,10 @@ export function createOnlineSession(waiting: OnlineDeps["waiting"]): OnlineSessi
 }
 
 export const listOnlineGames = (): Promise<GameSummary[]> => loadGames({ now: () => Date.now(), listGames: async (input) => (await server()).listGames(input) });
+
+/** The player's finished games, latest first; asking waits for no one, as there's nothing to hold up. */
+export const listFinishedGames = async (): Promise<FinishedGame[]> => (await (await server()).finishedGames({ sentAt: Date.now() })).games;
+
+/** A finished game's recording, or null if the server won't give one. */
+export const finishedGameRecording = async (game: string): Promise<string | null> =>
+  (await (await server()).gameRecording({ game, sentAt: Date.now() }))?.recording ?? null;

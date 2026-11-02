@@ -288,6 +288,8 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .device-scores strong { font-variant-numeric: tabular-nums; }
 .device-scores small { color: var(--muted); }
 .device-scores .ascended span { color: var(--hp); }
+.online-scores li { grid-template-columns: 7em 1fr auto auto; }
+.online-scores a { color: var(--accent); }
 .start-links { display: flex; flex-wrap: wrap; gap: 4px 12px; }
 .start-links button { padding: 6px 0; background: none; border: none; color: var(--muted); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
 .start-links button:hover { color: var(--text, inherit); }
@@ -312,6 +314,8 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .landing-panels { grid-template-columns: 1fr; }
   .device-scores li { grid-template-columns: 6.5em 1fr; }
   .device-scores small { grid-column: 2; }
+  .online-scores li { grid-template-columns: 6.5em 1fr; }
+  .online-scores a { grid-column: 2; }
   .inventory, .inv-resize, .show-inventory { display: none; }
   .top { height: auto; flex-wrap: wrap; }
 }
