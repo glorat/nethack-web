@@ -1,6 +1,9 @@
 /// <reference lib="webworker" />
 import type { Answer, GameEvent, GameRequest, StartOptions, UiMessage, WorkerMessage } from "../protocol";
-import { createAuthority } from "./authority";
+import type { AuthorityChoice } from "../protocol";
+import { browserAuthority, fixedAuthority } from "../offline/authority";
+import { type AskSeed, onlineAuthority } from "../online/authority";
+import type { Authority, Files } from "./authority";
 import { ReplayRunner } from "./replay-runner";
 import { type BootCore, never, replay, ReplayError, saveFiles, writeSaveFiles } from "./replayer";
 import { Shadow } from "./shadow";
@@ -78,6 +81,11 @@ type CreateModule = (config: object) => Promise<NetHackModule>;
 async function loadCore(assetBase: string): Promise<CreateModule> {
   const url = new URL("nethack.js", assetBase).href;
   return ((await import(/* @vite-ignore */ url)) as { default: CreateModule }).default;
+}
+
+function createAuthority(choice: AuthorityChoice, files: Files, askSeed: AskSeed): Promise<Authority> {
+  if (choice.kind === "online") return onlineAuthority(choice.game, choice.utcOffset, choice.now, askSeed);
+  return import.meta.env.DEV && choice.kind === "fixed" ? fixedAuthority(choice.inputs, files) : browserAuthority(files);
 }
 
 function askSeed(): Promise<{ seed: number; now: number }> {
