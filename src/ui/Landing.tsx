@@ -129,11 +129,13 @@ export function Landing() {
   const [about, setAbout] = useState(false);
   const [choosingOnline, setChoosingOnline] = useState(false);
   const [offered] = useState(onlineOffered);
+  const [refused] = useState(() => new URLSearchParams(location.search).has("refused"));
   const [latestOnline, setLatestOnline] = useState<GameSummary | null>(null);
   const [returning] = useState(lastMode);
   useEffect(() => {
     // anyone else's visit doesn't touch the server
-    if (!offered || returning !== "online") return;
+    // asking again would only be refused again, and send this page back to itself
+    if (!offered || returning !== "online" || refused) return;
     listOnlineGames().then(
       (games) => setLatestOnline(games.reduce<GameSummary | null>((a, g) => (a && a.lastPlayedAt >= g.lastPlayedAt ? a : g), null)),
       (e) => console.warn("couldn't list online games", e),
@@ -174,6 +176,11 @@ export function Landing() {
         <span class="landing-title">NetHack</span>
         <button onClick={() => setAbout(true)}>About</button>
       </header>
+      {refused && (
+        <p class="server-waiting" role="alert">
+          Online play isn't available in this browser right now, and your latest moves may not have been saved. Offline play still works.
+        </p>
+      )}
       <main class="landing-main">
         <section class="landing-hero">
           <form

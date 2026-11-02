@@ -567,12 +567,14 @@ export function App() {
     const params = new URLSearchParams(location.search);
     const utcOffset = chosenZone(location.search, -new Date().getTimezoneOffset() * 60);
     const build = { version: __NETHACK_VERSION__, core: __CORE_COMMIT__ };
+    setServerWaiting(true);
     const game = await session.current
       .open({ name, utcOffset, options, config, build }, { game: params.get("game") ?? undefined, fresh: params.has("new") })
       .catch((e) => {
         console.warn("the server refused the game", e);
         return null;
       });
+    setServerWaiting(false);
     if (!game) return setServerRefused(true);
     // a reload comes back to this game, not to whichever is latest
     params.set("game", game.game);

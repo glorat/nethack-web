@@ -82,17 +82,103 @@ test("a production build sends App Check tokens with every kind of call", async 
   expect(Object.fromEntries(seen)).toEqual({ auth: "app-check-token", firestore: "app-check-token", functions: "app-check-token" });
 });
 
+const exchange = (page: Page, answer: () => "token" | "brief" | "refuse" | "unreachable") =>
+  page.route("https://content-firebaseappcheck.googleapis.com/**", (route) => {
+    if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+    const kind = answer();
+    if (kind === "unreachable") return route.abort();
+    if (kind === "refuse") return route.fulfill({ status: 403, json: { error: { code: 403, status: "PERMISSION_DENIED" } }, headers: cors });
+    return route.fulfill({ json: { token: "app-check-token", ttl: kind === "brief" ? "1s" : "3600s" }, headers: cors });
+  });
+
+const fakeRecaptcha = (page: Page) => page.route(RECAPTCHA, (route) => route.fulfill({ contentType: "text/javascript", body: FAKE_RECAPTCHA }));
+
+const untilReturned = async (page: Page, check: () => Promise<boolean>) =>
+  expect
+    .poll(
+      async () => {
+        await page.keyboard.type("ms").catch(() => {});
+        return check();
+      },
+      { timeout: 30_000, intervals: [1000] },
+    )
+    .toBe(true);
+
 for (const [failure, respond] of [
   ["can't load", (route) => route.abort()],
   ["loads but never gets ready", (route) => route.fulfill({ contentType: "text/javascript", body: "window.grecaptcha = { enterprise: { ready() {} } };" })],
 ] as [string, Parameters<Page["route"]>[1]][]) {
-  test(`an online game still works when reCAPTCHA ${failure}`, async ({ page }) => {
+  test(`nothing goes to the server while reCAPTCHA ${failure}, and offline play is still there`, async ({ page }) => {
     const seen = await fakeServer(page);
     await page.route(RECAPTCHA, respond);
-    await startOnlineGame(page);
-    await reachedAll(seen);
+    await page.goto(`${PROD}?online`);
+    await page.getByLabel("Who are you?").fill("Checked");
+    await page.getByRole("button", { name: "Play Online" }).click();
+    await expect(page.getByText("Connecting…")).toBeVisible();
+    await page.waitForTimeout(6000);
+    await expect(page.getByText("Connecting…")).toBeVisible();
+    expect([...seen.keys()]).toEqual([]);
+    await page.getByRole("button", { name: "Back" }).click();
+    await expect(page.getByRole("button", { name: /Play Offline/ })).toBeVisible();
   });
 }
+
+test("a browser App Check refuses is sent home and told why, before anything goes to the server", async ({ page }) => {
+  const seen = await fakeServer(page);
+  await fakeRecaptcha(page);
+  await exchange(page, () => "refuse");
+  await page.goto(`${PROD}?online`);
+  await page.getByLabel("Who are you?").fill("Checked");
+  await page.getByRole("button", { name: "Play Online" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "isn't available" })).toBeVisible();
+  expect(new URL(page.url()).search).toBe("?online&refused");
+  expect([...seen.keys()]).toEqual([]);
+});
+
+test("App Check refusing mid-game ends it at the landing page", async ({ page }) => {
+  await fakeServer(page);
+  await fakeRecaptcha(page);
+  let answer: "brief" | "refuse" = "brief";
+  await exchange(page, () => answer);
+  await startOnlineGame(page);
+  answer = "refuse";
+  await untilReturned(page, async () => new URL(page.url()).search === "?online&refused");
+  await expect(page.getByRole("alert").filter({ hasText: "isn't available" })).toBeVisible();
+  let loads = 0;
+  page.on("load", () => loads++);
+  await page.waitForTimeout(3000);
+  expect(loads).toBe(0);
+});
+
+test("losing touch with App Check mid-game only shows the banner, and the lines follow when it's back", async ({ page }) => {
+  const seen = await fakeServer(page);
+  await fakeRecaptcha(page);
+  let answer: "brief" | "unreachable" = "brief";
+  await exchange(page, () => answer);
+  await startOnlineGame(page);
+  answer = "unreachable";
+  const banner = page.getByText("Not connected");
+  await untilReturned(page, () => banner.isVisible());
+  expect(page.url()).toContain("game=");
+  seen.clear();
+  answer = "brief";
+  await untilReturned(page, async () => seen.has("firestore") && !(await banner.isVisible()));
+});
+
+test("a batch refused while holding a token is taken as already there", async ({ page }) => {
+  await fakeServer(page);
+  await fakeRecaptcha(page);
+  await exchange(page, () => "token");
+  await page.route("https://firestore.googleapis.com/**", (route) =>
+    route.fulfill(
+      route.request().method() === "OPTIONS"
+        ? { status: 204, headers: cors }
+        : { status: 403, json: { error: { code: 403, status: "PERMISSION_DENIED", message: "Missing or insufficient permissions." } }, headers: cors },
+    ),
+  );
+  await startOnlineGame(page);
+  await expect(page.getByText(/being played elsewhere/)).toBeVisible({ timeout: 30_000 });
+});
 
 test("a dev build doesn't use App Check", async ({ page }) => {
   const appCheck: string[] = [];
