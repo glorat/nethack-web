@@ -94,6 +94,53 @@ for (const [failure, respond] of [
   });
 }
 
+test("reCAPTCHA that loads too late for the first call still gives later calls a token", async ({ page }) => {
+  const seen = await fakeServer(page);
+  await page.route(RECAPTCHA, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 6000));
+    await route.fulfill({ contentType: "text/javascript", body: FAKE_RECAPTCHA });
+  });
+  await page.route("https://content-firebaseappcheck.googleapis.com/**", (route) =>
+    route.fulfill(route.request().method() === "OPTIONS" ? { status: 204, headers: cors } : { json: { token: "app-check-token", ttl: "3600s" }, headers: cors }),
+  );
+  await startOnlineGame(page);
+  await expect
+    .poll(
+      async () => {
+        await page.keyboard.type("ms");
+        return seen.get("firestore");
+      },
+      { timeout: 40_000, intervals: [2000] },
+    )
+    .toBe("app-check-token");
+});
+
+for (const [who, tokens, notice] of [
+  ["with no App Check token", false, "Not connected"],
+  ["with an App Check token", true, "being played elsewhere"],
+] as const) {
+  test(`a batch refused ${who} shows the right reason`, async ({ page }) => {
+    await fakeServer(page);
+    await page.route("https://firestore.googleapis.com/**", (route) =>
+      route.fulfill(
+        route.request().method() === "OPTIONS"
+          ? { status: 204, headers: cors }
+          : { status: 403, json: { error: { code: 403, status: "PERMISSION_DENIED", message: "Missing or insufficient permissions." } }, headers: cors },
+      ),
+    );
+    if (tokens) {
+      await page.route(RECAPTCHA, (route) => route.fulfill({ contentType: "text/javascript", body: FAKE_RECAPTCHA }));
+      await page.route("https://content-firebaseappcheck.googleapis.com/**", (route) =>
+        route.fulfill(route.request().method() === "OPTIONS" ? { status: 204, headers: cors } : { json: { token: "app-check-token", ttl: "3600s" }, headers: cors }),
+      );
+    } else {
+      await page.route(RECAPTCHA, (route) => route.abort());
+    }
+    await startOnlineGame(page);
+    await expect(page.getByText(new RegExp(notice))).toBeVisible({ timeout: 30_000 });
+  });
+}
+
 test("a dev build doesn't use App Check", async ({ page }) => {
   const appCheck: string[] = [];
   page.on("request", (r) => {

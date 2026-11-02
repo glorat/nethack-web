@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
+import { type AppCheck, getToken as getAppCheckToken, initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { connectAuthEmulator, getAuth, signInAnonymously } from "firebase/auth";
 import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore/lite";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
@@ -35,17 +35,30 @@ function givingUpAfter(ms: number, provider: ReCaptchaEnterpriseProvider): ReCap
         reject(new Error("reCAPTCHA is unavailable"));
       }, ms);
     });
-    return Promise.race([getToken(...args), timeout]).finally(() => clearTimeout(timer));
+    const attempt = getToken(...args);
+    // only one that's still hanging is reason not to try; a slow one is over, and the next can use what it loaded
+    void attempt.catch(() => {}).finally(() => (gaveUp = false));
+    return Promise.race([attempt, timeout]).finally(() => clearTimeout(timer));
   };
   return provider;
 }
 
 // a dev build's emulators don't check tokens, and this would call out to Google
-if (!import.meta.env.DEV) {
-  initializeAppCheck(app, {
-    provider: givingUpAfter(5000, new ReCaptchaEnterpriseProvider("6LdcDAwuAAAAAA81qI1LoGLPgWlCU6hMogns6GWM")),
-    isTokenAutoRefreshEnabled: true,
-  });
+const appCheck: AppCheck | null = import.meta.env.DEV
+  ? null
+  : initializeAppCheck(app, {
+      provider: givingUpAfter(5000, new ReCaptchaEnterpriseProvider("6LdcDAwuAAAAAA81qI1LoGLPgWlCU6hMogns6GWM")),
+      isTokenAutoRefreshEnabled: true,
+    });
+
+async function hasAppCheckToken(): Promise<boolean> {
+  if (!appCheck) return true;
+  try {
+    await getAppCheckToken(appCheck);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const auth = getAuth(app);
@@ -89,8 +102,9 @@ export async function writeBatch(game: string, id: string, lines: string, sentAt
     await setDoc(doc(db, `users/${uid}/games/${game}/batches/${id}`), { lines, sentAt, receivedAt: serverTimestamp() });
     return "stored";
   } catch (e) {
-    // a client can only create a batch, so that's what's refused of one already there
-    if ((e as { code?: string }).code === "permission-denied") return "exists";
+    // A client can only create a batch, so that's what's refused of one already there. Having no App Check token is
+    // refused with the same code, and those lines haven't been stored.
+    if ((e as { code?: string }).code === "permission-denied" && (await hasAppCheckToken())) return "exists";
     throw e;
   }
 }
