@@ -5,7 +5,7 @@ import type { Answer, GameEvent, GameRequest } from "../protocol";
 import { Game, type GameHost, type Input, RESUMING } from "./game";
 import type { NetHackModule } from "./memory";
 import type { Recorder } from "./recorder";
-import { type BootCore, never, parseRecording, type RecordedSession, replay, ReplayError, type ReplayHost, writeSaveFiles } from "./replayer";
+import { type BootCore, parseRecording, type RecordedSession, replay, ReplayError, type ReplayHost, writeSaveFiles } from "./replayer";
 
 const OUT: unique symbol = Symbol("out");
 // as long as Game pauses for the core's delay_output
@@ -14,11 +14,20 @@ const DELAY_MS = 50;
 /** Answers from the recording until it runs out, then from the player through `handOver`. */
 export class ResumedHost implements GameHost {
   private live: GameHost | null = null;
+  private out = false;
+  private stopWaiting: (() => void) | null = null;
 
   constructor(
     private readonly replayed: ReplayHost,
     private readonly handOver: () => GameHost,
-  ) {}
+  ) {
+    // a failed replay's core must wait for good: Game would answer a rejection and let it run on
+    void replayed.finished.then(() => {
+      if (replayed.diverged) return;
+      this.out = true;
+      this.stopWaiting?.();
+    });
+  }
 
   get alone(): boolean {
     return (this.live ?? this.replayed).alone;
@@ -80,10 +89,12 @@ export class ResumedHost implements GameHost {
     return (this.live ?? this.replayed).uuid();
   }
 
-  // a failed replay's core must wait for good: Game would answer a rejection and let it run on
   private untilOut<T>(answer: Promise<T>): Promise<T | typeof OUT> {
-    const out: Promise<typeof OUT> = this.replayed.finished.then(() => (this.replayed.diverged ? never() : OUT));
-    return Promise.race<T | typeof OUT>([answer, out]);
+    if (this.out) return Promise.resolve(OUT);
+    return new Promise((resolve, reject) => {
+      this.stopWaiting = () => resolve(OUT);
+      answer.then(resolve, reject);
+    });
   }
 
   private liveHost(): GameHost {
