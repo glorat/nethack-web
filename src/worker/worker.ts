@@ -179,7 +179,9 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
   let replayFailed = false;
 
   async function resume(text: string, name: string): Promise<boolean> {
-    const bones = mode.bones(() => module!.FS);
+    // the live core's, as replay cores have no /save of their own; none yet when an online game comes back
+    const fs = module?.FS;
+    const bones = mode.bones(() => fs!);
     try {
       await resumeUnseen(text, {
         boot: () => replayBoot(createModule, assetBase, () => true),

@@ -15,7 +15,7 @@ export interface WorkerMode {
   readonly recording: string;
   /** The page has a use for what the recording already held when the game comes back. */
   readonly wantsRecordingSoFar: boolean;
-  /** The bones a replay can read, by hash; `files` is only read once one is wanted. */
+  /** The bones a replay can read, by hash, from the files given; they're only read once one is wanted. */
   bones(files: Files): (hash: string) => Uint8Array | undefined;
   /** Puts what a replay left of the game named in the /save of the core that carries on. */
   place(m: NetHackModule, name: string, files: Map<string, Uint8Array>): void;
