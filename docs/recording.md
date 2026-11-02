@@ -23,7 +23,7 @@ Each line is `<time> <tag> [args]`. `time` is the player's clock when it was wri
 | `session` | `unrecorded <time> tz=…` | A game restored with no whole recording: its start was never recorded, or the player continued it from a checkpoint; never replays |
 | `opt` | JSON | NETHACKOPTIONS, at the start of every session, as they can change between sessions |
 | `rc` | JSON | The `.nethackrc`, likewise |
-| `alone` | `0` or `1` | No other tab was playing |
+| `alone` | `0` or `1` | No other tab was playing in the same mode |
 | `seed` | n | A random seed the core asked for |
 | `now` | n | The time the core asked for, in seconds since 1970 |
 | `uuid` | uuid | The new game's id |
@@ -77,7 +77,7 @@ If the replay goes differently, the recording is cut back to its last line known
 
 A replay is applied once, as it would only fail the same way again. If no check had passed, the second replay fails too, or the recording can't be replayed, the player chooses: destroy the game, or continue from its last checkpoint, losing what came after. A game continued that way starts its recording again as `session unrecorded`, so it can never be replayed, and it's offered the same choice on every later close. The core's checkpoints play no other part. Only the player can destroy a game.
 
-A page that closes or crashes during a replay leaves `/save/resuming`, so the next start asks first instead of replaying. So does another tab being open, or having no locks to tell. There Destroy deletes the game and Recover applies its replay.
+A page that closes or crashes during a replay leaves `/save/resuming`, so the next start asks first instead of replaying. So does another tab playing in the same mode, or having no locks to tell. There Destroy deletes the game and Recover applies its replay.
 
 The web build never reads the high score list during play, only to rank a finished game, so what's on it can't make a replay go differently. Corpses, statues and doppelgangers that would take a past player's role and name get a random role and no name, as on a new install.
 

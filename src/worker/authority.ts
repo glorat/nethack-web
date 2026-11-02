@@ -3,7 +3,7 @@
 import type { NetHackModule } from "./memory";
 
 export interface Authority {
-  /** No other tab is playing, so a game left unfinished can't be one still going on there. */
+  /** No other tab is playing in this mode, so a game left unfinished can't be one still going on there. */
   readonly alone: boolean;
   /** Seconds since 1970, for every time the core reads. */
   now(): number;
@@ -21,14 +21,14 @@ export interface Authority {
 
 export type Files = () => NetHackModule["FS"];
 
-/** Whether this is the only tab playing; if so, it stays that until this worker ends. */
-export function soleTab(): Promise<boolean> {
+/** Whether this is the only tab holding `lock`, one for each mode; if so, it stays that until this worker ends. */
+export function soleTab(lock: string): Promise<boolean> {
   return new Promise((resolve) => {
     // absent outside https and localhost, where the game in progress is asked about as before
     if (!navigator.locks) return resolve(false);
-    void navigator.locks.request("nethack-game", { ifAvailable: true }, (lock) => {
-      resolve(lock !== null);
-      return lock ? new Promise<void>(() => {}) : undefined;
+    void navigator.locks.request(lock, { ifAvailable: true }, (held) => {
+      resolve(held !== null);
+      return held ? new Promise<void>(() => {}) : undefined;
     });
   });
 }
