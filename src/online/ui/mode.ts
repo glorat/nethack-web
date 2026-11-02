@@ -45,12 +45,16 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
       const params = new URLSearchParams(location.search);
       const utcOffset = chosenZone(location.search, -new Date().getTimezoneOffset() * 60);
       const build = { version: __NETHACK_VERSION__, core: __CORE_COMMIT__ };
+      waiting = true;
+      show();
       const opened = await session
         .open({ name: game.name, utcOffset, options: game.options, config: game.config, build }, { game: params.get("game") ?? undefined, fresh: params.has("new") })
         .catch((e) => {
           console.warn("the server refused the game", e);
           return null;
         });
+      waiting = false;
+      show();
       if (!opened) {
         refuse();
         return null;
