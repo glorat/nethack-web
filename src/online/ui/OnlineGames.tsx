@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import { PLAY_PATH } from "../../port/name";
-import { ascended, type FinishedGame, watchAddress } from "../results";
+import { ascended, type FinishedGame, outcome, watchAddress } from "../results";
 import { listFinishedGames } from "../server/api";
 
 const SHOWN = 10;
@@ -22,19 +22,24 @@ export function OnlineGames() {
     <section class="landing-panel landing-device">
       <h2>Your online games</h2>
       <ol class="device-scores online-scores">
-        {games.map(({ game, name, endedAt, result }) => (
-          <li key={game} class={ascended(result) ? "ascended" : undefined}>
-            <strong>{result?.points !== undefined ? result.points.toLocaleString() : "–"}</strong>
-            <span>
-              {result
-                ? `${name} (${result.role}-${result.race}): ${result.death}${result.turns !== undefined ? `, turn ${result.turns.toLocaleString()}` : ""}`
-                : `${name}: scored once the server has replayed the game, within a few hours`}
-            </span>
-            <small>{endedOn(endedAt)}</small>
-            <a href={watchAddress(PLAY_PATH, game)}>Watch</a>
-          </li>
+        {games.map((g) => (
+          <Row key={g.game} {...g} />
         ))}
       </ol>
     </section>
+  );
+}
+
+function Row(g: FinishedGame) {
+  const { game, name, endedAt, result } = g;
+  return (
+    <li class={ascended(result) ? "ascended" : undefined}>
+      <strong>{result?.points !== undefined ? result.points.toLocaleString() : "–"}</strong>
+      <span>{outcome(g)}</span>
+      <small>{endedOn(endedAt)}</small>
+      <a href={watchAddress(PLAY_PATH, game)} aria-label={`Watch ${name}'s game of ${endedOn(endedAt)}`}>
+        Watch
+      </a>
+    </li>
   );
 }

@@ -18,7 +18,17 @@ export interface FinishedGame {
   name: string;
   startedAt: number;
   endedAt: number;
+  /** The server has replayed it: without a result, that replay couldn't score it. */
+  checked: boolean;
   result?: GameResult;
+}
+
+/** What a row says of a game: its character and how it ended, or why there's no score. */
+export function outcome({ name, checked, result }: FinishedGame): string {
+  if (!result) return checked ? `${name}: the server couldn't score this game` : `${name}: scored once the server has replayed the game, within a few hours`;
+  const character = [result.role, result.race].filter(Boolean).join("-");
+  const turn = result.turns !== undefined ? `, turn ${result.turns.toLocaleString()}` : "";
+  return `${name}${character ? ` (${character})` : ""}: ${result.death ?? "ended"}${turn}`;
 }
 
 export const ascended = (result: GameResult | undefined): boolean => /^ascended\b/.test(result?.death ?? "");
