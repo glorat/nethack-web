@@ -129,7 +129,7 @@ async function expectUploaded(page: Page, game: string, text: string): Promise<S
 }
 
 /** Sweeps everything on the emulators, as the server's schedule would, and reads the game back. */
-function sweepAndRead(game: string): { recording: string; batches: number; segments: number; finished?: boolean; validation?: Record<string, unknown> } {
+function sweepAndRead(game: string): { recording: string; batches: number; segments: number; finished?: boolean; validation?: Record<string, unknown>; xlog?: string; result?: Record<string, unknown> } {
   return JSON.parse(execFileSync("node", ["lib/scripts/sweep-and-read.js", game], { cwd: "../nethack-server/functions", encoding: "utf8" }));
 }
 
@@ -452,8 +452,10 @@ test("a real game, reloaded, saved and restored, validates on the server's core 
   const text = await quit(page);
   await expectUploaded(page, game, text);
 
-  const { validation } = sweepAndRead(game);
+  const { validation, xlog, result } = sweepAndRead(game);
   expect(validation).toMatchObject({ replayed: true, matches: ALL_MATCH, cutBacks: 0 });
+  expect(xlog).toContain(`name=${name}\t`);
+  expect(result).toMatchObject({ name, death: "quit", role: "Val", player: expect.any(String), endedAt: expect.stringMatching(/Z$/) });
   expect(validation!.resumes).toBeGreaterThanOrEqual(2);
 });
 
