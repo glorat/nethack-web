@@ -5,7 +5,7 @@ import { ReplayRunner } from "./replay-runner";
 import { type BootCore, never, replay, ReplayError, saveFiles, writeSaveFiles } from "./replayer";
 import { Shadow } from "./shadow";
 import { CONFIG_FILE, Game, type Input } from "./game";
-import { BonesDb } from "./bones";
+import { BonesDb } from "../offline/bones";
 import { Recorder } from "./recorder";
 import { placeGameFiles, resumeUnseen } from "./resume";
 import { describeSquare, type NetHackModule } from "./memory";

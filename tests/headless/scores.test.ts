@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { parseScores } from "../../src/port/scores";
+import { parseScores } from "../../src/offline/scores";
 import { replayRecording, Session } from "./harness";
 
 /** Quits a game, declining the questions at its end. */

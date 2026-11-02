@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { BonesDb } from "../../src/worker/bones";
+import { BonesDb } from "../../src/offline/bones";
 import type { NetHackModule } from "../../src/worker/memory";
 
 function db(): BonesDb {

@@ -62,7 +62,7 @@ The sum on each `T` covers the main random generator and the hero's position, so
 
 ## Bones
 
-Bones belong to the host, not the core. When the core has decided to look for bones for a level it asks the host, and when it has written some at a death it hands them over. `src/worker/bones.ts` is the browser's database, under `/save/bones/`:
+Bones belong to the host, not the core. When the core has decided to look for bones for a level it asks the host, and when it has written some at a death it hands them over. `src/offline/bones.ts` is the browser's database, under `/save/bones/`:
 
 - `<sha256>` holds the bones themselves, kept for good so that recordings naming them can replay.
 - `<name>`, such as `bonD0.5`, holds the hash of the bones waiting for the next game to reach that level. The first bones left for a level stay until a game takes them; debug-mode games neither leave nor take any.

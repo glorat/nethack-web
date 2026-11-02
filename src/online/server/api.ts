@@ -1,5 +1,5 @@
-import { LogUploader, type LogPosition, type UploadDeps, type WriteResult } from "../port/upload";
-import { type GameSummary, loadGames, type OnlineDeps, OnlineSession } from "../port/online";
+import { LogUploader, type LogPosition, type UploadDeps, type WriteResult } from "../upload";
+import { type GameSummary, loadGames, type OnlineDeps, OnlineSession } from "../session";
 
 
 /** Only ever loaded for an online game, so offline play never touches it. */

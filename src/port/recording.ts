@@ -1,31 +1,13 @@
-// The last finished game's recording, which /play/?replay plays.
+// Reading and saving a recording, whichever mode it came from.
 
-const LAST_GAME_KEY = "nethack.lastGame";
-
-export function lastGame(): string | null {
-  try {
-    return localStorage.getItem(LAST_GAME_KEY);
-  } catch {
-    return null;
-  }
+export function lastTurnIn(text: string): number | null {
+  // not ^ with the m flag, which also matches after a U+2028 in typed text
+  const found = [...text.matchAll(/(?:^|\n)\d+ T (\d+)/g)].at(-1);
+  return found ? Number(found[1]) : null;
 }
 
-/** False if the browser wouldn't keep it, as it won't one too big, or it couldn't replay, which leaves the last game that can. */
-export function keepLastGame(text: string): boolean {
-  if (/^\d+ session (?:unrecorded|recover) /m.test(text)) return false;
-  try {
-    localStorage.setItem(LAST_GAME_KEY, text);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** The last turn the recording reached. */
-export function lastTurn(text: string): number {
-  let last = 0;
-  for (const m of text.matchAll(/^\d+ T (\d+)\b/gm)) last = Math.max(last, Number(m[1]));
-  return last;
+export function linesIn(text: string): number {
+  return text ? text.split("\n").length - 1 : 0;
 }
 
 /** A file name for the recording: the hero's name and when the game started. */

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { appCheckRefused, chosenZone, lastTurnIn, linesIn, onlineAddress, onlineWanted, type OnlineDeps, type OnlineGame, OnlineSession, zoneChoices, zoneLabel } from "../../src/port/online";
+import { appCheckRefused, onlineAddress, onlineWanted, type OnlineDeps, type OnlineGame, OnlineSession } from "../../src/online/session";
+import { chosenZone, zoneChoices, zoneLabel } from "../../src/online/zones";
+import { lastTurnIn, linesIn } from "../../src/port/recording";
 
 const START = { name: "Agnes", utcOffset: 3600, options: "name:Agnes", config: "rc", build: { version: "5.0.0", core: "abc" } };
 const inFlight = (recording: string, game = "old"): OnlineGame => ({ game, utcOffset: 0, options: "o", config: "c", recording, generation: 2, now: 4000 });

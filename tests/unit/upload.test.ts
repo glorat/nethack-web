@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { batchId, type LogPosition, LogUploader, MAX_BATCH, type UploadNotice, type WriteResult } from "../../src/port/upload";
+import { batchId, type LogPosition, LogUploader, MAX_BATCH, type UploadNotice, type WriteResult } from "../../src/online/upload";
 import { rebuildRecording } from "../rebuild-recording";
 
 const GAME = "game-1";

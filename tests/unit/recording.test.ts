@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { keepLastGame } from "../../src/port/recording";
+import { keepLastGame } from "../../src/offline/last-game";
 import { answerLine } from "../../src/worker/recorder";
 import type { NetHackModule } from "../../src/worker/memory";
 import { parseAnswer, parseRecording, ReplayHost } from "../../src/worker/replayer";

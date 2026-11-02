@@ -9,14 +9,17 @@ import { applyEvents, initialState, nextBatch } from "../port/state";
 import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, textSizeFromOptions } from "../port/textsize";
 import type { Answer, GameRequest, ReplayProgress, ShadowStatus } from "../protocol";
 import { buildDebugPackage, debugPackageName, namedBones } from "../port/debug-package";
-import { keepLastMode, offlineGameEnded, offlineGameStarted } from "../port/progress";
-import { keepScores } from "../port/scores";
-import { downloadRecording, downloadText, keepLastGame, lastGame, lastTurn } from "../port/recording";
+import { keepLastMode } from "../port/last-mode";
+import { offlineGameEnded, offlineGameStarted } from "../offline/progress";
+import { keepScores } from "../offline/scores";
+import { keepLastGame, lastGame } from "../offline/last-game";
+import { downloadRecording, downloadText, lastTurnIn, linesIn } from "../port/recording";
 import { gameAuthority } from "../port/fixedinputs";
 import { shadowWanted } from "../port/shadow";
-import { chosenZone, linesIn, onlineWanted, type OnlineSession } from "../port/online";
-import type { LogUploader, UploadNotice } from "../port/upload";
-import { createOnlineSession, createUploader } from "../server/upload";
+import { onlineWanted, type OnlineSession } from "../online/session";
+import { chosenZone } from "../online/zones";
+import type { LogUploader, UploadNotice } from "../online/upload";
+import { createOnlineSession, createUploader } from "../online/server/api";
 import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port/tilesets";
 import { loadTileSheet, type TileSheet } from "../tiles";
 import { beep, wakeBeep } from "./beep";
@@ -173,7 +176,7 @@ export function App() {
   const [replay] = useState(() => (new URLSearchParams(location.search).has("replay") ? { text: lastGame() } : null));
   const [replayProgress, setReplayProgress] = useState<ReplayProgress>({ turn: 0, playing: true, seeking: false, ended: null });
   const [replaySpeed, setReplaySpeed] = useState(REPLAY_SPEEDS[0].turnsPerSecond);
-  const replayLastTurn = useMemo(() => (replay?.text ? lastTurn(replay.text) : 0), [replay]);
+  const replayLastTurn = useMemo(() => ((replay?.text && lastTurnIn(replay.text)) || 0), [replay]);
   /** The game's recording, once it has ended, and whether the browser kept it for replaying. */
   const [recorded, setRecorded] = useState<{ text: string; kept: boolean } | null>(null);
   // a developer's option: a second core follows the game by its recording, to catch one that would replay differently
