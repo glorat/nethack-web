@@ -6,7 +6,7 @@ import { OnlineChoice } from "../online/ui/OnlineChoice";
 import { OnlineGames } from "../online/ui/OnlineGames";
 import { saveOptions, savedOptions } from "../port/options";
 import { keepLastMode, lastMode } from "../port/last-mode";
-import { anonymous, type Profile } from "../online/account";
+import type { Profile } from "../online/account";
 import { AccountBar, HandlePrompt } from "../online/ui/Account";
 import { offlineGameUnder } from "../offline/progress";
 import { DeviceGames } from "../offline/ui/DeviceGames";
@@ -59,9 +59,12 @@ export function Landing() {
       },
     );
   };
+  // a character's name is the player's choice, and their handle a good start for one
+  useEffect(() => {
+    if (profile?.handle && !name) setName(profile.handle);
+  }, [profile?.handle]);
   const offlineInProgress = !changing && offlineGameUnder(remembered);
-  // the server names online characters, so the name being typed has nothing to do with it
-  const continueOnline = latestOnline ? () => location.assign(onlineAddress(PLAY_PATH, latestOnline.name, { game: latestOnline.game })) : null;
+  const continueOnline = latestOnline && !changing ? () => location.assign(onlineAddress(PLAY_PATH, latestOnline.name, { game: latestOnline.game })) : null;
   const mainAction = continueOnline ?? (offlineInProgress || !offered ? "offline" : "online");
   const playButton = useRef<HTMLButtonElement>(null);
   const backFromOnline = () => {
@@ -75,7 +78,9 @@ export function Landing() {
     location.assign(saveName(n) ? PLAY_PATH : `${PLAY_PATH}?name=${encodeURIComponent(n)}`);
   };
   const chooseOnline = () => {
-    // the server names online characters, so the name typed is only for offline
+    const n = playerName(name);
+    if (!n) return;
+    saveName(n);
     setChoosingOnline(true);
   };
   const [offlineReady, setOfflineReady] = useState(false);
@@ -122,7 +127,7 @@ export function Landing() {
             <h1>NetHack</h1>
             <p class="start-sub">The classic dungeon crawl with painted tiles, in your browser. Nothing to install, and it plays even with no connection.</p>
             {choosingOnline ? (
-              <OnlineChoice onBack={backFromOnline} />
+              <OnlineChoice name={playerName(name)} onBack={backFromOnline} />
             ) : (
               <>
                 {changing ? (
@@ -133,13 +138,13 @@ export function Landing() {
                 ) : null}
                 {continueOnline && latestOnline ? (
                   <button type="submit" class="primary">
-                    {anonymous(latestOnline.name) ? "Continue Online" : `Continue Online as ${latestOnline.name}`}
+                    Continue Online as {latestOnline.name}
                   </button>
                 ) : null}
                 {[
                   offered ? (
-                    <button key="online" type={mainAction === "online" ? "submit" : "button"} class={mainAction === "online" ? "primary" : undefined} ref={playButton} onClick={mainAction === "online" ? undefined : chooseOnline}>
-                      {profile?.handle ? `Play Online as ${profile.handle}` : "Play Online"}
+                    <button key="online" type={mainAction === "online" ? "submit" : "button"} class={mainAction === "online" ? "primary" : undefined} disabled={!valid} ref={playButton} onClick={mainAction === "online" ? undefined : chooseOnline}>
+                      {changing ? "Play Online" : `Play Online as ${remembered}`}
                     </button>
                   ) : null,
                   <button key="offline" type={mainAction === "offline" ? "submit" : "button"} class={mainAction === "offline" ? "primary" : undefined} disabled={!valid} onClick={mainAction === "offline" ? undefined : playOffline}>
@@ -179,7 +184,7 @@ export function Landing() {
             <h2>{offered ? "Online or offline?" : "Where your game is kept"}</h2>
             {offered ? (
               <p>
-                <strong>Online</strong> games are kept for you, so start as many as you like and pick any of them up again. You need a connection, and may lose your last few moves if it drops. Sign in to keep them with your account, and to choose the handle they're played under; until then they stay linked to this browser, so clearing this site's data loses access to them. Shared high scores are on the way, for online games only.
+                <strong>Online</strong> games are kept for you, so start as many as you like and pick any of them up again. You need a connection, and may lose your last few moves if it drops. Sign in to keep them with your account, and to choose the handle your scores are shown under; until then they stay linked to this browser, so clearing this site's data loses access to them. Shared high scores are on the way, for online games only.
               </p>
             ) : null}
             <p>
