@@ -26,10 +26,25 @@ export interface FinishedGame {
 /** What a row says of a game: its character and how it ended, or why there's no score. */
 export function outcome({ name, checked, result }: FinishedGame): string {
   if (!result) return checked ? `${name}: the server couldn't score this game` : `${name}: scored once the server has replayed the game, within a few hours`;
+  return ending(name, result);
+}
+
+function ending(who: string, result: GameResult): string {
   const character = [result.role, result.race].filter(Boolean).join("-");
   const turn = result.turns !== undefined ? `, turn ${result.turns.toLocaleString()}` : "";
-  return `${name}${character ? ` (${character})` : ""}: ${result.death ?? "ended"}${turn}`;
+  return `${who}${character ? ` (${character})` : ""}: ${result.death ?? "ended"}${turn}`;
 }
+
+/** A game on the leaderboard, under its player's handle rather than the character's name. */
+export interface LeaderboardEntry {
+  /** Null for a player who hasn't chosen one. */
+  handle: string | null;
+  yours: boolean;
+  endedAt?: number;
+  result: GameResult;
+}
+
+export const standing = ({ handle, result }: LeaderboardEntry): string => ending(handle ?? "Anonymous", result);
 
 export const ascended = (result: GameResult | undefined): boolean => /^ascended\b/.test(result?.death ?? "");
 

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { ascended, type FinishedGame, outcome, watchAddress, watchedGame } from "../../src/online/results";
+import { ascended, type FinishedGame, outcome, standing, watchAddress, watchedGame } from "../../src/online/results";
 
 const game: FinishedGame = { game: "g1", name: "Agnes", startedAt: 0, endedAt: 0, checked: false };
 
@@ -25,4 +25,10 @@ test("only an ascension counts as one", () => {
   expect(ascended({ death: "ascended" })).toBe(true);
   expect(ascended({ death: "killed by an ascended being" })).toBe(false);
   expect(ascended(undefined)).toBe(false);
+});
+
+test("a leaderboard entry goes under the player's handle, never the character's name", () => {
+  const result = { role: "Val", race: "Hum", death: "ascended", turns: 50000 };
+  expect(standing({ handle: "Boardtop", yours: false, result })).toBe(`Boardtop (Val-Hum): ascended, turn ${(50000).toLocaleString()}`);
+  expect(standing({ handle: null, yours: true, result })).toMatch(/^Anonymous \(Val-Hum\)/);
 });
