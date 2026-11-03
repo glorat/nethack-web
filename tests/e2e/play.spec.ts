@@ -22,6 +22,8 @@ async function enterGame(page: Page, name: string) {
 
 /** Chooses the role, and the first of what's allowed for the rest, over the picker's random default. */
 async function pickCharacter(picker: Locator, role: RegExp) {
+  // a human can be any role, and roles the race can\'t play are disabled
+  await picker.getByRole("listbox", { name: "Race" }).getByRole("option", { name: "human" }).click();
   await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: role }).click();
   await picker.getByRole("listbox", { name: "Race" }).locator("button:not([disabled])").first().click();
   for (const name of ["Gender", "Alignment"]) await picker.getByRole("radiogroup", { name }).locator("button:not([disabled])").first().click();
@@ -320,8 +322,10 @@ test("arrow keys answer a direction prompt", async ({ page }) => {
 test("the character picker starts the chosen role", async ({ page }) => {
   await enterGame(page, `Pick${Date.now() % 100000}`);
   const picker = page.getByRole("dialog", { name: "Choose your character" });
+  await picker.getByRole("option", { name: "human" }).click();
   await picker.getByRole("option", { name: "Wizard" }).click();
   await picker.getByRole("option", { name: "elf" }).click();
+  await expect(picker.getByRole("option", { name: "Valkyrie" })).toBeDisabled();
   // elves are only chaotic
   await expect(picker.getByRole("radio", { name: "Lawful" })).toBeDisabled();
   await expect(picker.getByRole("radio", { name: "Chaotic" })).toHaveAttribute("aria-checked", "true");
