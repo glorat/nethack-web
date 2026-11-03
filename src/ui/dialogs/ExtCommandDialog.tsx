@@ -15,6 +15,7 @@ export function ExtCommandDialog({ commands, initial = "", onDone }: Props) {
   // with nothing typed nothing is highlighted, so a stray Return runs nothing
   const [active, setActive] = useState(initial.trim() ? 0 : -1);
   const input = useRef<HTMLInputElement>(null);
+  const list = useRef<HTMLDivElement>(null);
   // layout effect: focus before the dialog is painted, or keys typed fast after # are lost
   useLayoutEffect(() => {
     const field = input.current!;
@@ -36,6 +37,10 @@ export function ExtCommandDialog({ commands, initial = "", onDone }: Props) {
 
   const shown = listCommands(commands, filter);
   const pick = active < 0 ? undefined : shown[Math.min(active, shown.length - 1)];
+
+  useLayoutEffect(() => {
+    if (pick) list.current?.children[shown.indexOf(pick)]?.scrollIntoView({ block: "nearest" });
+  }, [pick]);
 
   return (
     <div class="dialog-backdrop">
@@ -74,7 +79,7 @@ export function ExtCommandDialog({ commands, initial = "", onDone }: Props) {
             e.preventDefault();
           }}
         />
-        <div class="ext-list">
+        <div class="ext-list" ref={list}>
           {shown.map((c) => (
             <button class={c === pick ? "ext-item active" : "ext-item"} onClick={() => onDone(c.index)}>
               <span class="ext-name">{c.name}</span>
