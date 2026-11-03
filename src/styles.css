@@ -221,6 +221,8 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .menu-heading { font-size: calc(11px * var(--text-scale)); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 8px 14px 2px; }
 .menu-heading.strong { color: var(--text); }
 .menu-items .menu-heading { position: sticky; top: 0; z-index: 1; background: var(--panel); }
+/* a row scrolled into view from below stops under the pinned heading, not behind it */
+.menu-items { scroll-padding-top: calc(16px * var(--text-scale) + 10px); }
 .menu-line { white-space: pre-wrap; padding: 1px 14px; }
 .menu-items.tabbed > .menu-line:not(.columns), .menu-items.tabbed > .menu-heading:not(.columns) { display: block; }
 .menu-item { padding: 3px 14px; }
