@@ -439,6 +439,8 @@ export class Recorder implements GameHost {
 export function checkLine(turn: number, m: NetHackModule, status: Record<string, string>): string {
   const fields = Object.fromEntries(
     Object.keys(status)
+      // only the core's own fields: the panel's extras are wording, not the game
+      .filter((k) => k.startsWith("BL_"))
       .sort()
       .map((k) => [k.replace(/^BL_/, ""), status[k].trim()]),
   );

@@ -1,10 +1,16 @@
 import { expect, test, vi } from "vitest";
 import { keepLastGame } from "../../src/offline/last-game";
-import { answerLine } from "../../src/worker/recorder";
+import { answerLine, checkLine } from "../../src/worker/recorder";
 import type { NetHackModule } from "../../src/worker/memory";
 import { parseAnswer, parseRecording, ReplayHost } from "../../src/worker/replayer";
 
 const head = '1 nhrec 1\n2 session new 2026-01-26T12:00:00.000Z tz=+11:00\n3 opt "name:A"\n4 rc ""\n';
+
+test("a check line holds the core's status fields, not the panel's extras", () => {
+  const m = { _nhweb_hero_x: () => 3, _nhweb_hero_y: () => 4, _nhweb_rng_fingerprint: () => 5 } as unknown as NetHackModule;
+  const line = checkLine(7, m, { BL_HP: "12", hero_kind: "human priest", dungeon_name: "The Dungeons of Doom", dungeon_level: "1" });
+  expect(line).toBe('= 7 @3,4 5 {"HP":"12"}');
+});
 
 test("text holding any character reads back as it was written", () => {
   const request = { kind: "getlin" as const, query: "" };
