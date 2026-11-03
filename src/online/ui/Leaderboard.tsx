@@ -12,7 +12,7 @@ export function Leaderboard() {
   }, []);
   if (!entries) return null;
   return (
-    <section class="landing-panel landing-device">
+    <section class="landing-panel landing-device secondary">
       <h2>Online high scores</h2>
       {entries.length ? (
         <ol class="device-scores leaderboard">
