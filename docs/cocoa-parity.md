@@ -95,7 +95,7 @@ Menus:
 
 Status:
 
-- [ ] HP and Pw bars warn below 2/3 as well as below 1/3 (`StatsView.m` `SetMeter`).
+- [x] HP and Pw bars warn below 2/3 as well as below 1/3 (`StatsView.m` `SetMeter`).
 - [ ] Alignment, race and role, or the polymorphed form, and the dungeon's name with the level (`wincocoa.m` `RoleText`, `LevelText`).
 
 Map:
