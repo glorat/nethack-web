@@ -733,6 +733,27 @@ test("a menu's text indented four spaces starts where the items' text does", asy
   expect(noteStart).toBeCloseTo(itemStart, 0);
 });
 
+test("arrowing up a long menu keeps the highlighted row clear of the pinned heading", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 420 });
+  await startAs(page, `Up${Date.now() % 100000}`, /Priest/);
+  await page.keyboard.press("Shift+D");
+  const dialog = page.getByRole("dialog");
+  await dialog.locator(".menu-item", { hasText: /all types/i }).click();
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(dialog).toContainText("holy water");
+  const rows = await dialog.locator(".menu-item").count();
+  for (let i = 0; i < rows; i++) await page.keyboard.press("ArrowDown");
+  for (let i = 1; i < rows; i++) {
+    await page.keyboard.press("ArrowUp");
+    const lit = dialog.locator(".menu-item.highlighted");
+    const hit = await lit.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      return el.contains(document.elementFromPoint(box.left + 40, box.top + 3));
+    });
+    expect(hit, `row ${rows - 1 - i}`).toBe(true);
+  }
+});
+
 test("in a menu of several picks, . or , picks everything, - or \\ nothing, and Select All everything", async ({ page }) => {
   await startAs(page, `All${Date.now() % 100000}`, /Priest/);
   await page.keyboard.press("Shift+D");
