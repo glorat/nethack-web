@@ -382,6 +382,7 @@ export class Game {
       this.monsters.clear();
       this.emit({ type: "map_clear" });
     }
+    if (w.kind === NHW_MESSAGE) this.emit({ type: "message_clear" });
     w.lines = [];
     w.menu = null;
     return 0;
