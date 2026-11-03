@@ -697,6 +697,42 @@ test("a menu's heading stays at the top while its items scroll under it", async 
   expect(top).toMatch(/menu-heading/);
 });
 
+test("a menu without tiles has no tile column, and one with tiles keeps it", async ({ page }) => {
+  await startAs(page, `Tiles${Date.now() % 100000}`, /Priest/);
+  const dialog = page.getByRole("dialog");
+  await page.keyboard.press("Shift+O");
+  await expect(dialog.locator(".menu-item").first()).toBeVisible();
+  await expect(dialog.locator(".inv-icon")).toHaveCount(0);
+  await expect(dialog.locator(".inv-letter").first()).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Shift+D");
+  await dialog.locator(".menu-item", { hasText: /all types/i }).click();
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(dialog).toContainText("holy water");
+  expect(await dialog.locator(".inv-icon").count()).toBe(await dialog.locator(".menu-item").count());
+});
+
+test("a menu's columns set apart by runs of spaces line up like tab-separated ones", async ({ page }) => {
+  await startGame(page, `Cols${Date.now() % 100000}`);
+  await page.keyboard.press("Shift+O");
+  const dialog = page.getByRole("dialog");
+  const row = (name: string) => dialog.locator(".menu-item", { hasText: name });
+  const left = async (name: string, n: number) => (await row(name).locator(".menu-field").nth(n).boundingBox())!.x;
+  await expect(row("dropped_nopick").locator(".menu-field")).toHaveText(["dropped_nopick", "[X]", "(for autopickup)"]);
+  expect(await left("dropped_nopick", 1)).toBeCloseTo(await left("fruit", 1), 0);
+  expect(await left("dropped_nopick", 2)).toBeCloseTo(await left("pickup_types", 2), 0);
+});
+
+test("a menu's text indented four spaces starts where the items' text does", async ({ page }) => {
+  await startGame(page, `Indent${Date.now() % 100000}`);
+  await page.keyboard.press("Shift+D");
+  const dialog = page.getByRole("dialog");
+  const note = dialog.locator(".menu-line", { hasText: "ignored unless" });
+  const noteStart = await note.evaluate((el) => el.getBoundingClientRect().left + parseFloat(getComputedStyle(el).paddingLeft));
+  const itemStart = (await dialog.locator(".menu-item", { hasText: "Auto-select" }).locator(".menu-text").boundingBox())!.x;
+  expect(noteStart).toBeCloseTo(itemStart, 0);
+});
+
 test("in a menu of several picks, . or , picks everything, - or \\ nothing, and Select All everything", async ({ page }) => {
   await startAs(page, `All${Date.now() % 100000}`, /Priest/);
   await page.keyboard.press("Shift+D");
