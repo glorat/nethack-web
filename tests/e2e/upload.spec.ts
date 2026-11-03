@@ -744,3 +744,29 @@ test("the leaderboard ranks a game under its player's handle, never the characte
     await result({});
   }
 });
+
+test("the landing page shows the player's achievements, earned first, once they've earned one", async ({ page }) => {
+  await online(page);
+  await untilPlaying(page, `Ac${Date.now() % 100000}`);
+  const earnedAt = Date.UTC(2026, 10, 1);
+  const mines = { id: "entered-mines", name: "Into the Mines", description: "Entered the Gnomish Mines" };
+  const ascended = { id: "ascended", name: "Ascended", description: "Ascended to demigodhood" };
+  let achievements: object[] = [mines, { hidden: true }, ascended];
+  await page.route(/\/europe-west1\/user$/, async (route) => {
+    if ((route.request().postDataJSON() as { data?: { method?: string } }).data?.method !== "achievements") return route.fallback();
+    await route.fulfill({ json: { result: { achievements } } });
+  });
+  const heading = page.getByRole("heading", { name: /Your achievements/ });
+  const answered = page.waitForResponse((r) => /\/europe-west1\/user$/.test(r.url()) && (r.request().postDataJSON() as { data?: { method?: string } }).data?.method === "achievements");
+  await page.goto("/");
+  await answered;
+  await page.waitForTimeout(200);
+  await expect(heading).toHaveCount(0);
+
+  achievements = [ascended, { hidden: true }, { ...mines, earned: { at: earnedAt, game: "11111111-1111-4111-8111-111111111111", turn: 1234 } }];
+  await page.goto("/");
+  const panel = page.locator("section", { has: heading });
+  await expect(heading).toHaveText("Your achievements 1 of 3 earned");
+  const date = await page.evaluate((at) => `${new Date(at).toLocaleDateString(undefined, { dateStyle: "medium" })}, turn ${(1234).toLocaleString()}`, earnedAt);
+  await expect(panel.getByRole("listitem")).toHaveText([`Into the MinesEntered the Gnomish Mines${date}`, "AscendedAscended to demigodhoodNot yet", "Hidden achievementShown once earned"]);
+});

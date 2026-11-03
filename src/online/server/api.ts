@@ -1,5 +1,6 @@
 import { LogUploader, type LogPosition, type UploadDeps, type WriteResult } from "../upload";
 import type { Profile } from "../account";
+import type { Achievement } from "../achievements";
 import type { FinishedGame, LeaderboardEntry } from "../results";
 import { type GameSummary, loadGames, type OnlineDeps, OnlineSession } from "../session";
 
@@ -50,6 +51,9 @@ export const listFinishedGames = async (): Promise<FinishedGame[]> => (await (aw
 
 /** The best-scoring games on the server, best first. */
 export const loadLeaderboard = async (): Promise<LeaderboardEntry[]> => (await (await server()).leaderboard({ sentAt: Date.now() })).entries;
+
+/** The server's achievements, with when the player earned each. */
+export const loadAchievements = async (): Promise<Achievement[]> => (await (await server()).achievements()).achievements;
 
 /** A finished game's recording, or null if the server won't give one. */
 export const finishedGameRecording = async (game: string): Promise<string | null> =>

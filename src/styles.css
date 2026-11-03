@@ -298,6 +298,13 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .leaderboard li { grid-template-columns: 2em 7em 1fr auto; }
 .leaderboard .yours span { font-weight: 600; }
 .leaderboard em { color: var(--muted); font-style: normal; font-weight: normal; }
+.landing-panel h2 small { color: var(--muted); font-weight: normal; }
+.landing-panel .achievements { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(14em, 1fr)); gap: 8px; }
+.landing-panel .achievements li + li { margin-top: 0; }
+.achievements li { display: flex; flex-direction: column; gap: 2px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }
+.achievements .earned { border-color: var(--hp); }
+.achievements .locked strong, .achievements .locked span { color: var(--muted); }
+.achievements small { color: var(--muted); }
 .start-links { display: flex; flex-wrap: wrap; gap: 4px 12px; }
 .start-links button { padding: 6px 0; background: none; border: none; color: var(--muted); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
 .start-links button:hover { color: var(--text, inherit); }
