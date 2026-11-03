@@ -58,6 +58,8 @@ export interface ExtCommand {
 export type GameEvent =
   | { type: "ready" }
   | { type: "message"; text: string; attr: number }
+  /** The core cleared the message window, as it does each turn. */
+  | { type: "message_clear" }
   | { type: "map"; cells: MapCell[] }
   | { type: "map_clear" }
   | { type: "cursor"; x: number; y: number }

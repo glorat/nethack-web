@@ -318,7 +318,7 @@ export class Session {
   }
 
   get messages(): string[] {
-    return this.state.messages.map((m) => m.text);
+    return this.state.messages.filter((m) => !m.separator).map((m) => m.text);
   }
 
   cell(x: number, y: number): MapCell | null {
