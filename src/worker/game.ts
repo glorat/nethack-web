@@ -659,6 +659,7 @@ export class Game {
       fields.hero_kind = text(this.m.UTF8ToString(this.m._nhweb_hero_kind()));
       fields.dungeon_name = text(this.m.UTF8ToString(this.m._nhweb_dungeon_name()));
       fields.dungeon_level = text(String(this.m._nhweb_dungeon_level()));
+      if (this.m._nhweb_rogue_level()) fields.rogue_level = text("1");
     }
     const now = this.m._nhweb_moves();
     for (const [name, { direction, improved, turn }] of this.changes) {
