@@ -53,6 +53,36 @@ interface Window {
 
 export type Input = { key: number } | { click: { x: number; y: number; button: number } };
 
+/** What the core reports of the game as it happens, each with the turn it happened on. See NHWEB_EVENT in the core's extern.h. */
+export type CoreEvent =
+  /** `id` is an ACH_* value, negated for a rank title reached as female */
+  | { kind: "achievement"; id: number; turn: number }
+  /** A #chronicle entry: `flags` are LL_* bits, and `format` the call's format string, the same whatever went into `text` */
+  | { kind: "chronicle"; flags: number; format: string; text: string; turn: number }
+  | { kind: "uevent"; field: string; value: number; turn: number }
+  /** Just before the game's final scoring: `conduct` as xlogfile's bits, `roleplay` as nhweb_roleplay()'s */
+  | { kind: "end"; conduct: number; roleplay: number; turn: number };
+
+const CORE_EVENT_KINDS = [undefined, "achievement", "chronicle", "uevent", "end"] as const;
+
+/** Decodes the shim's `shim_game_event(kind, a, b, turn, format, text)`. */
+export function coreEvent(args: unknown[]): CoreEvent | null {
+  const [kind, a, b, turn] = args as number[];
+  const [format, text] = [String(args[4] ?? ""), String(args[5] ?? "")];
+  switch (CORE_EVENT_KINDS[kind]) {
+    case "achievement":
+      return { kind: "achievement", id: a, turn };
+    case "chronicle":
+      return { kind: "chronicle", flags: a, format, text, turn };
+    case "uevent":
+      return { kind: "uevent", field: text, value: a, turn };
+    case "end":
+      return { kind: "end", conduct: a, roleplay: b, turn };
+    default:
+      return null;
+  }
+}
+
 export interface GameHost extends Authority {
   post(events: GameEvent[]): void;
   request(request: GameRequest): Promise<Answer | null>;
@@ -67,6 +97,8 @@ export interface GameHost extends Authority {
   resume?(): Promise<boolean>;
   /** The core's pause in an animation; a short wait if not given. */
   delayOutput?(): Promise<void>;
+  /** Something the core reports of the game, which needs no answer. */
+  gameEvent?(event: CoreEvent): void;
 }
 
 /** "FOODPOIS" style names of the bits set in a BL_CONDITION mask, in `order`. */
@@ -304,6 +336,11 @@ export class Game {
         const path = args[0] as string;
         this.host.bonesLeft(baseName(path), this.m.FS.readFile(path), !!this.m._nhweb_wizard());
         this.m.FS.unlink(path);
+        return 0;
+      }
+      case "shim_game_event": {
+        const event = coreEvent(args);
+        if (event) this.host.gameEvent?.(event);
         return 0;
       }
       case "shim_doprev_message":
