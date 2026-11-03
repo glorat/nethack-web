@@ -5,13 +5,11 @@ interface Props {
   text: string;
   onNewGame(): void;
   onQuit(): void;
-  /** Watches the game again; absent if the browser couldn't keep its recording. */
+  /** Watches the game again; absent until its recording has come, or if it can't replay. */
   onReplay?(): void;
-  /** Saves the game's recording as a file; absent if there's none. */
-  onDownload?(): void;
 }
 
-export function GameOverDialog({ text, onNewGame, onQuit, onReplay, onDownload }: Props) {
+export function GameOverDialog({ text, onNewGame, onQuit, onReplay }: Props) {
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // not a key held from closing the last window, which the player pressed before this appeared
@@ -30,7 +28,6 @@ export function GameOverDialog({ text, onNewGame, onQuit, onReplay, onDownload }
         <div class="dialog-title">The game is over</div>
         <div>{text ? `${text} ` : ""}Start a new game, or quit to the home page.</div>
         <div class="dialog-buttons">
-          {onDownload ? <button onClick={onDownload}>Download Recording</button> : null}
           {onReplay ? <button onClick={onReplay}>Replay</button> : null}
           <button onClick={onQuit}>Quit</button>
           <button class="primary" onClick={onNewGame}>

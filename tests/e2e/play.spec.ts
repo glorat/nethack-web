@@ -1318,18 +1318,21 @@ test("a finished game can be replayed from its end screen or its address, reload
   await page.keyboard.press("y");
   await untilGameOver(page);
   const over = page.getByRole("dialog", { name: "The game is over" });
+  // downloading is the replay's, not a choice beside starting again
+  await expect(over.getByRole("button", { name: /download/i })).toHaveCount(0);
+
+  await over.getByRole("button", { name: "Replay" }).click();
+  const playing = page.url();
+  expect(new URL(playing).search).toBe("?replay");
+  const bar = page.getByRole("toolbar", { name: "Replay" });
+  await expect(bar).toBeVisible();
 
   const download = page.waitForEvent("download");
-  await over.getByRole("button", { name: "Download Recording" }).click();
+  await bar.getByRole("button", { name: "Download" }).click();
   const file = await download;
   expect(file.suggestedFilename()).toMatch(new RegExp(`^nethack-${name}-\\d{4}-\\d\\d-\\d\\d\\.txt$`));
   const { readFile } = await import("node:fs/promises");
   expect(await readFile((await file.path())!, "utf8")).toMatch(/^\d+ nhrec 1\n\d+ session new /);
-
-  await over.getByRole("button", { name: "Replay" }).click();
-  const playing = page.url();
-  const bar = page.getByRole("toolbar", { name: "Replay" });
-  await expect(bar).toBeVisible();
   await expect(page.locator(".overlay-note")).toBeHidden();
   await bar.getByLabel("Speed").selectOption({ label: "Max" });
   await expect(bar).toContainText("End of the recording", { timeout: 20000 });
@@ -1367,6 +1370,60 @@ test("a finished game can be replayed from its end screen or its address, reload
   await expect(broken).toContainText("This replay is no longer available.", { timeout: 20000 });
   await expect(broken).not.toContainText("line ");
   expect(errors).toEqual([]);
+});
+
+test("a finished game the browser won't keep still replays from its end screen, until the page is reloaded", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.addInitScript(() => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (key === "nethack.lastGame") throw new DOMException("full", "QuotaExceededError");
+      return setItem.call(this, key, value);
+    };
+  });
+  await startGame(page, `Big${Date.now() % 100000}`);
+  for (let i = 0; i < 3; i++) await page.keyboard.type("ms");
+  await page.keyboard.press("#");
+  await page.keyboard.type("quit");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("y");
+  await untilGameOver(page);
+
+  await page.getByRole("dialog", { name: "The game is over" }).getByRole("button", { name: "Replay" }).click();
+  const bar = page.getByRole("toolbar", { name: "Replay" });
+  await bar.getByLabel("Speed").selectOption({ label: "Max" });
+  await expect(bar).toContainText("End of the recording", { timeout: 20000 });
+  await expect(page.locator(".messages")).toContainText(/Really quit without saving\?/);
+
+  // nothing kept to come back to
+  await page.reload();
+  await expect(page).not.toHaveURL(/play/);
+  await expect(page.getByRole("link", { name: "Watch your last game" })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("a game the browser stops saving says so, and stops saying so once it saves again", async ({ page }) => {
+  await startGame(page, `Full${Date.now() % 100000}`);
+  // Chromium's quota override doesn't fail IndexedDB writes, so the game's worker is made to
+  const [worker] = page.workers();
+  await worker.evaluate(() => {
+    const store = IDBObjectStore.prototype as unknown as { put: unknown; realPut: unknown };
+    store.realPut = store.put;
+    store.put = () => {
+      throw new DOMException("full", "QuotaExceededError");
+    };
+  });
+  const notice = page.getByRole("status").filter({ hasText: "isn't being saved" });
+  await page.keyboard.type("ms");
+  await expect(notice).toBeVisible();
+
+  await worker.evaluate(() => {
+    const store = IDBObjectStore.prototype as unknown as { put: unknown; realPut: unknown };
+    store.put = store.realPut;
+  });
+  await page.keyboard.type("ms");
+  await expect(notice).toHaveCount(0);
 });
 
 test.describe("shadowing a game", () => {

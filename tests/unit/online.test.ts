@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { appCheckRefused, onlineAddress, onlineWanted, type OnlineDeps, type OnlineGame, OnlineSession } from "../../src/online/session";
 import { chosenZone, zoneChoices, zoneLabel } from "../../src/online/zones";
-import { lastTurnIn, linesIn } from "../../src/port/recording";
+import { lastTurnIn, linesIn, replayable } from "../../src/port/recording";
 
 const START = { name: "Agnes", utcOffset: 3600, options: "name:Agnes", config: "rc", build: { version: "5.0.0", core: "abc" } };
 const inFlight = (recording: string, game = "old"): OnlineGame => ({ game, utcOffset: 0, options: "o", config: "c", recording, generation: 2, now: 4000 });
@@ -155,6 +155,12 @@ test("the last turn is read from whole lines only", () => {
   expect(lastTurnIn("1 seed 5")).toBeNull();
   expect(lastTurnIn('1 T 3 abcd\n1 l "x\u20281 T 99999"')).toBe(3);
   expect(lastTurnIn("1 T 3 abcd")).toBe(3);
+});
+
+test("a game whose start wasn't recorded, or continued from a checkpoint, isn't offered to replay", () => {
+  expect(replayable("1 nhrec 1\n1 session new 2026-11-03 tz=+00:00\n1 end over\n")).toBe(true);
+  expect(replayable("1 nhrec 1\n1 session unrecorded 2026-11-03 tz=+00:00\n")).toBe(false);
+  expect(replayable("1 nhrec 1\n1 session new 2026-11-03 tz=+00:00\n2 session recover 2026-11-03\n")).toBe(false);
 });
 
 test("lines are counted by their ends", () => {

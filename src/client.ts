@@ -98,6 +98,10 @@ export class GameClient {
     this.send({ type: "debug_files", id, hashes });
     return new Promise((resolve) => this.debugFiles.set(id, resolve));
   }
+
+  stop(): void {
+    this.worker.terminate();
+  }
 }
 
 /** Main-thread handle on a second core, following the game by its recording. */
@@ -118,5 +122,9 @@ export class ShadowClient {
 
   lines(lines: string[], atPrompt: boolean): void {
     this.worker.postMessage({ type: "shadow_lines", lines, atPrompt } satisfies UiMessage);
+  }
+
+  stop(): void {
+    this.worker.terminate();
   }
 }

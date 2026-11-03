@@ -19,8 +19,10 @@ export interface PageMode {
   /** What the worker starts with, or null if the game can't start, which the mode has shown. */
   start(game: GameStart): Promise<StartOptions | null>;
   events(events: GameEvent[]): void;
-  /** A finished game's recording; true if it's kept for replaying. */
-  finished(text: string): boolean;
+  /** A finished game's recording. */
+  finished(text: string): void;
+  /** The address of the finished game's replay, which a reload of it comes back to if the mode can still find the recording. */
+  replayAddress(): string;
   /** A seed for the core, or null if there won't be one, which the mode has shown. */
   seed(): Promise<{ seed: number; now: number } | null>;
   /** Whatever has to happen before Save & Quit leaves the page. */

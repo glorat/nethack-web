@@ -42,17 +42,19 @@ function pushInput(input: Input): void {
   }
 }
 
-function syncfs(populate: boolean): Promise<void> {
+/** False if it failed. */
+function syncfs(populate: boolean): Promise<boolean> {
   return new Promise((resolve) => {
     module!.FS.syncfs(populate, (err) => {
       if (err) console.error("syncfs failed", err);
-      resolve();
+      resolve(!err);
     });
   });
 }
 
 let persisting: Promise<void> | null = null;
 let persistAgain = false;
+let saveFailing = false;
 
 /** Writes /save to IndexedDB; a call made while one is running queues one more. */
 function persist(): Promise<void> {
@@ -60,7 +62,11 @@ function persist(): Promise<void> {
     persistAgain = true;
     return persisting;
   }
-  persisting = syncfs(false).then(() => {
+  persisting = syncfs(false).then((saved) => {
+    if (saved === saveFailing) {
+      saveFailing = !saved;
+      send({ type: "events", events: [{ type: "save_failing", failing: saveFailing }] });
+    }
     persisting = null;
     if (persistAgain) {
       persistAgain = false;

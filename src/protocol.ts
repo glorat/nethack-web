@@ -83,6 +83,8 @@ export type GameEvent =
   | { type: "scores"; text: string }
   /** An online game that can't be replayed, and so can't come back. */
   | { type: "game_lost" }
+  /** Writing the game to the browser's storage has started or stopped failing. */
+  | { type: "save_failing"; failing: boolean }
   | { type: "error"; text: string };
 
 export type MenuHow = "none" | "one" | "any";

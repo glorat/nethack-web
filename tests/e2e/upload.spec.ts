@@ -48,6 +48,16 @@ async function pass(page: Page, turns: number) {
 }
 
 async function quit(page: Page): Promise<string> {
+  const over = await endGame(page);
+  // the recording comes from the game's end, with what's still to send carrying on behind its replay
+  await over.getByRole("button", { name: "Replay" }).click();
+  const bar = page.getByRole("toolbar", { name: "Replay" });
+  const [download] = await Promise.all([page.waitForEvent("download"), bar.getByRole("button", { name: "Download" }).click()]);
+  return readFileSync(await download.path(), "utf8");
+}
+
+/** Quits the game, as far as the end screen. */
+async function endGame(page: Page) {
   await page.keyboard.press("#");
   await page.keyboard.type("quit");
   await page.keyboard.press("Enter");
@@ -61,8 +71,7 @@ async function quit(page: Page): Promise<string> {
     await page.keyboard.press("n");
     await page.waitForFunction((shown) => document.querySelector<HTMLElement>('[role="dialog"]')?.innerText !== shown, shown, { polling: "raf" });
   }
-  const [download] = await Promise.all([page.waitForEvent("download"), over.getByRole("button", { name: /download/i }).click()]);
-  return readFileSync(await download.path(), "utf8");
+  return over;
 }
 
 interface Stored {
@@ -423,9 +432,17 @@ test("an online game leaves the offline last-game replay alone", async ({ page }
   await page.addInitScript(() => localStorage.setItem("nethack.lastGame", "offline game"));
   await untilPlaying(page, `Rp${Date.now() % 100000}`);
   await pass(page, 1);
+  const game = await gameId(page);
   await quit(page);
+  await expect(page.locator(".stats-title")).toContainText("Rp");
   expect(await page.evaluate(() => localStorage.getItem("nethack.lastGame"))).toBe("offline game");
-  await expect(page.getByRole("dialog", { name: "The game is over" }).getByRole("button", { name: /replay/i })).toHaveCount(0);
+  // a reload watches it from the server, not the offline last game
+  expect(new URL(page.url()).searchParams.get("game")).toBe(game);
+  expect(new URL(page.url()).searchParams.has("replay")).toBe(true);
+  await expect.poll(async () => (await stored(page, game)).map((b) => b.lines).join("\n"), { timeout: 10_000 }).toMatch(/\d+ end over/);
+  await page.reload();
+  await expect(page.getByText(/Turn \d+ of \d+/)).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".stats-title")).toContainText("Rp");
 });
 
 const ALL_MATCH = { seeds: true, times: true, id: true, timeZone: true, config: true };
@@ -520,11 +537,11 @@ test("the landing page lists games in flight, goes back to one, and starts a new
   await page.locator(".stats-title").waitFor({ timeout: 15_000 });
   await afterPrompts(page);
   expect(await gameId(page)).toBe(game);
-  const text = await quit(page);
-  expect(text).toMatch(/ session new \S+ tz=\+09:00/);
+  const over = await endGame(page);
+  await expect.poll(async () => (await stored(page, game)).map((b) => b.lines).join("\n"), { timeout: 10_000 }).toMatch(/ session new \S+ tz=\+09:00/);
 
   // New Game reloads this page
-  await page.reload();
+  await over.getByRole("button", { name: "New Game" }).click();
   await expect.poll(async () => [undefined, game].includes(await gameId(page))).toBe(false);
   expect((await requests(page, await gameId(page)))[0].utcOffset).toBe(32400);
 
