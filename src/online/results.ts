@@ -25,7 +25,7 @@ export interface FinishedGame {
 
 /** What a row says of a game: its character and how it ended, or why there's no score. */
 export function outcome({ name, checked, result }: FinishedGame): string {
-  if (!result) return checked ? `${name}: the server couldn't score this game` : `${name}: scored once the server has replayed the game, within a few hours`;
+  if (!result) return checked ? `${name}: this game couldn't be scored` : `${name}: score not ready yet. It will appear here.`;
   return ending(name, result);
 }
 

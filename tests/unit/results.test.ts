@@ -13,8 +13,8 @@ test("a watch address names the online game, and reads back as it", () => {
 
 test("a game says how it ended once scored, that its score is to come, or that it couldn't be scored", () => {
   expect(outcome({ ...game, checked: true, result: { role: "Val", race: "Dwa", death: "killed by a newt", turns: 1200 } })).toBe(`Agnes (Val-Dwa): killed by a newt, turn ${(1200).toLocaleString()}`);
-  expect(outcome(game)).toMatch(/^Agnes: scored once the server has replayed the game/);
-  expect(outcome({ ...game, checked: true })).toBe("Agnes: the server couldn't score this game");
+  expect(outcome(game)).toBe("Agnes: score not ready yet. It will appear here.");
+  expect(outcome({ ...game, checked: true })).toBe("Agnes: this game couldn't be scored");
 });
 
 test("a result missing fields still reads as words", () => {
