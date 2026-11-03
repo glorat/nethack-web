@@ -69,6 +69,46 @@ Decided for the web:
 - [x] An About box: NetHack, this port and the painted tiles by Kevin Tam, the Cocoa interface it follows, the classic tiles, the licence.
 - [x] Closing the tab mid-game keeps the game (Cocoa saves on ⌘Q or closing the window, `terminateApplication`). A page can't wait on a save as it unloads, so the recording is kept as the game goes, and the next start brings the game back by replaying it, asking first only if the last replay didn't finish or another tab is open; see `docs/recording.md`.
 
+## Third pass
+
+Found by comparing the code of each window with Cocoa's.
+
+Extended commands:
+
+- [ ] Nothing is highlighted until something is typed, so Return with an empty field runs nothing (`ExtCommandWindowController.m` `textChangedIn:`).
+- [ ] The highlighted row is scrolled into view (`highlightRow:`).
+- [ ] A hint under the list: "Return runs the highlighted command, Esc cancels."
+
+Messages:
+
+- [ ] Message attributes: bold, underline for dim and underline, and inverse; a plain line mentioning "you" or "your" in blue (`iHack/NhWindow.m` `addLine:attr:`).
+- [ ] A `------------` line between turns, after the core clears the message window.
+
+Menus:
+
+- [ ] A row picked by its letter is scrolled into view (`reloadRowForItem`).
+- [ ] Columns padded with two or more spaces line up, as tab-separated ones do (`SplitFields`).
+- [ ] The current heading stays at the top while the list scrolls (group rows).
+- [ ] No tile or letter column in a menu without tiles or letters.
+- [ ] A text line indented four or more spaces starts where the items' text does.
+- [ ] Close is the default button in a read-only menu.
+
+Status:
+
+- [ ] HP and Pw bars warn below 2/3 as well as below 1/3 (`StatsView.m` `SetMeter`).
+- [ ] Alignment, race and role, or the polymorphed form, and the dungeon's name with the level (`wincocoa.m` `RoleText`, `LevelText`).
+
+Map:
+
+- [ ] The Rogue level is drawn as text even with tiles on (`MainView.m` `drawRect:`).
+
+To decide, by trying both:
+
+- [ ] A prompt with fewer than two or more than nine answers goes to the message window instead of a dialog (`YesNoInput` `canAskWithChoices`).
+- [ ] Roles a chosen race can't play are disabled in the character picker, where web changes the race instead (`PlayerSelectionWindowController.m` `selectRace`).
+- [ ] Menus as wide as their contents, up to 90% of the screen, clipped rather than wrapped.
+- [ ] Map tooltips shown only once the pointer rests, and kept across turns (`MainView.m` `mouseMoved:`).
+
 ## Later
 
 - [ ] Importing a tile set, kept in the browser (`importTileSet`).
