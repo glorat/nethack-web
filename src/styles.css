@@ -117,7 +117,8 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .meter-bar { position: relative; flex: 1; height: calc(14px * var(--text-scale)); background: #161616; border-radius: 3px; overflow: hidden; }
 .meter-fill { position: absolute; inset: 0 auto 0 0; background: var(--hp); }
 .meter.pw .meter-fill { background: var(--pw); }
-.meter.low .meter-fill { background: var(--danger); }
+.meter.warning .meter-fill { background: #d29922; }
+.meter.critical .meter-fill { background: var(--danger); }
 .meter-text { position: absolute; inset: 0; font: calc(11px * var(--text-scale))/calc(14px * var(--text-scale)) var(--mono); padding-left: 4px; }
 .stat-grid { display: grid; grid-template-columns: repeat(4, auto); gap: 0 10px; margin-top: 6px; font-size: calc(12px * var(--text-scale)); }
 .stat { display: flex; gap: 4px; white-space: nowrap; }
