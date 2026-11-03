@@ -91,7 +91,7 @@ Menus:
 - [ ] The current heading stays at the top while the list scrolls (group rows).
 - [ ] No tile or letter column in a menu without tiles or letters.
 - [ ] A text line indented four or more spaces starts where the items' text does.
-- [ ] Close is the default button in a read-only menu.
+- [x] Close is the default button in a read-only menu.
 
 Status:
 

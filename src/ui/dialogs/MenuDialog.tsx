@@ -284,7 +284,13 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
             ) : null}
           </div>
           {count.current > 0 ? <span class="hint">Count: {count.current}</span> : null}
-          <button onClick={() => onDone(null)}>{how === "none" ? "Close" : "Cancel"}</button>
+          {how === "none" ? (
+            <button class="primary" onClick={() => onDone(null)}>
+              Close
+            </button>
+          ) : (
+            <button onClick={() => onDone(null)}>Cancel</button>
+          )}
           {how === "any" ? (
             <button class="primary" onClick={() => finish(selected.current)}>
               OK
