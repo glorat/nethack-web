@@ -655,6 +655,19 @@ test("a command's menu of suitable items still takes any item's letter", async (
   await expect(page.locator(".messages")).toContainText(/silly thing to drink/);
 });
 
+test("a menu of several picks shows a checkbox on each row, ticked when picked", async ({ page }) => {
+  await startAs(page, `Box${Date.now() % 100000}`, /Priest/);
+  await page.keyboard.press("Shift+D");
+  const dialog = page.getByRole("dialog");
+  const row = dialog.getByRole("menuitemcheckbox", { name: /all types/i });
+  await expect(row.locator(".menu-check")).toBeVisible();
+  await expect(row).toHaveAttribute("aria-checked", "false");
+  await row.click();
+  await expect(row).toHaveAttribute("aria-checked", "true");
+  await row.click();
+  await expect(row).toHaveAttribute("aria-checked", "false");
+});
+
 test("in a menu of several picks, . or , picks everything, - or \\ nothing, and Select All everything", async ({ page }) => {
   await startAs(page, `All${Date.now() % 100000}`, /Priest/);
   await page.keyboard.press("Shift+D");
