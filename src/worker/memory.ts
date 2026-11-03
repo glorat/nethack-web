@@ -49,6 +49,9 @@ export interface NetHackModule {
   _nhweb_ascii_map(): number;
   _nhweb_set_ascii_map(on: number): void;
   _nhweb_dec_graphics(): number;
+  _nhweb_hero_kind(): number;
+  _nhweb_dungeon_name(): number;
+  _nhweb_dungeon_level(): number;
   _main(argc: number, argv: number): number;
   ENV: Record<string, string>;
   FS: EmscriptenFS;

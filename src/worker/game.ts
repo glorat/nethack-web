@@ -653,6 +653,13 @@ export class Game {
 
   private statusWithChanges(): Record<string, StatusValue> {
     const fields = { ...this.status };
+    // not core fields: what the status panel says of the hero and where they are
+    if (this.m._nhweb_in_play()) {
+      const text = (text: string) => ({ text, color: 0, percent: 0 });
+      fields.hero_kind = text(this.m.UTF8ToString(this.m._nhweb_hero_kind()));
+      fields.dungeon_name = text(this.m.UTF8ToString(this.m._nhweb_dungeon_name()));
+      fields.dungeon_level = text(String(this.m._nhweb_dungeon_level()));
+    }
     const now = this.m._nhweb_moves();
     for (const [name, { direction, improved, turn }] of this.changes) {
       // a field the core has stopped showing shows no change either
