@@ -5,6 +5,7 @@ import { type GameSummary, onlineAddress, onlineWanted } from "../online/session
 import { OnlineChoice } from "../online/ui/OnlineChoice";
 import { Leaderboard } from "../online/ui/Leaderboard";
 import { OnlineGames } from "../online/ui/OnlineGames";
+import { Achievements } from "../online/ui/Achievements";
 import { saveOptions, savedOptions } from "../port/options";
 import { keepLastMode, lastMode } from "../port/last-mode";
 import type { Profile } from "../online/account";
@@ -172,6 +173,7 @@ export function Landing() {
           <>
             <Leaderboard />
             <OnlineGames />
+            <Achievements />
           </>
         ) : null}
         <DeviceGames />
