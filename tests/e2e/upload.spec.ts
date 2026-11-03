@@ -775,6 +775,32 @@ test("the leaderboard ranks a game under its player's handle, never the characte
   }
 });
 
+test("the landing page lists every online game in progress, latest first, once there's more than the one to continue", async ({ page }) => {
+  await online(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("nethack-web.lastMode", "online");
+    localStorage.setItem("nethack-web.name", "Someone");
+  });
+  const game = (n: number, name: string) => ({ game: `${n}${n}${n}${n}${n}${n}${n}${n}-${n}${n}${n}${n}-4${n}${n}${n}-8${n}${n}${n}-${`${n}`.repeat(12)}`, name, startedAt: Date.UTC(2026, 10, n), lastPlayedAt: Date.UTC(2026, 10, n, 12) });
+  let games = [game(1, "Older")];
+  await page.route(/\/europe-west1\/user$/, async (route) => {
+    if ((route.request().postDataJSON() as { data?: { method?: string } }).data?.method !== "listGames") return route.fallback();
+    await route.fulfill({ json: { result: { games } } });
+  });
+  const heading = page.getByRole("heading", { name: "Your online games in progress" });
+  await page.goto("/");
+  await expect(page.locator("form button").first()).toHaveText("Continue Online as Older");
+  await expect(heading).toHaveCount(0);
+
+  games = [game(1, "Older"), game(3, "Latest"), game(2, "Middle")];
+  await page.goto("/");
+  await expect(page.locator("form button").first()).toHaveText("Continue Online as Latest");
+  const links = page.locator("section", { has: heading }).getByRole("link");
+  await expect(page.locator("section", { has: heading }).getByRole("listitem").locator("strong")).toHaveText(["Latest", "Middle", "Older"]);
+  await expect(links).toHaveText(["Continue", "Continue", "Continue"]);
+  await expect(links.first()).toHaveAttribute("href", new RegExp(`[?&]game=${games[1]!.game}`));
+});
+
 test("the landing page shows the player's latest achievements once they've earned one, and all of them under their headings", async ({ page }) => {
   await online(page);
   await untilPlaying(page, `Ac${Date.now() % 100000}`);

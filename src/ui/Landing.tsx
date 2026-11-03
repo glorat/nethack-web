@@ -5,6 +5,7 @@ import { type GameSummary, onlineAddress, onlineWanted } from "../online/session
 import { OnlineChoice } from "../online/ui/OnlineChoice";
 import { Leaderboard } from "../online/ui/Leaderboard";
 import { OnlineGames } from "../online/ui/OnlineGames";
+import { GamesInProgress } from "../online/ui/GamesInProgress";
 import { Achievements } from "../online/ui/Achievements";
 import { saveOptions, savedOptions } from "../port/options";
 import { keepLastMode, lastMode } from "../port/last-mode";
@@ -29,7 +30,7 @@ export function Landing() {
   const [choosingOnline, setChoosingOnline] = useState(false);
   const [offered] = useState(onlineOffered);
   const [refused] = useState(() => new URLSearchParams(location.search).has("refused"));
-  const [latestOnline, setLatestOnline] = useState<GameSummary | null>(null);
+  const [inProgress, setInProgress] = useState<GameSummary[]>([]);
   const [returning] = useState(lastMode);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [signingIn, setSigningIn] = useState(false);
@@ -39,7 +40,7 @@ export function Landing() {
     // asking again would only be refused again, and send this page back to itself
     if (!offered || returning !== "online" || refused) return;
     listOnlineGames().then(
-      (games) => setLatestOnline(games.reduce<GameSummary | null>((a, g) => (a && a.lastPlayedAt >= g.lastPlayedAt ? a : g), null)),
+      setInProgress,
       (e) => console.warn("couldn't list online games", e),
     );
     loadProfile().then(setProfile, (e) => console.warn("couldn't read the profile", e));
@@ -65,6 +66,7 @@ export function Landing() {
   useEffect(() => {
     if (profile?.handle && !name) setName(profile.handle);
   }, [profile?.handle]);
+  const latestOnline = inProgress.reduce<GameSummary | null>((a, g) => (a && a.lastPlayedAt >= g.lastPlayedAt ? a : g), null);
   const offlineInProgress = !changing && offlineGameUnder(remembered);
   const continueOnline = latestOnline && !changing ? () => location.assign(onlineAddress(PLAY_PATH, latestOnline.name, { game: latestOnline.game })) : null;
   const mainAction = continueOnline ?? (offlineInProgress || !offered ? "offline" : "online");
@@ -170,6 +172,8 @@ export function Landing() {
           </form>
           <img class="landing-shot" src={`${import.meta.env.BASE_URL}screenshot.jpg`} alt="A NetHack game: the dungeon map in painted tiles, with stats, equipment, messages and inventory around it" />
         </section>
+        {/* one is already the Continue button */}
+        {onlinePanels && inProgress.length > 1 ? <GamesInProgress games={inProgress} /> : null}
         {onlinePanels ? <OnlineGames /> : null}
         <DeviceGames />
         {onlinePanels ? (
@@ -179,7 +183,7 @@ export function Landing() {
           </>
         ) : null}
         <section class="landing-panels">
-          <details class="landing-panel landing-help" open={!returning}>
+          <details class={`landing-panel landing-help${returning ? " secondary" : ""}`} open={!returning}>
             <summary>
               <h2>New to NetHack?</h2>
             </summary>
@@ -191,7 +195,7 @@ export function Landing() {
             </ul>
             <p>The <a href={WIKI_URL} target="_blank" rel="noopener">NetHack Wiki</a> covers everything.</p>
           </details>
-          <div class="landing-panel">
+          <div class={`landing-panel${returning ? " secondary" : ""}`}>
             <h2>{offered ? "Online or offline?" : "Where your game is kept"}</h2>
             {offered ? (
               <>
