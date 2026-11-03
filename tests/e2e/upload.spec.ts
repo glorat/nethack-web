@@ -565,6 +565,15 @@ test("the landing page can be left while the server hangs, and focus follows the
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
+test("starting an online game says what a dropped connection costs, and what not signing in does", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Who are you?").fill(`Nt${Date.now() % 100000}`);
+  await page.getByRole("button", { name: "Play Online" }).click();
+  await page.getByRole("button", { name: /^Start New Game/ }).waitFor();
+  await expect(page.getByText("If your connection drops, you may lose your last few moves.")).toBeVisible();
+  await expect(page.getByText("Until you sign in, your online games are kept for this browser only, and clearing this site's data loses them.")).toBeVisible();
+});
+
 test("a long name fits on a phone", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await page.goto("/");
@@ -700,6 +709,10 @@ test("signing in keeps the anonymous player's games, and the name they chose", a
   // a name was kept from before, so it stays the player's choice
   await page.getByRole("button", { name: "Change Name" }).click();
   await expect(page.getByLabel("Who are you?")).toHaveValue(name);
+
+  await page.getByRole("button", { name: "Play Online" }).click();
+  await page.getByRole("button", { name: /^Start New Game/ }).waitFor();
+  await expect(page.getByText(/Until you sign in/)).toHaveCount(0);
 });
 
 test("a handle someone else has is refused, and another can be chosen", async ({ browser }) => {
@@ -762,12 +775,12 @@ test("the leaderboard ranks a game under its player's handle, never the characte
   }
 });
 
-test("the landing page shows the player's achievements, earned first, once they've earned one", async ({ page }) => {
+test("the landing page shows the player's latest achievements once they've earned one, and all of them under their headings", async ({ page }) => {
   await online(page);
   await untilPlaying(page, `Ac${Date.now() % 100000}`);
   const earnedAt = Date.UTC(2026, 10, 1);
-  const mines = { id: "entered-mines", name: "Into the Mines", description: "Entered the Gnomish Mines" };
-  const ascended = { id: "ascended", name: "Ascended", description: "Ascended to demigodhood" };
+  const mines = { id: "entered-mines", name: "Into the Mines", description: "Entered the Gnomish Mines", group: "The Dungeon" };
+  const ascended = { id: "ascended", name: "Ascended", description: "Ascended to demigodhood", group: "The Amulet" };
   let achievements: object[] = [mines, { hidden: true }, ascended];
   await page.route(/\/europe-west1\/user$/, async (route) => {
     if ((route.request().postDataJSON() as { data?: { method?: string } }).data?.method !== "achievements") return route.fallback();
@@ -780,10 +793,22 @@ test("the landing page shows the player's achievements, earned first, once they'
   await page.waitForTimeout(200);
   await expect(heading).toHaveCount(0);
 
-  achievements = [ascended, { hidden: true }, { ...mines, earned: { at: earnedAt, game: "11111111-1111-4111-8111-111111111111", turn: 1234 } }];
+  const game = "11111111-1111-4111-8111-111111111111";
+  achievements = [{ ...mines, earned: { at: earnedAt, game, turn: 1234 } }, { hidden: true }, ascended];
   await page.goto("/");
   const panel = page.locator("section", { has: heading });
   await expect(heading).toHaveText("Your achievements 1 of 3 earned");
   const date = await page.evaluate((at) => `${new Date(at).toLocaleDateString(undefined, { dateStyle: "medium" })}, turn ${(1234).toLocaleString()}`, earnedAt);
-  await expect(panel.getByRole("listitem")).toHaveText([`Into the MinesEntered the Gnomish Mines${date}`, "AscendedAscended to demigodhoodNot yet", "Hidden achievementShown once earned"]);
+  await expect(panel.getByRole("listitem")).toHaveText([`Into the MinesEntered the Gnomish Mines${date} · Watch`]);
+  await expect(panel.getByRole("link", { name: "Watch the game that earned Into the Mines" })).toHaveAttribute("href", new RegExp(`[?&]game=${game}`));
+
+  const all = panel.getByRole("button", { name: "See All Achievements" });
+  await all.click();
+  const dialog = page.getByRole("dialog", { name: "Your achievements" });
+  await expect(dialog.getByRole("heading")).toHaveText(["The Dungeon 1 of 1 earned", "The Amulet 0 of 1 earned"]);
+  await expect(dialog.getByRole("listitem")).toHaveText([`Into the MinesEntered the Gnomish Mines${date} · Watch`, "AscendedAscended to demigodhoodNot yet"]);
+  await expect(dialog.getByText("1 more is hidden until you earn it.")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(all).toBeFocused();
 });

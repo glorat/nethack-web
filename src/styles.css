@@ -277,7 +277,10 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .landing-hero { display: flex; gap: 16px; align-items: stretch; }
 .landing-hero .start-card { flex: none; }
 .landing-shot { flex: 1; min-width: 0; object-fit: cover; object-position: left top; border: 1px solid var(--border); border-radius: 12px; }
-.landing-panels { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.landing-panels { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; align-items: start; }
+.landing-help summary { cursor: pointer; }
+.landing-help summary h2 { display: inline; }
+.landing-help[open] summary { margin-bottom: 8px; }
 .landing-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
 .landing-panel h2 { margin: 0 0 8px; font-size: 15px; }
 .landing-panel p { margin: 8px 0 0; }
@@ -305,6 +308,15 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .achievements .earned { border-color: var(--hp); }
 .achievements .locked strong, .achievements .locked span { color: var(--muted); }
 .achievements small { color: var(--muted); }
+.achievement-progress { display: block; width: 100%; height: 6px; margin: 0 0 12px; accent-color: var(--hp); }
+.link-button { margin-top: 12px; padding: 0; background: none; border: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+.achievements-dialog { width: min(720px, 92vw); }
+.achievements-groups { overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.achievements-groups h3 { margin: 0 0 8px; font-size: 14px; }
+.achievements-groups h3 small { color: var(--muted); font-weight: normal; }
+.achievements-groups .achievements { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(14em, 1fr)); gap: 8px; }
+.achievements-groups .hint { margin: 0; }
+.achievements a { color: var(--accent); }
 .start-links { display: flex; flex-wrap: wrap; gap: 4px 12px; }
 .start-links button { padding: 6px 0; background: none; border: none; color: var(--muted); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
 .start-links button:hover { color: var(--text, inherit); }

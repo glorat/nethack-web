@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { PLAY_PATH } from "../../port/name";
-import { listOnlineGames } from "../server/api";
+import { listOnlineGames, loadProfile } from "../server/api";
 import { type GameSummary, onlineAddress } from "../session";
 import { zoneChoices, zoneLabel } from "../zones";
 
@@ -24,6 +24,13 @@ export function OnlineChoice({ name, onBack }: { name: string; onBack: () => voi
     });
   };
   useEffect(load, []);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  useEffect(() => {
+    loadProfile().then(
+      (p) => setSignedIn(p.signedIn),
+      (e) => console.warn("couldn't read the profile", e),
+    );
+  }, []);
   const panel = useRef<HTMLDivElement>(null);
   // the button that opened this has gone, and focus with it
   useEffect(() => panel.current?.focus(), [games, failed]);
@@ -75,12 +82,15 @@ export function OnlineChoice({ name, onBack }: { name: string; onBack: () => voi
         ))}
       </select>
       <p class="start-sub">Sets the date and hour in your game, which the moon and some monsters care about. It can't change once the game has started.</p>
+      <p class="start-sub">If your connection drops, you may lose your last few moves.</p>
       <button type="button" class="primary" onClick={() => location.assign(onlineAddress(PLAY_PATH, name, { utcOffset: zone }))}>
         Start New Game as {name}
       </button>
       <button type="button" onClick={onBack}>
         Back
       </button>
+      {/* below the buttons, as it arrives late and mustn't move them */}
+      {signedIn === false ? <p class="start-sub">Until you sign in, your online games are kept for this browser only, and clearing this site's data loses them.</p> : null}
     </div>
   );
 }
