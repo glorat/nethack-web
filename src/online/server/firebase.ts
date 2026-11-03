@@ -5,6 +5,7 @@ import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc } 
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 import { appCheckRefused, type OnlineDeps, refusedAddress } from "../session";
 import type { Profile } from "../account";
+import type { Achievement } from "../achievements";
 import type { FinishedGame } from "../results";
 import type { WriteResult } from "../upload";
 
@@ -107,6 +108,8 @@ export const listGames: OnlineDeps["listGames"] = (input) => userRequest("listGa
 export const resumeGame: OnlineDeps["resumeGame"] = (input) => userRequest("resumeGame", input);
 
 export const finishedGames = (input: { sentAt: number }) => userRequest<{ games: FinishedGame[] }>("finishedGames", input);
+
+export const achievements = () => userRequest<{ achievements: Achievement[] }>("achievements", {});
 
 export const gameRecording = (input: { game: string; sentAt: number }) => userRequest<{ recording: string } | null>("gameRecording", input);
 
