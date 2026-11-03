@@ -12,10 +12,10 @@ import { buildDebugPackage, debugPackageName, namedBones } from "../port/debug-p
 import { keepLastMode } from "../port/last-mode";
 import { lastGame } from "../offline/last-game";
 import { offlineMode } from "../offline/ui/mode";
-import { downloadRecording, downloadText, lastTurnIn } from "../port/recording";
+import { downloadRecording, downloadText, lastTurnIn, replayable } from "../port/recording";
 import { shadowWanted } from "../port/shadow";
 import { onlineWanted } from "../online/session";
-import { onlineMode, type ServerNotice } from "../online/ui/mode";
+import { onlineMode } from "../online/ui/mode";
 import { watchedGame } from "../online/results";
 import { finishedGameRecording } from "../online/server/api";
 import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port/tilesets";
@@ -167,14 +167,27 @@ interface Pending {
   typed?: string;
 }
 
-export function App() {
+interface Props {
+  /** The recording of the game this page just played, to replay in place of what the address asks for. */
+  handedOver?: string;
+  /** Replays the game this page just played: this App goes, and another comes with `handedOver`. */
+  onReplay(text: string): void;
+}
+
+export function App({ handedOver, onReplay }: Props) {
   // the address asks for a replay, in place of playing: of the last finished game here, or of an online game from the server
   const [watched] = useState(() => watchedGame(location.search));
   const [replay, setReplay] = useState<{ text: string | null; loading?: boolean } | null>(() =>
-    !new URLSearchParams(location.search).has("replay") ? null : watched ? { text: null, loading: true } : { text: lastGame() },
+    handedOver !== undefined
+      ? { text: handedOver }
+      : !new URLSearchParams(location.search).has("replay")
+        ? null
+        : watched
+          ? { text: null, loading: true }
+          : { text: lastGame() },
   );
   useEffect(() => {
-    if (!watched) return;
+    if (!watched || handedOver !== undefined) return;
     finishedGameRecording(watched).then(
       (text) => setReplay({ text }),
       (e) => {
@@ -186,15 +199,15 @@ export function App() {
   const [replayProgress, setReplayProgress] = useState<ReplayProgress>({ turn: 0, playing: true, seeking: false, ended: null });
   const [replaySpeed, setReplaySpeed] = useState(REPLAY_SPEEDS[0].turnsPerSecond);
   const replayLastTurn = useMemo(() => ((replay?.text && lastTurnIn(replay.text)) || 0), [replay]);
-  /** The game's recording, once it has ended, and whether the browser kept it for replaying. */
-  const [recorded, setRecorded] = useState<{ text: string; kept: boolean } | null>(null);
+  /** The game's recording, once it has ended. */
+  const [recorded, setRecorded] = useState<string | null>(null);
   // a developer's option: a second core follows the game by its recording, to catch one that would replay differently
   const shadow = useRef<ShadowClient | null>(null);
   const shadowRecording = useRef("");
   const [shadowStatus, setShadowStatus] = useState<ShadowStatus | null>(null);
   const [shadowing] = useState(() => !replay && shadowWanted());
-  const [serverNotice, setServerNotice] = useState<ServerNotice>(null);
-  const [mode] = useState<PageMode | null>(() => (replay ? null : onlineWanted(location.search) ? onlineMode(setServerNotice) : offlineMode()));
+  const [notice, setNotice] = useState<string | null>(null);
+  const [mode] = useState<PageMode | null>(() => (replay ? null : onlineWanted(location.search) ? onlineMode(setNotice) : offlineMode(setNotice)));
   const [gameLost, setGameLost] = useState(false);
   const unseen = useRef(!!mode?.dropsUnseenKeys);
   const [sheet, setSheet] = useState<TileSheet | null>(null);
@@ -336,7 +349,10 @@ export function App() {
               try {
                 localStorage.setItem(OPTIONS_KEY, savedOptionsFile(e.text, BASE_OPTIONS));
               } catch {}
-            if (e.type === "recording") setRecorded({ text: e.text, kept: !!mode?.finished(e.text) });
+            if (e.type === "recording") {
+              mode?.finished(e.text);
+              setRecorded(e.text);
+            }
             if (e.type === "recorded_before") {
               shadowRecording.current = e.text;
               shadow.current?.before(e.text);
@@ -407,6 +423,20 @@ export function App() {
       }),
     [],
   );
+  useEffect(
+    () => () => {
+      client.stop();
+      shadow.current?.stop();
+    },
+    [],
+  );
+  const replayHere = (text: string) => {
+    // what leaving the page would have done, and what it still has to do once the replay's page goes
+    mode?.closing();
+    window.addEventListener("pagehide", () => mode?.closing());
+    history.replaceState(null, "", mode!.replayAddress());
+    onReplay(text);
+  };
 
   const [tileSet, setTileSetState] = useState(savedTileSet);
   /** save: chosen in the View menu; tile_file's choice isn't kept, as it is the option's. */
@@ -690,9 +720,9 @@ export function App() {
 
   return (
     <div class="app" data-commanding={commanding || undefined}>
-      {serverNotice ? (
+      {notice ? (
         <div class="server-waiting" role="status">
-          {serverNotice}
+          {notice}
         </div>
       ) : null}
       <MenuBar menus={menus} />
@@ -739,8 +769,7 @@ export function App() {
             text={state.gameOver}
             onNewGame={() => location.reload()}
             onQuit={() => location.replace(LANDING_PATH)}
-            onReplay={recorded?.kept ? () => location.assign(`${PLAY_PATH}?replay`) : undefined}
-            onDownload={recorded ? () => downloadRecording(recorded.text) : undefined}
+            onReplay={recorded !== null && replayable(recorded) ? () => replayHere(recorded) : undefined}
           />
         ) : null}
         {optionsDialog}
@@ -764,7 +793,7 @@ export function App() {
         <ShadowBar
           status={shadowStatus}
           onDownload={async () => {
-            const text = recorded?.text ?? shadowRecording.current;
+            const text = recorded ?? shadowRecording.current;
             const { files, bones } = await client.files(namedBones(text));
             const made = { recording: text, files, bones, shadow: shadowStatus };
             downloadText(buildDebugPackage(made), debugPackageName());

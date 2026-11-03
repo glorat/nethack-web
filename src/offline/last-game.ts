@@ -1,4 +1,5 @@
 // The last finished game's recording, which /play/?replay plays.
+import { replayable } from "../port/recording";
 
 const LAST_GAME_KEY = "nethack.lastGame";
 
@@ -12,7 +13,7 @@ export function lastGame(): string | null {
 
 /** False if the browser wouldn't keep it, as it won't one too big, or it couldn't replay, which leaves the last game that can. */
 export function keepLastGame(text: string): boolean {
-  if (/^\d+ session (?:unrecorded|recover) /m.test(text)) return false;
+  if (!replayable(text)) return false;
   try {
     localStorage.setItem(LAST_GAME_KEY, text);
     return true;

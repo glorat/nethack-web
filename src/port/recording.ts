@@ -7,6 +7,11 @@ export function lastTurnIn(text: string): number | null {
   return last === undefined ? null : Number(last);
 }
 
+/** False for a game whose start wasn't recorded, or one continued from a checkpoint, which never replay. */
+export function replayable(text: string): boolean {
+  return !/^\d+ session (?:unrecorded|recover) /m.test(text);
+}
+
 export function linesIn(text: string): number {
   return text ? text.split("\n").length - 1 : 0;
 }

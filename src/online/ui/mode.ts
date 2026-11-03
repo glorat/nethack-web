@@ -92,8 +92,12 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
     },
     finished(text) {
       uploader?.finished(text);
-      // an online game's replay will have its own way, from the server
-      return false;
+    },
+    replayAddress() {
+      // watchedGame's address, from the server
+      const params = new URLSearchParams(location.search);
+      params.set("replay", "");
+      return `${location.pathname}?${params}`;
     },
     async seed() {
       if (!session) return null;

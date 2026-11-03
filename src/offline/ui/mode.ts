@@ -6,7 +6,9 @@ import { keepLastGame } from "../last-game";
 import { offlineGameEnded, offlineGameStarted } from "../progress";
 import { keepScores } from "../scores";
 
-export function offlineMode(): PageMode {
+export const SAVE_FAILING = "This browser isn't saving your game, so closing this page could lose your latest moves";
+
+export function offlineMode(notice: (text: string | null) => void): PageMode {
   let name = "";
   return {
     kind: "offline",
@@ -14,15 +16,21 @@ export function offlineMode(): PageMode {
     async start(game) {
       name = game.name;
       offlineGameStarted(name);
+      // best-effort storage can be cleared by the browser, which would take the game with it
+      void navigator.storage?.persist?.().catch(() => false);
       return { assetBase: game.assetBase, options: game.options, config: game.config, shadowed: game.shadowed, authority: gameAuthority() };
     },
     events(events) {
       for (const e of events) {
         if (e.type === "scores") keepScores(e.text);
         if (e.type === "game_over" && e.text !== SAVED_FAREWELL) offlineGameEnded(name);
+        if (e.type === "save_failing") notice(e.failing ? SAVE_FAILING : null);
       }
     },
-    finished: keepLastGame,
+    finished(text) {
+      keepLastGame(text);
+    },
+    replayAddress: () => `${location.pathname}?replay`,
     seed: async () => null,
     leaving: async () => {},
     closing() {},
