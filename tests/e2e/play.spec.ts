@@ -1258,6 +1258,12 @@ test("arrowing through the extended commands keeps the highlighted one in view",
   await expect(dialog.locator(".ext-item.active")).toBeInViewport({ ratio: 1 });
 });
 
+test("the extended command dialog says what Return and Esc do", async ({ page }) => {
+  await startGame(page, `Hint${Date.now() % 100000}`);
+  await page.keyboard.press("#");
+  await expect(page.getByRole("dialog")).toContainText("Return runs the highlighted command, Esc cancels.");
+});
+
 test("the game beeps at a click on unexplored ground far away, and at an inventory pick it can't take", async ({ page }) => {
   await page.addInitScript(() => {
     const w = window as unknown as { beeps: number; AudioContext: typeof AudioContext };

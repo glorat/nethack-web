@@ -77,7 +77,7 @@ Extended commands:
 
 - [x] Nothing is highlighted until something is typed, so Return with an empty field runs nothing (`ExtCommandWindowController.m` `textChangedIn:`).
 - [x] The highlighted row is scrolled into view (`highlightRow:`).
-- [ ] A hint under the list: "Return runs the highlighted command, Esc cancels."
+- [x] A hint under the list: "Return runs the highlighted command, Esc cancels."
 
 Messages:
 
