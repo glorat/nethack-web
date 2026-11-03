@@ -117,19 +117,20 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     highlight.current = i;
     update();
   };
+  const reveal = (i: number) => list.current?.children[order.indexOf(i)]?.scrollIntoView({ block: "nearest" });
   const moveHighlight = (step: 1 | -1) => {
     const rows = order.filter((i) => items[i].identifier !== 0);
     if (!rows.length) return;
     const at = highlight.current === null ? -1 : rows.indexOf(highlight.current);
     const next = at < 0 ? (step > 0 ? 0 : rows.length - 1) : Math.min(rows.length - 1, Math.max(0, at + step));
     highlight.current = rows[next];
-    list.current?.children[order.indexOf(rows[next])]?.scrollIntoView({ block: "nearest" });
+    reveal(rows[next]);
     update();
   };
 
   // sorting moves the highlighted row
   useLayoutEffect(() => {
-    if (highlight.current !== null) list.current?.children[order.indexOf(highlight.current)]?.scrollIntoView({ block: "nearest" });
+    if (highlight.current !== null) reveal(highlight.current);
   }, [sorted]);
 
   // layout effect: listen before the dialog is painted, or a fast key press is lost
@@ -171,6 +172,7 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
       if (!hits.length) return;
       if (how === "one") return choose(hits[0]);
       toggle(hits);
+      reveal(hits[0]);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);

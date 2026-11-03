@@ -668,6 +668,21 @@ test("a menu of several picks shows a checkbox on each row, ticked when picked",
   await expect(row).toHaveAttribute("aria-checked", "false");
 });
 
+test("an item picked by its letter in a menu of several picks is scrolled into view", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 420 });
+  await startAs(page, `Reveal${Date.now() % 100000}`, /Priest/);
+  await page.keyboard.press("Shift+D");
+  const dialog = page.getByRole("dialog");
+  await dialog.locator(".menu-item", { hasText: /all types/i }).click();
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(dialog).toContainText("holy water");
+  const last = dialog.locator(".menu-item").last();
+  await expect(last).not.toBeInViewport();
+  await page.keyboard.press((await last.locator(".inv-letter").innerText()).trim());
+  await expect(last).toHaveAttribute("aria-checked", "true");
+  await expect(last).toBeInViewport({ ratio: 0.9 });
+});
+
 test("in a menu of several picks, . or , picks everything, - or \\ nothing, and Select All everything", async ({ page }) => {
   await startAs(page, `All${Date.now() % 100000}`, /Priest/);
   await page.keyboard.press("Shift+D");
