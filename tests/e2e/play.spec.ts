@@ -742,6 +742,13 @@ test("a short question from the game shows a button for each answer", async ({ p
   await expect(page.locator(".stats-title")).toBeVisible();
 });
 
+test("a read-only list's Close is its default button", async ({ page }) => {
+  await startGame(page, `Close${Date.now() % 100000}`);
+  await page.keyboard.press("Control+x");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("button", { name: "Close" })).toHaveClass(/primary/);
+});
+
 test("a read-only list is text that can be selected and copied", async ({ page }) => {
   await startGame(page, `Copy${Date.now() % 100000}`);
   // ^X lists attributes in a read-only menu
