@@ -156,6 +156,11 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .messages { flex: 1; min-width: calc(200px * var(--text-scale)); overflow-y: auto; padding: 6px 10px; }
 .message { color: var(--muted); }
 .message.current { color: var(--text); }
+.message.hero { color: color-mix(in srgb, #0a84ff 65%, var(--bg)); }
+.message.current.hero { color: #0a84ff; }
+.message.bold { font-weight: 700; }
+.message.underline { text-decoration: underline; }
+.message.inverse { color: #ff453a; background: #0a84ff; }
 
 /* inventory sidebar */
 .inventory {

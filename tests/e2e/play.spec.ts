@@ -1277,6 +1277,15 @@ test("the extended command dialog says what Return and Esc do", async ({ page })
   await expect(page.getByRole("dialog")).toContainText("Return runs the highlighted command, Esc cancels.");
 });
 
+test("a message about the hero stands out, and a line separates one turn's messages from the next", async ({ page }) => {
+  await startGame(page, `Msg${Date.now() % 100000}`);
+  const messages = page.locator(".messages");
+  await expect(messages.locator(".message.hero", { hasText: /\bYou\b/ }).first()).toBeVisible();
+  await page.keyboard.press(":");
+  await page.keyboard.press(":");
+  await expect(messages.locator(".message.separator").last()).toHaveText("------------");
+});
+
 test("the game beeps at a click on unexplored ground far away, and at an inventory pick it can't take", async ({ page }) => {
   await page.addInitScript(() => {
     const w = window as unknown as { beeps: number; AudioContext: typeof AudioContext };
