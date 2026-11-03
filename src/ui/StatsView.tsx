@@ -1,4 +1,5 @@
 import { conditionSeverity, encumbranceSeverity, hungerSeverity, type Severity } from "../port/badges";
+import { meterLevel } from "../port/meter";
 import type { StatusValue } from "../protocol";
 import { nhColor } from "./colors";
 
@@ -25,9 +26,8 @@ function Meter({ label, cur, max, kind }: { label: string; cur: string; max: str
   const c = Number(cur);
   const m = Number(max);
   const pct = m > 0 ? Math.max(0, Math.min(100, (c / m) * 100)) : 0;
-  const low = m > 0 && c / m < 1 / 3;
   return (
-    <div class={`meter ${kind}${low ? " low" : ""}`}>
+    <div class={`meter ${kind} ${meterLevel(c, m)}`}>
       <span class="meter-label">{label}</span>
       <div class="meter-bar">
         <div class="meter-fill" style={{ width: `${pct}%` }} />
