@@ -76,6 +76,13 @@ async function userRequest<Output>(method: string, input: object): Promise<Outpu
   return (await httpsCallable<unknown, Output>(functions, "user")({ method, input })).data;
 }
 
+/** Needs no sign-in, but sends one if there is one, so the server knows who's asking. */
+async function publicRequest<Output>(method: string, input: object): Promise<Output> {
+  await holdingToken();
+  await auth.authStateReady();
+  return (await httpsCallable<unknown, Output>(functions, "publicApi")({ method, input })).data;
+}
+
 /**
  * Links a Google account to the anonymous player here, so their uid and games carry over. An account that's already
  * someone's is signed in to instead, leaving this browser's anonymous games with the anonymous uid.
@@ -109,7 +116,7 @@ export const resumeGame: OnlineDeps["resumeGame"] = (input) => userRequest("resu
 
 export const finishedGames = (input: { sentAt: number }) => userRequest<{ games: FinishedGame[] }>("finishedGames", input);
 
-export const leaderboard = (input: { sentAt: number }) => userRequest<{ entries: LeaderboardEntry[] }>("leaderboard", input);
+export const leaderboard = (input: { sentAt: number }) => publicRequest<{ entries: LeaderboardEntry[] }>("leaderboard", input);
 
 export const achievements = () => userRequest<{ achievements: Achievement[] }>("achievements", {});
 
