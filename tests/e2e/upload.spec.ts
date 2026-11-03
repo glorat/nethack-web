@@ -708,3 +708,39 @@ test("a handle someone else has is refused, and another can be chosen", async ({
     await context.close();
   }
 });
+
+test("the leaderboard ranks a game under its player's handle, never the character's name", async ({ page }) => {
+  await online(page);
+  const name = `Lb${Date.now() % 100000}`;
+  await untilPlaying(page, name);
+  const game = await gameId(page);
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.serverUid)).toBeTruthy();
+  const uid = await page.evaluate(() => document.documentElement.dataset.serverUid!);
+
+  await page.goto("/");
+  await signInWithGoogle(page, `${crypto.randomUUID()}@example.com`);
+  const handle = `Lb${crypto.randomUUID().slice(0, 8).replaceAll("-", "")}`;
+  await page.getByLabel("Handle").fill(handle);
+  await page.getByRole("button", { name: "Request Handle" }).click();
+  await expect(page.locator(".landing-bar")).toContainText(`Signed in as ${handle}`);
+
+  // far above any real score, so it leads whatever else the emulator holds; the validator would write it from a replay
+  const points = 2e12 + Math.floor(Math.random() * 1e9);
+  const result = (fields: object) =>
+    page.request.patch(`${FIRESTORE}/v1/projects/demo-nethack/databases/(default)/documents/users/${uid}/games/${game}?updateMask.fieldPaths=projection.result`, {
+      headers: { Authorization: "Bearer owner" },
+      data: { fields },
+    });
+  const text = (value: string) => ({ stringValue: value });
+  await result({ projection: { mapValue: { fields: { result: { mapValue: { fields: { points: { integerValue: String(points) }, role: text("Val"), race: text("Hum"), death: text("ascended"), name: text(name), endedAt: text(new Date().toISOString()) } } } } } } });
+  try {
+    await page.reload();
+    const first = page.locator(".leaderboard li").first();
+    await expect(first).toContainText(points.toLocaleString(), { timeout: 20_000 });
+    await expect(first).toContainText(`${handle} (Val-Hum): ascended`);
+    await expect(first).toContainText("(yours)");
+    await expect(first).not.toContainText(name);
+  } finally {
+    await result({});
+  }
+});

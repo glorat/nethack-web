@@ -1,6 +1,6 @@
 import { LogUploader, type LogPosition, type UploadDeps, type WriteResult } from "../upload";
 import type { Profile } from "../account";
-import type { FinishedGame } from "../results";
+import type { FinishedGame, LeaderboardEntry } from "../results";
 import { type GameSummary, loadGames, type OnlineDeps, OnlineSession } from "../session";
 
 /** Only ever loaded for an online game, so offline play never touches it. */
@@ -47,6 +47,9 @@ export const listOnlineGames = (): Promise<GameSummary[]> => loadGames({ now: ()
 
 /** The player's finished games, latest first; asking waits for no one, as there's nothing to hold up. */
 export const listFinishedGames = async (): Promise<FinishedGame[]> => (await (await server()).finishedGames({ sentAt: Date.now() })).games;
+
+/** The best-scoring games on the server, best first. */
+export const loadLeaderboard = async (): Promise<LeaderboardEntry[]> => (await (await server()).leaderboard({ sentAt: Date.now() })).entries;
 
 /** A finished game's recording, or null if the server won't give one. */
 export const finishedGameRecording = async (game: string): Promise<string | null> =>

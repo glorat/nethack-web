@@ -3,6 +3,7 @@ import { WIKI_URL } from "../port/describe";
 import { playerName, PLAY_PATH, savedName, saveName } from "../port/name";
 import { type GameSummary, onlineAddress, onlineWanted } from "../online/session";
 import { OnlineChoice } from "../online/ui/OnlineChoice";
+import { Leaderboard } from "../online/ui/Leaderboard";
 import { OnlineGames } from "../online/ui/OnlineGames";
 import { saveOptions, savedOptions } from "../port/options";
 import { keepLastMode, lastMode } from "../port/last-mode";
@@ -167,7 +168,12 @@ export function Landing() {
           </form>
           <img class="landing-shot" src={`${import.meta.env.BASE_URL}screenshot.jpg`} alt="A NetHack game: the dungeon map in painted tiles, with stats, equipment, messages and inventory around it" />
         </section>
-        {offered && returning === "online" && !refused ? <OnlineGames /> : null}
+        {offered && returning === "online" && !refused ? (
+          <>
+            <Leaderboard />
+            <OnlineGames />
+          </>
+        ) : null}
         <DeviceGames />
         <section class="landing-panels">
           <div class="landing-panel">
@@ -184,7 +190,7 @@ export function Landing() {
             <h2>{offered ? "Online or offline?" : "Where your game is kept"}</h2>
             {offered ? (
               <p>
-                <strong>Online</strong> games are kept for you, so start as many as you like and pick any of them up again. You need a connection, and may lose your last few moves if it drops. Sign in to keep them with your account, and to choose the handle your scores are shown under; until then they stay linked to this browser, so clearing this site's data loses access to them. Shared high scores are on the way, for online games only.
+                <strong>Online</strong> games are kept for you, so start as many as you like and pick any of them up again. You need a connection, and may lose your last few moves if it drops. Sign in to keep them with your account, and to choose the handle your scores are shown under; until then they stay linked to this browser, so clearing this site's data loses access to them. Online games that end are scored by the server and ranked under your handle.
               </p>
             ) : null}
             <p>
