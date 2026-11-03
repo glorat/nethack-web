@@ -6,7 +6,7 @@ import { keepLastGame } from "../last-game";
 import { offlineGameEnded, offlineGameStarted } from "../progress";
 import { keepScores } from "../scores";
 
-export const SAVE_FAILING = "This browser isn't saving your game, so closing this page could lose your latest moves";
+export const SAVE_FAILING = "Your game isn't being saved right now. If you close this page, you may lose your latest moves.";
 
 export function offlineMode(notice: (text: string | null) => void): PageMode {
   let name = "";

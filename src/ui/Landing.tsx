@@ -188,7 +188,7 @@ export function Landing() {
               </p>
             ) : null}
             <p>
-              <strong>Offline</strong> games run entirely on this device, and nothing is uploaded. The first visit downloads about 10 MB, and after that you can play with no connection. Close the tab at any time and your game comes back under the same name. Clearing this site's data deletes it, and so can the browser, if the device runs short of space or, in Safari, after a week away.{offered ? " A game you can't afford to lose is safer played online." : ""}
+              <strong>Offline</strong> games are kept on this device. You can play without an internet connection, and your game is waiting whenever you come back. It isn't backed up anywhere, though, so it can be lost, for example if you clear your browsing data.{offered ? " Play online to keep your games safe." : ""}
             </p>
           </div>
         </section>

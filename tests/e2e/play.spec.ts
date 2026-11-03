@@ -1414,7 +1414,7 @@ test("a game the browser stops saving says so, and stops saying so once it saves
       throw new DOMException("full", "QuotaExceededError");
     };
   });
-  const notice = page.getByRole("status").filter({ hasText: "isn't saving your game" });
+  const notice = page.getByRole("status").filter({ hasText: "isn't being saved" });
   await page.keyboard.type("ms");
   await expect(notice).toBeVisible();
 
