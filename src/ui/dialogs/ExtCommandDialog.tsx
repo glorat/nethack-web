@@ -87,6 +87,7 @@ export function ExtCommandDialog({ commands, initial = "", onDone }: Props) {
             </button>
           ))}
         </div>
+        <div class="hint">Return runs the highlighted command, Esc cancels.</div>
       </div>
     </div>
   );

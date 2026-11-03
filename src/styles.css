@@ -206,7 +206,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .direction { height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 6px; }
 .direction-key { font-family: var(--mono); color: var(--muted); }
 .direction-arrow { font-size: 18px; }
-.direction-dialog .hint { font-size: 12px; }
+.direction-dialog .hint, .ext-dialog .hint { font-size: 12px; }
 .dialog-title { font-weight: 600; }
 .dialog-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; align-items: center; }
 .hint { color: var(--muted); }
