@@ -79,7 +79,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   gap: 1px;
   background: var(--border);
   border-bottom: 1px solid var(--border);
-  height: calc(168px * var(--text-scale));
+  height: calc(186px * var(--text-scale));
   flex: none;
 }
 .top > * { background: var(--panel); }
@@ -111,7 +111,8 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .stats, .messages, .inventory, .menu-dialog, .text-dialog { font-size: calc(13px * var(--text-scale)); }
 .stats { width: calc(250px * var(--text-scale)); padding: 8px 10px; overflow: hidden; flex: none; }
 .stats-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.stats-sub { color: var(--muted); font-size: calc(12px * var(--text-scale)); margin-bottom: 6px; white-space: nowrap; }
+.stats-sub { color: var(--muted); font-size: calc(12px * var(--text-scale)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stats-sub + .meter { margin-top: 6px; }
 .meter { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
 .meter-label { width: calc(20px * var(--text-scale)); color: var(--muted); font-size: calc(11px * var(--text-scale)); }
 .meter-bar { position: relative; flex: 1; height: calc(14px * var(--text-scale)); background: #161616; border-radius: 3px; overflow: hidden; }

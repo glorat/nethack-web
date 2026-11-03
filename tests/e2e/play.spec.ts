@@ -754,6 +754,13 @@ test("arrowing up a long menu keeps the highlighted row clear of the pinned head
   }
 });
 
+test("the status panel gives the hero's alignment, race and role, and the dungeon's name with the level", async ({ page }) => {
+  await startAs(page, `Head${Date.now() % 100000}`, /Priest/);
+  const lines = page.locator(".stats .stats-sub");
+  await expect(lines.nth(0)).toHaveText(/^(Lawful|Neutral|Chaotic) (human|elven) priest(ess)?$/);
+  await expect(lines.nth(1)).toHaveText("The Dungeons of Doom: level 1");
+});
+
 test("in a menu of several picks, . or , picks everything, - or \\ nothing, and Select All everything", async ({ page }) => {
   await startAs(page, `All${Date.now() % 100000}`, /Priest/);
   await page.keyboard.press("Shift+D");
