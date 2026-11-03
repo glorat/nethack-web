@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "preact/hooks";
+import { messageLook } from "../port/messages";
 import type { Message } from "../port/state";
 
 export function MessageView({ messages, batch }: { messages: Message[]; batch: number }) {
@@ -9,11 +10,14 @@ export function MessageView({ messages, batch }: { messages: Message[]; batch: n
   }, [messages]);
   return (
     <div class="messages" ref={list}>
-      {messages.map((m) => (
-        <div key={m.id} class={`message${m.separator ? " separator" : m.batch === batch ? " current" : ""}`}>
-          {m.text}
-        </div>
-      ))}
+      {messages.map((m) => {
+        const classes = m.separator ? ["separator"] : [m.batch === batch && "current", messageLook(m.text, m.attr)];
+        return (
+          <div key={m.id} class={["message", ...classes].filter(Boolean).join(" ")}>
+            {m.text}
+          </div>
+        );
+      })}
     </div>
   );
 }
