@@ -1211,6 +1211,29 @@ test("an extended command only one name starts with completes as it's typed, and
   await expect(dialog).toBeHidden();
 });
 
+test("an extended command highlights nothing until something is typed, so Return alone runs nothing", async ({ page }) => {
+  await startGame(page, `Bare${Date.now() % 100000}`);
+  await page.keyboard.press("#");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("textbox")).toBeFocused();
+  await expect(dialog.locator(".ext-item").first()).toBeVisible();
+  await expect(dialog.locator(".ext-item.active")).toHaveCount(0);
+  await page.keyboard.press("Enter");
+  await expect(dialog).toBeHidden();
+  // had a command run, its own prompt would be up instead
+  await page.keyboard.press("#");
+  await expect(dialog.getByRole("textbox")).toBeFocused();
+  await page.keyboard.press("e");
+  await expect(dialog.locator(".ext-item.active")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(dialog.locator(".ext-item.active")).toHaveCount(0);
+  await page.keyboard.press(" ");
+  await expect(dialog.locator(".ext-item.active")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("ArrowDown");
+  await expect(dialog.locator(".ext-item").first()).toHaveClass(/active/);
+});
+
 test("the game beeps at a click on unexplored ground far away, and at an inventory pick it can't take", async ({ page }) => {
   await page.addInitScript(() => {
     const w = window as unknown as { beeps: number; AudioContext: typeof AudioContext };

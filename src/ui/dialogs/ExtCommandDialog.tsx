@@ -12,7 +12,8 @@ export function ExtCommandDialog({ commands, initial = "", onDone }: Props) {
   // what the player typed, which the list follows; the field also holds any completion
   const [filter, setFilter] = useState(initial);
   const typed = useRef(initial);
-  const [active, setActive] = useState(0);
+  // with nothing typed nothing is highlighted, so a stray Return runs nothing
+  const [active, setActive] = useState(initial.trim() ? 0 : -1);
   const input = useRef<HTMLInputElement>(null);
   // layout effect: focus before the dialog is painted, or keys typed fast after # are lost
   useLayoutEffect(() => {
@@ -24,7 +25,7 @@ export function ExtCommandDialog({ commands, initial = "", onDone }: Props) {
   const type = (text: string) => {
     typed.current = text;
     setFilter(text);
-    setActive(0);
+    setActive(text.trim() ? 0 : -1);
   };
 
   // the completed part stays selected, so typing on replaces it
@@ -34,7 +35,7 @@ export function ExtCommandDialog({ commands, initial = "", onDone }: Props) {
   };
 
   const shown = listCommands(commands, filter);
-  const pick = shown[Math.min(active, shown.length - 1)];
+  const pick = active < 0 ? undefined : shown[Math.min(active, shown.length - 1)];
 
   return (
     <div class="dialog-backdrop">
