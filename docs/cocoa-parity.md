@@ -81,7 +81,7 @@ Extended commands:
 
 Messages:
 
-- [ ] Message attributes: bold, underline for dim and underline, and inverse; a plain line mentioning "you" or "your" in blue (`iHack/NhWindow.m` `addLine:attr:`).
+- [x] Message attributes: bold, underline for dim and underline, and inverse; a plain line mentioning "you" or "your" in blue (`iHack/NhWindow.m` `addLine:attr:`).
 - [x] A `------------` line between turns, after the core clears the message window.
 
 Menus:
