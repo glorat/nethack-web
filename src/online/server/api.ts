@@ -1,5 +1,6 @@
 import { LogUploader, type LogPosition, type UploadDeps, type WriteResult } from "../upload";
 import type { Profile } from "../account";
+import type { Achievement } from "../achievements";
 import type { FinishedGame } from "../results";
 import { type GameSummary, loadGames, type OnlineDeps, OnlineSession } from "../session";
 
@@ -47,6 +48,9 @@ export const listOnlineGames = (): Promise<GameSummary[]> => loadGames({ now: ()
 
 /** The player's finished games, latest first; asking waits for no one, as there's nothing to hold up. */
 export const listFinishedGames = async (): Promise<FinishedGame[]> => (await (await server()).finishedGames({ sentAt: Date.now() })).games;
+
+/** The server's achievements, with when the player earned each. */
+export const loadAchievements = async (): Promise<Achievement[]> => (await (await server()).achievements()).achievements;
 
 /** A finished game's recording, or null if the server won't give one. */
 export const finishedGameRecording = async (game: string): Promise<string | null> =>
