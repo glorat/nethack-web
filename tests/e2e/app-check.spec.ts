@@ -27,7 +27,7 @@ async function fakeServer(page: Page): Promise<Map<string, string | undefined>> 
   const idToken = `${jwtPart({ alg: "none" })}.${jwtPart({ sub: "player", exp: 4102444800 })}.x`;
   await answer("https://identitytoolkit.googleapis.com/**", "auth", () => ({ idToken, refreshToken: "r", expiresIn: "3600", localId: "player", users: [{ localId: "player" }] }));
   await answer("https://firestore.googleapis.com/**", "firestore", () => ({ writeResults: [{}], commitTime: new Date().toISOString() }));
-  await answer("https://europe-west1-nethack-web-server.cloudfunctions.net/user", "functions", ({ method, input }) => {
+  await answer("https://europe-west1-nethack-web-server.cloudfunctions.net/{user,publicApi}", "functions", ({ method, input }) => {
     const now = Math.floor(Date.now() / 1000);
     const answers: Record<string, object> = {
       listGames: { games: [] },
