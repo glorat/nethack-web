@@ -1108,6 +1108,17 @@ test("when the game ends, a dialog offers a new game under the same name, or the
   expect(new URL(page.url()).search).toBe("?replay");
 });
 
+test("the help for new players is open for a new visitor, and folded away once they've played", async ({ page }) => {
+  await page.goto("/");
+  const help = page.locator("details", { has: page.getByRole("heading", { name: "New to NetHack?" }) });
+  await expect(help).toHaveAttribute("open", "");
+  await startGame(page, `Hp${Date.now() % 100000}`);
+  await page.keyboard.press("S");
+  await expect(help).not.toHaveAttribute("open");
+  await help.getByText("New to NetHack?").click();
+  await expect(help.getByText("The NetHack Wiki covers everything.")).toBeVisible();
+});
+
 test("a saved game is what the landing page offers first, and a new visitor sees no games of their own", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /best games/ })).toHaveCount(0);
