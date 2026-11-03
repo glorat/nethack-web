@@ -100,7 +100,7 @@ Status:
 
 Map:
 
-- [ ] The Rogue level is drawn as text even with tiles on (`MainView.m` `drawRect:`).
+- [x] The Rogue level is drawn as text even with tiles on (`MainView.m` `drawRect:`).
 
 To decide, by trying both:
 

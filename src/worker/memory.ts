@@ -52,6 +52,7 @@ export interface NetHackModule {
   _nhweb_hero_kind(): number;
   _nhweb_dungeon_name(): number;
   _nhweb_dungeon_level(): number;
+  _nhweb_rogue_level(): number;
   _main(argc: number, argv: number): number;
   ENV: Record<string, string>;
   FS: EmscriptenFS;
