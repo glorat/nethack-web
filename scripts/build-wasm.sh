@@ -33,8 +33,16 @@ JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
 cd "$NH"
 # setup.sh copies the hints into the Makefiles, so rerun it to pick up hint edits
 (cd sys/unix && sh setup.sh "$HINTS" >/dev/null)
-if [ ! -d lib/lua ]; then
-    make fetch-lua
+# Lua from the core's pinned submodule, which git checks by hash, rather than a download, put where the core's build
+# reads the release tarball's sources
+want="$(sed -n 's/^LUA_VERSION = //p' sys/unix/Makefile.top)"
+git submodule update --init submodules/lua >/dev/null
+have="$(awk -F'"' '/^#define LUA_VERSION_(MAJOR|MINOR|RELEASE)[ \t]/ { printf "%s%s", sep, $2; sep = "." }' submodules/lua/lua.h)"
+[ "$have" = "$want" ] || { echo "submodules/lua is Lua $have, but the core's build wants $want" >&2; exit 1; }
+if [ "$(readlink "lib/lua-$want/src" || true)" != ../../submodules/lua ]; then
+    rm -rf "lib/lua-$want"
+    mkdir -p "lib/lua-$want"
+    ln -s ../../submodules/lua "lib/lua-$want/src"
 fi
 # several targets each build makedefs if it's missing, and overwrite it and hacklib.a under each other
 make CROSS_TO_WASM=1 makedefs
