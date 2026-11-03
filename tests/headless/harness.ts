@@ -7,11 +7,17 @@ import { applyEvents, cellAt, initialState, type GameState } from "../../src/por
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
 import { BonesDb } from "../../src/offline/bones";
 import { Recorder } from "../../src/worker/recorder";
-import { type BootCore, never, replay, ReplayError, saveFiles, writeSaveFiles } from "../../src/worker/replayer";
+import { type BootCore, never, replay, ReplayError, type ReplayedEvent, saveFiles, writeSaveFiles } from "../../src/worker/replayer";
 import { placeGameFiles, resumeUnseen } from "../../src/worker/resume";
 import { describeSquare, type EmscriptenFS, type NetHackModule } from "../../src/worker/memory";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+
+/** getpwuid() is always "web_user" here, which sysconf's WIZARDS doesn't list. */
+function allowDebugMode(m: { FS: EmscriptenFS }): void {
+  const sysconf = new TextDecoder().decode(m.FS.readFile("/sysconf"));
+  m.FS.writeFile("/sysconf", new TextEncoder().encode(sysconf.replace(/^WIZARDS=.*$/m, "WIZARDS=*")));
+}
 
 // a Monday at first quarter, so no full or new moon and no Friday the 13th change luck
 const DEFAULT_DATE = "2026-01-26T12:00:00Z";
@@ -178,11 +184,7 @@ export class Session {
         },
       ],
     });
-    if (options.wizard) {
-      // getpwuid() is always "web_user" here, which sysconf's WIZARDS doesn't list
-      const sysconf = new TextDecoder().decode(m.FS.readFile("/sysconf"));
-      m.FS.writeFile("/sysconf", new TextEncoder().encode(sysconf.replace(/^WIZARDS=.*$/m, "WIZARDS=*")));
-    }
+    if (options.wizard) allowDebugMode(m);
     // a session from an earlier test is left suspended inside a callback, and the shim's reentry check is global
     const shared = (globalThis as { nethackGlobal?: { shimFunctionRunning?: unknown } }).nethackGlobal;
     if (shared) shared.shimFunctionRunning = null;
@@ -437,6 +439,8 @@ export interface Replayed {
   state: GameState;
   /** Whether it ended where the recording did, or where it went differently. */
   error: ReplayError | null;
+  /** What the core reported along the way. */
+  events: ReplayedEvent[];
 }
 
 /** Boots a fresh real core for each session of a replay, in Node. */
@@ -463,6 +467,8 @@ export async function headlessBoot(): Promise<(current: () => boolean) => BootCo
           },
         ],
       });
+      // a debug-mode recording replays in debug mode, as the session that made it was allowed to
+      allowDebugMode(m);
       // as the worker does: a core for a playing-through a seek or stop has replaced must not start, or it takes over the shim's helpers
       if (!current()) return never();
       const shared = (globalThis as { nethackGlobal?: { shimFunctionRunning?: unknown } }).nethackGlobal;
@@ -508,17 +514,19 @@ export async function replayCore(text: string): Promise<{ files: Map<string, Uin
 /** Plays a recording again on the real core, as fast as it goes. */
 export async function replayRecording(text: string, saves?: Map<string, Uint8Array>): Promise<Replayed> {
   let state = initialState();
+  const events: ReplayedEvent[] = [];
   const boot = (await headlessBoot())(() => true);
   try {
     await replay(text, boot, {
       post: (events) => (state = applyEvents(state, events)),
+      event: (e) => events.push(e),
       pace: () => Promise.resolve(),
       delay: () => Promise.resolve(),
       bones: (hash) => saves?.get(`bones/${hash}`),
     });
-    return { state, error: null };
+    return { state, error: null, events };
   } catch (e) {
-    if (e instanceof ReplayError) return { state, error: e };
+    if (e instanceof ReplayError) return { state, error: e, events };
     throw e;
   }
 }
