@@ -76,7 +76,7 @@ Found by comparing the code of each window with Cocoa's.
 Extended commands:
 
 - [x] Nothing is highlighted until something is typed, so Return with an empty field runs nothing (`ExtCommandWindowController.m` `textChangedIn:`).
-- [ ] The highlighted row is scrolled into view (`highlightRow:`).
+- [x] The highlighted row is scrolled into view (`highlightRow:`).
 - [ ] A hint under the list: "Return runs the highlighted command, Esc cancels."
 
 Messages:

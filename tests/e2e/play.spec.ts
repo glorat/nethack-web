@@ -1245,6 +1245,19 @@ test("an extended command highlights nothing until something is typed, so Return
   await expect(dialog.locator(".ext-item").first()).toHaveClass(/active/);
 });
 
+test("arrowing through the extended commands keeps the highlighted one in view", async ({ page }) => {
+  await startGame(page, `Scroll${Date.now() % 100000}`);
+  await page.keyboard.press("#");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("textbox")).toBeFocused();
+  const list = dialog.locator(".ext-list");
+  expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  const rows = await dialog.locator(".ext-item").count();
+  for (let i = 0; i < rows; i++) await page.keyboard.press("ArrowDown");
+  await expect(dialog.locator(".ext-item").last()).toHaveClass(/active/);
+  await expect(dialog.locator(".ext-item.active")).toBeInViewport({ ratio: 1 });
+});
+
 test("the game beeps at a click on unexplored ground far away, and at an inventory pick it can't take", async ({ page }) => {
   await page.addInitScript(() => {
     const w = window as unknown as { beeps: number; AudioContext: typeof AudioContext };
