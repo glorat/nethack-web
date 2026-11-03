@@ -228,7 +228,7 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
           ref={list}
           onCopy={how === "none" ? copyList : undefined}
           onMouseLeave={how === "one" ? () => setHighlight(null) : undefined}
-          class={`menu-items${columns > 1 ? " tabbed" : ""}${how === "none" ? " readonly" : ""}`}
+          class={`menu-items${columns > 1 ? " tabbed" : ""}${how === "none" ? " readonly" : ""}${how === "any" ? " pick-any" : ""}`}
           style={{ "--menu-columns": columns }}
         >
           {order.map((i) => [items[i], i] as const).map(([item, i]) =>
@@ -255,7 +255,10 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
                       }
                 }
                 onMouseMove={how === "one" ? () => setHighlight(i) : undefined}
+                role={how === "any" ? "menuitemcheckbox" : undefined}
+                aria-checked={how === "any" ? selected.current.has(i) : undefined}
               >
+                {how === "any" ? <span class="menu-check" /> : null}
                 <span class="inv-icon" style={tileStyle(sheet, item.tile, ICON)} />
                 <span class="inv-letter">{item.accelerator}</span>
                 {columns > 1 ? (
