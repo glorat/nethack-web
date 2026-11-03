@@ -683,6 +683,20 @@ test("an item picked by its letter in a menu of several picks is scrolled into v
   await expect(last).toBeInViewport({ ratio: 0.9 });
 });
 
+test("a menu's heading stays at the top while its items scroll under it", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 420 });
+  await startGame(page, `Pin${Date.now() % 100000}`);
+  await page.keyboard.press("Shift+O");
+  const list = page.getByRole("dialog").locator(".menu-items");
+  await expect(list.locator(".menu-item").first()).toBeVisible();
+  const top = await list.evaluate((el) => {
+    el.scrollTop = el.scrollHeight / 2;
+    const box = el.getBoundingClientRect();
+    return document.elementFromPoint(box.left + 30, box.top + 4)?.closest(".menu-heading, .menu-item")?.className;
+  });
+  expect(top).toMatch(/menu-heading/);
+});
+
 test("in a menu of several picks, . or , picks everything, - or \\ nothing, and Select All everything", async ({ page }) => {
   await startAs(page, `All${Date.now() % 100000}`, /Priest/);
   await page.keyboard.press("Shift+D");

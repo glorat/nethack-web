@@ -220,6 +220,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .menu-items, .ext-list { overflow-y: auto; margin: 0 -14px; }
 .menu-heading { font-size: calc(11px * var(--text-scale)); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 8px 14px 2px; }
 .menu-heading.strong { color: var(--text); }
+.menu-items .menu-heading { position: sticky; top: 0; z-index: 1; background: var(--panel); }
 .menu-line { white-space: pre-wrap; padding: 1px 14px; }
 .menu-items.tabbed > .menu-line { display: block; }
 .menu-item { padding: 3px 14px; }

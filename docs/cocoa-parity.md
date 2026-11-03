@@ -88,7 +88,7 @@ Menus:
 
 - [x] A row picked by its letter is scrolled into view (`reloadRowForItem`).
 - [ ] Columns padded with two or more spaces line up, as tab-separated ones do (`SplitFields`).
-- [ ] The current heading stays at the top while the list scrolls (group rows).
+- [x] The current heading stays at the top while the list scrolls (group rows).
 - [ ] No tile or letter column in a menu without tiles or letters.
 - [ ] A text line indented four or more spaces starts where the items' text does.
 - [x] Close is the default button in a read-only menu.
