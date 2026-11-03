@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { applyEvents, cellAt, initialState, MAX_MESSAGES, nextBatch } from "../../src/port/state";
+import { applyEvents, cellAt, initialState, MAX_MESSAGES, nextBatch, TURN_SEPARATOR } from "../../src/port/state";
 import type { MapCell } from "../../src/protocol";
 
 const cell = (x: number, y: number, tile = 1): MapCell => ({
@@ -35,6 +35,22 @@ test("messages skip blanks, carry their batch and are capped", () => {
   s = applyEvents(s, many);
   expect(s.messages).toHaveLength(MAX_MESSAGES);
   expect(s.messages.at(-1)?.text).toBe(`m${MAX_MESSAGES + 4}`);
+});
+
+test("a line separates the messages of one turn from the next, once, and not before the first", () => {
+  const s = applyEvents(initialState(), [
+    { type: "message_clear" },
+    { type: "message", text: "Hello", attr: 0 },
+    { type: "message", text: "There", attr: 0 },
+    { type: "message_clear" },
+    { type: "message_clear" },
+    { type: "message", text: "   ", attr: 0 },
+    { type: "message", text: "Again", attr: 0 },
+    { type: "message_clear" },
+  ]);
+  expect(s.messages.map((m) => m.text)).toEqual(["Hello", "There", TURN_SEPARATOR, "Again"]);
+  expect(s.messages.map((m) => !!m.separator)).toEqual([false, false, true, false]);
+  expect(new Set(s.messages.map((m) => m.id)).size).toBe(4);
 });
 
 test("unchanged state is returned for no-op events", () => {

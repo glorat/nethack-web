@@ -11,7 +11,11 @@ export interface Message {
   attr: number;
   /** Turn-ish grouping: messages since the player's last input share a batch. */
   batch: number;
+  /** The line between turns, not a message from the game. */
+  separator?: boolean;
 }
+
+export const TURN_SEPARATOR = "------------";
 
 export interface GameState {
   started: boolean;
@@ -34,6 +38,8 @@ export interface GameState {
   error: string | null;
   batch: number;
   nextMessageId: number;
+  /** The message window was cleared since the last message, so the next one starts a new turn. */
+  messagesCleared: boolean;
 }
 
 export function initialState(): GameState {
@@ -53,6 +59,7 @@ export function initialState(): GameState {
     error: null,
     batch: 0,
     nextMessageId: 1,
+    messagesCleared: false,
   };
 }
 
@@ -76,13 +83,22 @@ export function applyEvents(state: GameState, events: GameEvent[]): GameState {
       case "cursor":
         next = { ...next, cursor: { x: event.x, y: event.y } };
         break;
+      case "message_clear":
+        if (!next.messagesCleared) next = { ...next, messagesCleared: true };
+        break;
       case "message": {
         if (!event.text.trim()) break;
-        const message = { id: next.nextMessageId, text: event.text, attr: event.attr, batch: next.batch };
+        let id = next.nextMessageId;
+        const added: Message[] = [];
+        const last = next.messages.at(-1);
+        if (next.messagesCleared && last && !last.separator)
+          added.push({ id: id++, text: TURN_SEPARATOR, attr: 0, batch: next.batch, separator: true });
+        added.push({ id: id++, text: event.text, attr: event.attr, batch: next.batch });
         next = {
           ...next,
-          messages: [...next.messages, message].slice(-MAX_MESSAGES),
-          nextMessageId: next.nextMessageId + 1,
+          messages: [...next.messages, ...added].slice(-MAX_MESSAGES),
+          nextMessageId: id,
+          messagesCleared: false,
         };
         break;
       }

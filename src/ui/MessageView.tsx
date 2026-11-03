@@ -10,7 +10,7 @@ export function MessageView({ messages, batch }: { messages: Message[]; batch: n
   return (
     <div class="messages" ref={list}>
       {messages.map((m) => (
-        <div key={m.id} class={m.batch === batch ? "message current" : "message"}>
+        <div key={m.id} class={`message${m.separator ? " separator" : m.batch === batch ? " current" : ""}`}>
           {m.text}
         </div>
       ))}

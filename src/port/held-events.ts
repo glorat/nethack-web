@@ -24,6 +24,9 @@ export class HeldEvents {
           this.cleared = true;
           this.cells.clear();
           break;
+        case "message_clear":
+          if (this.messages.at(-1)?.type !== "message_clear") this.messages.push(event);
+          break;
         case "message":
           if (!event.text.trim()) break;
           this.messages.push(event);
