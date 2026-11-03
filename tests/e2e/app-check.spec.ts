@@ -146,6 +146,8 @@ test("App Check refusing mid-game ends it at the landing page", async ({ page })
   answer = "refuse";
   await untilReturned(page, async () => new URL(page.url()).search === "?online&refused");
   await expect(page.getByRole("alert").filter({ hasText: "isn't available" })).toBeVisible();
+  // the landing page can show its alert before its own load event, which mustn't count as another
+  await page.waitForLoadState("load");
   let loads = 0;
   page.on("load", () => loads++);
   await page.waitForTimeout(3000);
