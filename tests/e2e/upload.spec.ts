@@ -649,7 +649,7 @@ test("a finished online game is listed on the landing page, scored once validate
 
   await page.goto("/");
   const row = page.locator(".online-scores li", { hasText: name });
-  await expect(row).toContainText("scored once the server has replayed the game", { timeout: 20_000 });
+  await expect(row).toContainText("score not ready yet", { timeout: 20_000 });
 
   expect(sweepAndRead(game).result).toBeTruthy();
   await page.reload();
