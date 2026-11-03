@@ -21,6 +21,8 @@ async function untilPlaying(page: Page, name: string, mode: "online" | "offline"
   }
   const picker = page.getByRole("dialog", { name: "Choose your character" });
   await picker.waitFor();
+  // a human can be any role, and roles the race can\'t play are disabled
+  await picker.getByRole("listbox", { name: "Race" }).getByRole("option", { name: "human" }).click();
   await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: /Valkyrie/ }).click();
   await picker.getByRole("listbox", { name: "Race" }).locator("button:not([disabled])").first().click();
   for (const group of ["Gender", "Alignment"]) await picker.getByRole("radiogroup", { name: group }).locator("button:not([disabled])").first().click();
@@ -518,6 +520,8 @@ test("the landing page lists games in flight, goes back to one, and starts a new
   await page.getByRole("button", { name: `Start New Game as ${name}` }).click();
   const picker = page.getByRole("dialog", { name: "Choose your character" });
   await picker.waitFor({ timeout: 15_000 });
+  // a human can be any role, and roles the race can\'t play are disabled
+  await picker.getByRole("listbox", { name: "Race" }).getByRole("option", { name: "human" }).click();
   await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: /Valkyrie/ }).click();
   await picker.getByRole("listbox", { name: "Race" }).locator("button:not([disabled])").first().click();
   for (const group of ["Gender", "Alignment"]) await picker.getByRole("radiogroup", { name: group }).locator("button:not([disabled])").first().click();
