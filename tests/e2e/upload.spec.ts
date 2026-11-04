@@ -679,16 +679,34 @@ test("a game the server won't give to watch says so", async ({ page }) => {
   await expect(page.getByText("This game can't be watched.")).toBeVisible({ timeout: 20_000 });
 });
 
-/** Signs in through the Auth emulator's stand-in for Google's popup, as a new account. */
-async function signInWithGoogle(page: Page, email: string) {
-  const [popup] = await Promise.all([page.waitForEvent("popup"), page.getByRole("button", { name: "Sign In with Google" }).click()]);
+/** Signs in through the Auth emulator's stand-in for Google's sign-in page, as a new account unless it's one used before. */
+async function signInWithGoogle(page: Page, email: string, used = false) {
+  await page.getByRole("button", { name: "Sign In with Google" }).click();
+  await page.waitForURL(/\/emulator\/auth\/handler/);
   // the widget wires its buttons up only once it has loaded
-  await popup.waitForLoadState();
-  await popup.getByRole("button", { name: /add new account/i }).click();
-  await popup.getByLabel(/email/i).fill(email);
-  // signing in reloads the page
-  await Promise.all([page.waitForEvent("load"), popup.getByRole("button", { name: /sign in with google/i }).click()]);
+  await page.waitForLoadState();
+  if (used) {
+    await page.getByText(email).click();
+  } else {
+    await page.getByRole("button", { name: /add new account/i }).click();
+    await page.getByLabel(/email/i).fill(email);
+    await page.getByRole("button", { name: /sign in with google/i }).click();
+  }
+  await page.waitForURL((url) => url.port === "5199");
+  // back from Google, the address no longer says to finish signing in, so a reload won't try again
+  await expect.poll(() => new URL(page.url()).searchParams.has("signingin")).toBe(false);
 }
+
+test("backing out of Google's sign-in comes back ready to try again", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("nethack-web.lastMode", "online"));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Sign In with Google" }).click();
+  await page.waitForURL(/\/emulator\/auth\/handler/);
+  await page.goBack();
+  await expect(page.getByRole("button", { name: "Sign In with Google" })).toBeEnabled();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect.poll(() => new URL(page.url()).searchParams.has("signingin")).toBe(false);
+});
 
 test("signing in keeps the anonymous player's games, and the name they chose", async ({ page }) => {
   await online(page);
@@ -766,9 +784,7 @@ test("signing out comes home as a new player, and signing in again brings the ac
   await expect(page.getByRole("button", { name: "Sign In with Google" })).toBeVisible();
   await expect.poll(() => new URL(page.url()).searchParams.has("signedout")).toBe(false);
 
-  const [popup] = await Promise.all([page.waitForEvent("popup"), page.getByRole("button", { name: "Sign In with Google" }).click()]);
-  await popup.waitForLoadState();
-  await Promise.all([page.waitForEvent("load"), popup.getByText(email).click()]);
+  await signInWithGoogle(page, email, true);
   await expect(account).toHaveText(handle);
 });
 

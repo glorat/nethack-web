@@ -13,13 +13,21 @@ import type { Profile } from "../online/account";
 import { AccountBar, HandlePrompt } from "../online/ui/Account";
 import { offlineGameUnder } from "../offline/progress";
 import { DeviceGames } from "../offline/ui/DeviceGames";
-import { listOnlineGames, loadProfile, signInWithGoogle, signOut } from "../online/server/api";
+import { finishSignIn, listOnlineGames, loadProfile, signInWithGoogle, signOut } from "../online/server/api";
 import { updateWhenIdle } from "../sw/register";
 import { AboutDialog } from "./dialogs/AboutDialog";
 import { OptionsDialog } from "./dialogs/OptionsDialog";
 
 /** Online stays out of sight in a production build until it's ready for players; `?online` shows it, for trying it there. */
 const onlineOffered = () => import.meta.env.DEV || onlineWanted(location.search);
+
+/** This page's address without the given parameters. */
+function addressWithout(...names: string[]): string {
+  const params = new URLSearchParams(location.search);
+  for (const name of names) params.delete(name);
+  const search = params.toString();
+  return `${location.pathname}${search ? `?${search}` : ""}`;
+}
 
 export function Landing() {
   const [remembered] = useState(savedName);
@@ -31,46 +39,70 @@ export function Landing() {
   const [offered] = useState(onlineOffered);
   const [refused] = useState(() => new URLSearchParams(location.search).has("refused"));
   const [inProgress, setInProgress] = useState<GameSummary[]>([]);
-  const [returning] = useState(lastMode);
+  const [returning, setReturning] = useState(lastMode);
   const [profile, setProfile] = useState<Profile | null>(null);
+  // only a page back from Google loads the server's code to read its answer, so other visits stay off the server
+  const [finishing, setFinishing] = useState(() => new URLSearchParams(location.search).has("signingin"));
   const [signingIn, setSigningIn] = useState(false);
   const [signInFailed, setSignInFailed] = useState(false);
   const [signedOut] = useState(() => new URLSearchParams(location.search).has("signedout"));
   const [signOutFailed, setSignOutFailed] = useState(false);
   useEffect(() => {
-    // the note is for coming here from signing out, not for a reload later
+    // the notes are for coming here from Google or signing out, not for a reload later
     const params = new URLSearchParams(location.search);
-    if (!params.has("signedout")) return;
-    params.delete("signedout");
-    const search = params.toString();
-    history.replaceState(history.state, "", `${location.pathname}${search ? `?${search}` : ""}`);
+    if (params.has("signedout") || params.has("signingin")) history.replaceState(history.state, "", addressWithout("signedout", "signingin"));
+  }, []);
+  useEffect(() => {
+    if (!finishing) return;
+    finishSignIn()
+      .then(
+        (signedIn) => {
+          if (!signedIn) return;
+          // the account's games and handle are the server's to show, which this page asks for after an online game
+          keepLastMode("online");
+          setReturning("online");
+        },
+        (e) => {
+          console.warn("couldn't sign in", e);
+          setSignInFailed(true);
+        },
+      )
+      .finally(() => setFinishing(false));
   }, []);
   useEffect(() => {
     // anyone else's visit doesn't touch the server
     // asking again would only be refused again, and send this page back to itself
-    if (!offered || returning !== "online" || refused) return;
+    // until a sign-in is finished, the player's games and profile are still the anonymous player's
+    if (finishing || !offered || returning !== "online" || refused) return;
     listOnlineGames().then(
       setInProgress,
       (e) => console.warn("couldn't list online games", e),
     );
     loadProfile().then(setProfile, (e) => console.warn("couldn't read the profile", e));
+  }, [finishing, returning]);
+  useEffect(() => {
+    // back from Google without signing in, the browser may show this page as it was left
+    const shown = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      history.replaceState(history.state, "", addressWithout("signingin"));
+      setSigningIn(false);
+    };
+    addEventListener("pageshow", shown);
+    return () => removeEventListener("pageshow", shown);
   }, []);
   const signIn = () => {
     setSigningIn(true);
     setSignInFailed(false);
-    signInWithGoogle().then(
-      () => {
-        // the account's games and handle are the server's to show, which this page asks for after an online game
-        keepLastMode("online");
-        location.reload();
-      },
-      (e) => {
-        setSigningIn(false);
-        if ((e as { code?: string }).code === "auth/popup-closed-by-user") return;
-        console.warn("couldn't sign in", e);
-        setSignInFailed(true);
-      },
-    );
+    // Google sends the player back to this address, which then says to finish
+    const params = new URLSearchParams(location.search);
+    params.set("signingin", "");
+    history.replaceState(history.state, "", `${location.pathname}?${params}`);
+    signInWithGoogle().catch((e) => {
+      history.replaceState(history.state, "", addressWithout("signingin"));
+      setSigningIn(false);
+      console.warn("couldn't sign in", e);
+      setSignInFailed(true);
+    });
   };
   const signOutHere = () => {
     setSignOutFailed(false);
@@ -126,7 +158,7 @@ export function Landing() {
       <header class="landing-bar">
         <span class="landing-title">NetHack</span>
         <span class="landing-bar-end">
-          {offered && !refused ? <AccountBar profile={profile} onSignIn={signIn} signingIn={signingIn} onSignOut={signOutHere} /> : null}
+          {offered && !refused ? <AccountBar profile={profile} onSignIn={signIn} signingIn={signingIn || finishing} onSignOut={signOutHere} /> : null}
           <button onClick={() => setAbout(true)}>About</button>
         </span>
       </header>
