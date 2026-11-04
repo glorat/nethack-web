@@ -72,6 +72,7 @@ export function YesNoDialog({ query, choices, defaultChoice, onDone }: Props) {
             {/* the first answer rightmost, as Cocoa lays them out */}
             {keys.map(button).reverse()}
             {!keys.length ? <span class="hint">Press a key</span> : null}
+            {!keys.length ? <button onClick={() => onDone(null)}>Cancel</button> : null}
           </div>
         ) : (
           <div class="answers">{keys.map(button)}</div>
