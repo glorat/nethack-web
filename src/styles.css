@@ -85,7 +85,11 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .top > * { background: var(--panel); }
 
 .map-pane { position: relative; flex: 1; min-height: 0; display: flex; }
-.map { flex: 1; overflow: auto; background: #000; }
+.map {
+  flex: 1; overflow: auto; background: #000;
+  /* Safari's double-tap zoom, long-press callout and scroll bounce would fight the game's taps; a pinch is the map's own */
+  touch-action: manipulation; overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
 .map-zoom { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 4px; }
 .map-zoom button { width: 28px; padding: 2px 0; opacity: 0.8; }
 .map-zoom .ascii-toggle { width: auto; padding: 2px 8px; }
