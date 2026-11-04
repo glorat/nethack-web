@@ -101,3 +101,15 @@ test("a seed the core can't take, or a hook that fails, leaves the game as it wo
     expect(g.state.status).toEqual(plain.state.status);
   }
 });
+
+test("the largest 32-bit seed reaches the core as it was given, and replays", async () => {
+  const g = await (await Session.start({ pageSeed: 7, options: "time", injectSeed: once(10, 0xffffffff) })).skipText();
+  await play(g);
+  await quit(g);
+  expect(g.recording).toMatch(/ reseed 4294967295\n/);
+  const replayed = await replayRecording(g.recording!);
+  expect(replayed.error).toBeNull();
+  // as the same seed, not one cut or wrapped on its way in
+  const changed = await replayRecording(g.recording!.replace(/ reseed 4294967295\n/, " reseed 2147483647\n"));
+  expect(changed.error?.message).toMatch(/sum/);
+});
