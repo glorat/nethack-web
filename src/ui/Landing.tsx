@@ -300,6 +300,9 @@ export function Landing() {
         <p>
           Report problems on <a href="https://github.com/glorat/nethack-web/issues" target="_blank" rel="noopener">this site's issue tracker</a>, not to the DevTeam. <a href="https://github.com/glorat/nethack-web" target="_blank" rel="noopener">Source code</a>, <a href={`${import.meta.env.BASE_URL}license.txt`} target="_blank" rel="noopener">NetHack General Public License</a>, and <a href={`${import.meta.env.BASE_URL}third-party-licenses.txt`} target="_blank" rel="noopener">other open source software</a>.
         </p>
+        <p>
+          <a href={`${import.meta.env.BASE_URL}terms/`}>Terms of Use</a> · <a href={`${import.meta.env.BASE_URL}privacy/`}>Privacy Policy</a>
+        </p>
       </footer>
       {editingOptions ? (
         <OptionsDialog
