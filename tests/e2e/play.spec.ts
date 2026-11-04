@@ -737,6 +737,29 @@ test("a menu's text indented four spaces starts where the items' text does", asy
   expect(noteStart).toBeCloseTo(itemStart, 0);
 });
 
+test("a menu widens to fit a long row", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 800 });
+  await startGame(page, `Wide${Date.now() % 100000}`);
+  await page.keyboard.type("#name");
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog");
+  await dialog.getByText("a particular object in inventory").click();
+  await dialog.getByText("+1 spear").click();
+  await dialog.locator("input").fill("Glorious Shining Blade of the Seventh Northern Kingdom of Asgard");
+  await page.keyboard.press("Enter");
+  await untilCommand(page);
+  for (let i = 0; i < 3; i++) {
+    await page.getByRole("menuitem", { name: "View" }).click();
+    await page.getByRole("menuitem", { name: /Bigger Text/ }).click();
+  }
+  await untilCommand(page);
+  await page.keyboard.press("i");
+  const items = dialog.locator(".menu-items");
+  await expect(items).toContainText("Asga (weapon in right hand)");
+  expect(await items.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
+  expect((await dialog.boundingBox())!.width).toBeGreaterThan(720);
+});
+
 test("arrowing up a long menu keeps the highlighted row clear of the pinned heading", async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 420 });
   await startAs(page, `Up${Date.now() % 100000}`, /Priest/);
