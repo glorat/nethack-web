@@ -565,7 +565,7 @@ test("the landing page can be left while the server hangs, and focus follows the
   await expect.poll(() => page.evaluate(() => document.activeElement?.className)).toBe("online-choice");
   await page.getByRole("button", { name: "Back" }).click();
   await expect(page.getByRole("button", { name: /^Play Online/ })).toBeFocused();
-  await expect(page.getByRole("button", { name: /^Play Offline/ })).toBeVisible();
+  await expect(page.locator(".landing-bar").getByRole("link", { name: "Go Offline" })).toBeVisible();
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
@@ -595,7 +595,8 @@ test("the landing page says when it can't reach the server, and offline still pl
   await page.getByRole("button", { name: "Play Online" }).click();
   await expect(page.getByRole("alert")).toContainText(/can't reach the server/i, { timeout: 15_000 });
   await page.getByRole("button", { name: "Back" }).click();
-  await page.getByRole("button", { name: "Play Offline" }).click();
+  await page.getByRole("link", { name: "Play Offline Instead" }).click();
+  await page.getByRole("button", { name: /^Play Offline/ }).click();
   await page.getByRole("dialog", { name: "Choose your character" }).waitFor({ timeout: 15_000 });
 });
 
@@ -783,6 +784,31 @@ test("signing out comes home as a new player, and signing in again brings the ac
 
   await signInWithGoogle(page, email, true);
   await expect(account).toHaveText(handle);
+});
+
+test("signing in to an account that's already someone's shows that account's finished games, not this browser's", async ({ page }) => {
+  await online(page);
+  const email = `${crypto.randomUUID()}@example.com`;
+  await page.goto("/online/");
+  await signInWithGoogle(page, email);
+  await expect(page.locator(".landing-bar .account")).toHaveText("Signed in", { timeout: 20_000 });
+  await page.locator(".landing-bar .account").click();
+  await Promise.all([page.waitForEvent("load"), page.getByRole("menuitem", { name: "Sign Out" }).click()]);
+
+  // a new anonymous player, who finishes a game of their own
+  const name = `An${Date.now() % 100000}`;
+  await untilPlaying(page, name);
+  const game = await gameId(page);
+  await quit(page);
+  await expect.poll(async () => (await stored(page, game)).map((b) => b.lines).join("\n"), { timeout: 10_000 }).toMatch(/\d+ end over/);
+  await page.goto("/online/");
+  const theirs = page.locator(".online-scores li", { hasText: name });
+  await expect(theirs).toBeVisible({ timeout: 20_000 });
+
+  await signInWithGoogle(page, email, true);
+  await expect(page.locator(".landing-bar .account")).toHaveText("Signed in", { timeout: 20_000 });
+  await page.waitForTimeout(2000);
+  await expect(theirs).toHaveCount(0);
 });
 
 test("the leaderboard ranks a game under its player's handle, never the character's name", async ({ page }) => {
