@@ -11,7 +11,7 @@ const online = (page: Page) => page.addInitScript(() => localStorage.removeItem(
 const gameId = (page: Page) => page.evaluate(() => document.documentElement.dataset.serverGame!);
 
 async function untilPlaying(page: Page, name: string, mode: "online" | "offline" = "online") {
-  await page.goto("/");
+  await page.goto(mode === "online" ? "/online/" : "/offline/");
   await page.getByLabel("Who are you?").fill(name);
   if (mode === "online") {
     await page.getByRole("button", { name: "Play Online" }).click();
@@ -168,7 +168,7 @@ test("a game swept during and after play can be rebuilt from its archive and rep
   expect(after.segments).toBe(2);
 
   await page.evaluate((rebuilt) => localStorage.setItem("nethack.lastGame", rebuilt), after.recording);
-  await page.goto("/play/?replay");
+  await page.goto("/offline/watch/");
   const bar = page.getByRole("toolbar", { name: "Replay" });
   await bar.getByLabel("Speed").selectOption({ label: "Max" });
   await expect(bar).toContainText("End of the recording", { timeout: 20_000 });
@@ -201,7 +201,7 @@ test("a whole game can be rebuilt from the server and replayed", async ({ page }
   expect(((await direct.json()) as { documents?: unknown[] }).documents).toHaveLength(1);
 
   await page.evaluate((rebuilt) => localStorage.setItem("nethack.lastGame", rebuilt), rebuildRecording(batches));
-  await page.goto("/play/?replay");
+  await page.goto("/offline/watch/");
   const bar = page.getByRole("toolbar", { name: "Replay" });
   await bar.getByLabel("Speed").selectOption({ label: "Max" });
   await expect(bar).toContainText("End of the recording", { timeout: 20_000 });
@@ -276,7 +276,7 @@ test("a game saved and restored carries on as the same game", async ({ page }) =
   await page.waitForURL((url) => !url.pathname.includes("/play"), { timeout: 15_000 });
 
   expect(await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name))).not.toContain("/save");
-  await page.goto(`/play/?online&name=${name}`);
+  await page.goto(`/online/play/?name=${name}`);
   await page.locator(".stats-title").waitFor({ timeout: 15_000 });
   await afterPrompts(page);
   expect(await gameId(page)).toBe(game);
@@ -298,10 +298,10 @@ test("a new game gets its own ID, and the old one stays in flight to come back t
   await page.waitForTimeout(1200);
   const before = rebuildRecording(await stored(page, old));
 
-  await page.goto(`/play/?online&name=${name}&new`);
+  await page.goto(`/online/play/?name=${name}&new`);
   await page.getByRole("dialog", { name: "Choose your character" }).waitFor({ timeout: 15_000 });
   await expect.poll(() => gameId(page)).not.toBe(old);
-  await page.goto(`/play/?online&name=${name}&game=${old}`);
+  await page.goto(`/online/play/?name=${name}&game=${old}`);
   await page.locator(".stats-title").waitFor({ timeout: 15_000 });
   await afterPrompts(page);
   expect(await gameId(page)).toBe(old);
@@ -322,7 +322,7 @@ test("a game playing in two tabs tells the one that loses, and its lines stay ou
 
   const other = await context.newPage();
   await online(other);
-  await other.goto(`/play/?online&name=${name}&game=${game}`);
+  await other.goto(`/online/play/?name=${name}&game=${game}`);
   await other.locator(".stats-title").waitFor({ timeout: 15_000 });
   await afterPrompts(other);
   await pass(other, 2);
@@ -440,7 +440,7 @@ test("an online game leaves the offline last-game replay alone", async ({ page }
   expect(await page.evaluate(() => localStorage.getItem("nethack.lastGame"))).toBe("offline game");
   // a reload watches it from the server, not the offline last game
   expect(new URL(page.url()).searchParams.get("game")).toBe(game);
-  expect(new URL(page.url()).searchParams.has("replay")).toBe(true);
+  expect(new URL(page.url()).pathname).toBe("/online/watch/");
   await expect.poll(async () => (await stored(page, game)).map((b) => b.lines).join("\n"), { timeout: 10_000 }).toMatch(/\d+ end over/);
   await page.reload();
   await expect(page.getByText(/Turn \d+ of \d+/)).toBeVisible({ timeout: 20_000 });
@@ -466,7 +466,7 @@ test("a real game, reloaded, saved and restored, validates on the server's core 
   await page.keyboard.press("Enter");
   await page.keyboard.press("y");
   await page.waitForURL((url) => !url.pathname.includes("/play"), { timeout: 15_000 });
-  await page.goto(`/play/?online&name=${name}&game=${game}`);
+  await page.goto(`/online/play/?name=${name}&game=${game}`);
   await page.locator(".stats-title").waitFor({ timeout: 15_000 });
   await afterPrompts(page);
   await pass(page, 3);
@@ -502,7 +502,7 @@ test("a real game that was cut back still validates, with the cut-back noted", a
 test("with the server out of reach, a new game waits and says so, then starts", async ({ page }) => {
   await online(page);
   await page.route(EMULATORS, (route) => route.abort());
-  await page.goto(`/play/?online&new&name=Wa${Date.now() % 100000}`);
+  await page.goto(`/online/play/?new&name=Wa${Date.now() % 100000}`);
   const waiting = page.getByRole("status").filter({ hasText: "Waiting for the server" });
   await waiting.waitFor({ timeout: 15_000 });
   await page.unroute(EMULATORS);
@@ -513,7 +513,7 @@ test("with the server out of reach, a new game waits and says so, then starts", 
 test("the landing page lists games in flight, goes back to one, and starts a new one in the zone chosen", async ({ page }) => {
   await online(page);
   const name = `Li${Date.now() % 100000}`;
-  await page.goto("/");
+  await page.goto("/online/");
   await page.getByLabel("Who are you?").fill(name);
   await page.getByRole("button", { name: "Play Online" }).click();
   await page.getByLabel("Time zone").selectOption({ label: "UTC+09:00" });
@@ -532,7 +532,7 @@ test("the landing page lists games in flight, goes back to one, and starts a new
   await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(0);
   await page.waitForTimeout(1200);
 
-  await page.goto("/");
+  await page.goto("/online/");
   const first = page.locator("form button").first();
   await expect(first).toHaveText(`Continue Online as ${name}`);
   await expect(first).toHaveClass(/primary/);
@@ -549,7 +549,7 @@ test("the landing page lists games in flight, goes back to one, and starts a new
   await expect.poll(async () => [undefined, game].includes(await gameId(page))).toBe(false);
   expect((await requests(page, await gameId(page)))[0].utcOffset).toBe(32400);
 
-  await page.goto("/");
+  await page.goto("/online/");
   await page.getByRole("button", { name: `Play Online as ${name}` }).click();
   await page.getByRole("button", { name: /^Start New Game/ }).waitFor();
   await expect(page.locator(".online-games").getByRole("link", { name: new RegExp(name) })).toHaveCount(0);
@@ -557,7 +557,7 @@ test("the landing page lists games in flight, goes back to one, and starts a new
 
 test("the landing page can be left while the server hangs, and focus follows the choice", async ({ page }) => {
   await page.route(/\/europe-west1\/user$/, () => {});
-  await page.goto("/");
+  await page.goto("/online/");
   const name = page.getByLabel("Who are you?");
   await name.fill(`Ha${Date.now() % 100000}`);
   await name.press("Enter");
@@ -570,7 +570,7 @@ test("the landing page can be left while the server hangs, and focus follows the
 });
 
 test("starting an online game says what a dropped connection costs, and what not signing in does", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/online/");
   await page.getByLabel("Who are you?").fill(`Nt${Date.now() % 100000}`);
   await page.getByRole("button", { name: "Play Online" }).click();
   await page.getByRole("button", { name: /^Start New Game/ }).waitFor();
@@ -580,7 +580,7 @@ test("starting an online game says what a dropped connection costs, and what not
 
 test("a long name fits on a phone", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
-  await page.goto("/");
+  await page.goto("/online/");
   await page.getByLabel("Who are you?").fill("W".repeat(31));
   await page.getByRole("button", { name: "Play Online" }).click();
   await page.getByRole("button", { name: /^Start New Game/ }).waitFor();
@@ -590,7 +590,7 @@ test("a long name fits on a phone", async ({ page }) => {
 test("the landing page says when it can't reach the server, and offline still plays", async ({ page }) => {
   await online(page);
   await page.route(EMULATORS, (route) => route.abort());
-  await page.goto("/");
+  await page.goto("/online/");
   await page.getByLabel("Who are you?").fill(`No${Date.now() % 100000}`);
   await page.getByRole("button", { name: "Play Online" }).click();
   await expect(page.getByRole("alert")).toContainText(/can't reach the server/i, { timeout: 15_000 });
@@ -627,7 +627,7 @@ test("an offline game never reaches the server, and stays apart from an online o
   expect(reached).toEqual([]);
 
   await online(page);
-  await page.goto(`/play/?online&name=${name}`);
+  await page.goto(`/online/play/?name=${name}`);
   // a new character, not the offline game coming back
   await page.getByRole("dialog", { name: "Choose your character" }).waitFor({ timeout: 20_000 });
   expect(await gameId(page)).toBeTruthy();
@@ -646,7 +646,7 @@ test("an online game in another tab doesn't hold up an offline game coming back"
   await untilPlaying(onlineTab, `${name}x`);
 
   const offline = await context.newPage();
-  await offline.goto(`/play/?name=${name}`);
+  await offline.goto(`/offline/play/?name=${name}`);
   await offline.locator(".app[data-commanding]").waitFor({ timeout: 20_000 });
   await expect(offline.getByRole("dialog")).toHaveCount(0);
 });
@@ -660,7 +660,7 @@ test("a finished online game is listed on the landing page, scored once validate
   await quit(page);
   await expect.poll(async () => (await stored(page, game)).map((b) => b.lines).join("\n"), { timeout: 10_000 }).toMatch(/\d+ end over/);
 
-  await page.goto("/");
+  await page.goto("/online/");
   const row = page.locator(".online-scores li", { hasText: name });
   await expect(row).toContainText("score not ready yet", { timeout: 20_000 });
 
@@ -675,7 +675,7 @@ test("a finished online game is listed on the landing page, scored once validate
 
 test("a game the server won't give to watch says so", async ({ page }) => {
   await online(page);
-  await page.goto(`/play/?replay&online&game=${crypto.randomUUID()}`);
+  await page.goto(`/online/watch/?game=${crypto.randomUUID()}`);
   await expect(page.getByText("This game can't be watched.")).toBeVisible({ timeout: 20_000 });
 });
 
@@ -693,19 +693,16 @@ async function signInWithGoogle(page: Page, email: string, used = false) {
     await page.getByRole("button", { name: /sign in with google/i }).click();
   }
   await page.waitForURL((url) => url.port === "5199");
-  // back from Google, the address no longer says to finish signing in, so a reload won't try again
-  await expect.poll(() => new URL(page.url()).searchParams.has("signingin")).toBe(false);
 }
 
 test("backing out of Google's sign-in comes back ready to try again", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("nethack-web.lastMode", "online"));
-  await page.goto("/");
+  await page.goto("/online/");
   await page.getByRole("button", { name: "Sign In with Google" }).click();
   await page.waitForURL(/\/emulator\/auth\/handler/);
   await page.goBack();
   await expect(page.getByRole("button", { name: "Sign In with Google" })).toBeEnabled();
   await expect(page.getByRole("alert")).toHaveCount(0);
-  await expect.poll(() => new URL(page.url()).searchParams.has("signingin")).toBe(false);
 });
 
 test("signing in keeps the anonymous player's games, and the name they chose", async ({ page }) => {
@@ -717,7 +714,7 @@ test("signing in keeps the anonymous player's games, and the name they chose", a
   await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(0);
   await page.waitForTimeout(1200);
 
-  await page.goto("/");
+  await page.goto("/online/");
   await signInWithGoogle(page, `${crypto.randomUUID()}@example.com`);
   await expect(page.locator(".landing-bar .account")).toHaveText("Signed in");
   const handle = `Hd${crypto.randomUUID().slice(0, 8).replaceAll("-", "")}`;
@@ -743,7 +740,7 @@ test("a handle someone else has is refused, and another can be chosen", async ({
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.addInitScript(() => localStorage.setItem("nethack-web.lastMode", "online"));
-    await page.goto("/");
+    await page.goto("/online/");
     await signInWithGoogle(page, `${crypto.randomUUID()}@example.com`);
     await page.getByLabel("Handle").fill(handle);
     await page.getByRole("button", { name: "Request Handle" }).click();
@@ -763,7 +760,7 @@ test("a handle someone else has is refused, and another can be chosen", async ({
 
 test("signing out comes home as a new player, and signing in again brings the account back", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("nethack-web.lastMode", "online"));
-  await page.goto("/");
+  await page.goto("/online/");
   const email = `${crypto.randomUUID()}@example.com`;
   await signInWithGoogle(page, email);
   const handle = `So${crypto.randomUUID().slice(0, 8).replaceAll("-", "")}`;
@@ -796,7 +793,7 @@ test("the leaderboard ranks a game under its player's handle, never the characte
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.serverUid)).toBeTruthy();
   const uid = await page.evaluate(() => document.documentElement.dataset.serverUid!);
 
-  await page.goto("/");
+  await page.goto("/online/");
   await signInWithGoogle(page, `${crypto.randomUUID()}@example.com`);
   const handle = `Lb${crypto.randomUUID().slice(0, 8).replaceAll("-", "")}`;
   await page.getByLabel("Handle").fill(handle);
@@ -837,12 +834,12 @@ test("the landing page lists every online game in progress, latest first, once t
     await route.fulfill({ json: { result: { games } } });
   });
   const heading = page.getByRole("heading", { name: "Your online games in progress" });
-  await page.goto("/");
+  await page.goto("/online/");
   await expect(page.locator("form button").first()).toHaveText("Continue Online as Older");
   await expect(heading).toHaveCount(0);
 
   games = [game(1, "Older"), game(3, "Latest"), game(2, "Middle")];
-  await page.goto("/");
+  await page.goto("/online/");
   await expect(page.locator("form button").first()).toHaveText("Continue Online as Latest");
   const links = page.locator("section", { has: heading }).getByRole("link");
   await expect(page.locator("section", { has: heading }).getByRole("listitem").locator("strong")).toHaveText(["Latest", "Middle", "Older"]);
@@ -863,14 +860,14 @@ test("the landing page shows the player's latest achievements once they've earne
   });
   const heading = page.getByRole("heading", { name: /Your achievements/ });
   const answered = page.waitForResponse((r) => /\/europe-west1\/user$/.test(r.url()) && (r.request().postDataJSON() as { data?: { method?: string } }).data?.method === "achievements");
-  await page.goto("/");
+  await page.goto("/online/");
   await answered;
   await page.waitForTimeout(200);
   await expect(heading).toHaveCount(0);
 
   const game = "11111111-1111-4111-8111-111111111111";
   achievements = [{ ...mines, earned: { at: earnedAt, game, turn: 1234 } }, { hidden: true }, ascended];
-  await page.goto("/");
+  await page.goto("/online/");
   const panel = page.locator("section", { has: heading });
   await expect(heading).toHaveText("Your achievements 1 of 3 earned");
   const date = await page.evaluate((at) => `${new Date(at).toLocaleDateString(undefined, { dateStyle: "medium" })}, turn ${(1234).toLocaleString()}`, earnedAt);

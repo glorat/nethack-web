@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { PLAY_PATH } from "../../port/name";
 import { type Achievement, earned, grouped, latest, type Shown } from "../achievements";
-import { watchAddress } from "../results";
+import { gameWatchAddress } from "../results";
 import { loadAchievements } from "../server/api";
 
 const LATEST = 4;
@@ -99,7 +98,7 @@ function Row({ a }: { a: Shown }) {
       {a.earned ? (
         <small>
           {`${earnedOn(a.earned.at)}, turn ${a.earned.turn.toLocaleString()} · `}
-          <a href={watchAddress(PLAY_PATH, a.earned.game)} aria-label={`Watch the game that earned ${a.name}`}>
+          <a href={gameWatchAddress(a.earned.game)} aria-label={`Watch the game that earned ${a.name}`}>
             Watch
           </a>
         </small>

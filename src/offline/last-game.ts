@@ -1,4 +1,4 @@
-// The last finished game's recording, which /play/?replay plays.
+// The last finished game's recording, which /offline/watch/ plays.
 import { replayable } from "../port/recording";
 
 const LAST_GAME_KEY = "nethack.lastGame";

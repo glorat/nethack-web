@@ -10,8 +10,6 @@ export function playerName(typed: string): string {
     .join("");
 }
 
-export const PLAY_PATH = `${import.meta.env.BASE_URL}play/`;
-
 const NAME_KEY = "nethack-web.name";
 
 export function savedName(): string {

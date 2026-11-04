@@ -19,8 +19,10 @@ NetHack and this web port are under the NetHack General Public License ([LICENSE
 - `src/port/`: UI-side game state, without DOM code.
 - `src/online/`, `src/offline/`: what belongs to one mode only, from the worker's
   side to the page's. Everything else is shared by both.
-- `index.html`, `src/landing.tsx`: the landing page at `/`, which loads none of the game.
-- `play/index.html`, `src/main.tsx`: the game at `/play/`.
+- Each mode has its own pages, `/online/` and `/offline/`, with its game at `play/` and replays at `watch/` under it. The address is the mode, and nothing under `/offline/` reaches the network. `src/port/modes.ts` builds and reads these addresses.
+- `index.html`, `src/door.ts`: `/`, which opens the mode last visited, or online the first time.
+- `online/index.html`, `offline/index.html`, `src/landing.tsx`: each mode's home, which loads none of the game.
+- `*/play/index.html`, `*/watch/index.html`, `src/main.tsx`: the game, and watching a finished one.
 - `src/ui/`: map, stats, equipment, messages, inventory, and dialogs.
 - `src/sw/sw.js`: service worker; the build adds the precache list.
 

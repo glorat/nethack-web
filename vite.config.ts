@@ -15,6 +15,9 @@ function publicFiles(dir: string): string[] {
   });
 }
 
+/** Every page, by its directory: the root, which opens the last mode, and each mode's home, game and replay. */
+const PAGES = ["", ...["online", "offline"].flatMap((mode) => [`${mode}/`, `${mode}/play/`, `${mode}/watch/`])];
+
 /** Emits sw.js with a precache list of everything the built game loads. */
 function serviceWorker(): Plugin {
   let publicDir = "";
@@ -24,10 +27,10 @@ function serviceWorker(): Plugin {
     configResolved(config) {
       publicDir = config.publicDir;
     },
-    generateBundle(_options, bundle) {
+    // after Vite's own, which drops the empty chunk of each page whose script another page shares
+    generateBundle: { order: "post", handler(_options, bundle) {
       const files = [
-        "./",
-        "./play/",
+        ...PAGES.map((page) => `./${page}`),
         ...Object.keys(bundle).filter((f) => !/\.(map|html)$/.test(f)).map((f) => `./${f}`),
         ...publicFiles(publicDir).map((f) => `./${relative(publicDir, f).split("\\").join("/")}`),
       ];
@@ -35,14 +38,14 @@ function serviceWorker(): Plugin {
       for (const f of Object.values(bundle)) hash.update(f.type === "chunk" ? f.code : f.source);
       for (const f of publicFiles(publicDir)) hash.update(readFileSync(f));
       // the pages aren't in the bundle yet, and an unchanged sw.js would never fetch them again
-      for (const f of ["./index.html", "./play/index.html"]) hash.update(readFileSync(new URL(f, import.meta.url)));
+      for (const page of PAGES) hash.update(readFileSync(new URL(`./${page}index.html`, import.meta.url)));
       const source = readFileSync(new URL("./src/sw/sw.js", import.meta.url), "utf8");
       this.emitFile({
         type: "asset",
         fileName: "sw.js",
         source: `const PRECACHE = ${JSON.stringify([...new Set(files)])};\nconst VERSION = "${hash.digest("hex").slice(0, 12)}";\n${source}`,
       });
-    },
+    } },
   };
 }
 
@@ -67,7 +70,7 @@ export default defineConfig({
   worker: { format: "es" },
   build: {
     rollupOptions: {
-      input: { landing: new URL("./index.html", import.meta.url).pathname, play: new URL("./play/index.html", import.meta.url).pathname },
+      input: Object.fromEntries(PAGES.map((page) => [page.replaceAll("/", "-") || "root", new URL(`./${page}index.html`, import.meta.url).pathname])),
     },
   },
   test: {

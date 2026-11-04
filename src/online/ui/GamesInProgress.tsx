@@ -1,4 +1,3 @@
-import { PLAY_PATH } from "../../port/name";
 import { type GameSummary, onlineAddress } from "../session";
 
 const playedOn = (at: number) => new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -15,7 +14,7 @@ export function GamesInProgress({ games }: { games: GameSummary[] }) {
             <li key={g.game}>
               <strong>{g.name}</strong>
               <small>Last played {playedOn(g.lastPlayedAt)}</small>
-              <a href={onlineAddress(PLAY_PATH, g.name, { game: g.game })} aria-label={`Continue ${g.name}, last played ${playedOn(g.lastPlayedAt)}`}>
+              <a href={onlineAddress(g.name, { game: g.game })} aria-label={`Continue ${g.name}, last played ${playedOn(g.lastPlayedAt)}`}>
                 Continue
               </a>
             </li>

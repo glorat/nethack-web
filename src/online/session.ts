@@ -1,6 +1,7 @@
 // An online game, from the page's side: the server holds it, and answers for what the core can't decide.
 // Offline games never come here. Asking waits as long as it takes, and never makes up an answer.
 
+import { homeAddress, playAddress } from "../port/modes";
 import { lastTurnIn } from "../port/recording";
 
 const RETRY_MS = 5000;
@@ -106,25 +107,20 @@ export function appCheckRefused(e: unknown): boolean {
   return (code === "appCheck/initial-throttle" || code === "appCheck/throttled") && (status === 403 || status === 404);
 }
 
-/** The landing page, saying why an online game ended there. */
-export function refusedAddress(path: string): string {
-  return `${path}?online&refused`;
+/** The online home, saying why an online game ended there. */
+export function refusedAddress(): string {
+  return `${homeAddress("online")}?refused`;
 }
 
-/** Whether the address asks for an online game. */
-export function onlineWanted(search: string): boolean {
-  return new URLSearchParams(search).has("online");
-}
-
-/** An address for the game page: an online game with the player's choices, or `game` to go back to one. */
-export function onlineAddress(path: string, name: string, choice: { game: string } | { utcOffset: number }): string {
-  const params = new URLSearchParams({ online: "", name });
+/** An address for the online game page: a new game with the player's choices, or `game` to go back to one. */
+export function onlineAddress(name: string, choice: { game: string } | { utcOffset: number }): string {
+  const params = new URLSearchParams({ name });
   if ("game" in choice) params.set("game", choice.game);
   else {
     params.set("new", "");
     params.set("tz", String(choice.utcOffset));
   }
-  return `${path}?${params}`;
+  return `${playAddress("online")}?${params}`;
 }
 
 /** The games a player can go back to; asking waits for no one, as the page can offer to try again. */

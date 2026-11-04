@@ -42,7 +42,7 @@ async function fakeServer(page: Page): Promise<Map<string, string | undefined>> 
 }
 
 async function startOnlineGame(page: Page) {
-  await page.goto(`${PROD}?online`);
+  await page.goto(`${PROD}online/`);
   await page.getByLabel("Who are you?").fill("Checked");
   await page.getByRole("button", { name: "Play Online" }).click();
   await page.getByRole("button", { name: /^Start New Game/ }).click();
@@ -115,7 +115,7 @@ for (const [failure, respond] of [
   test(`nothing goes to the server while reCAPTCHA ${failure}, and offline play is still there`, async ({ page }) => {
     const seen = await fakeServer(page);
     await page.route(RECAPTCHA, respond);
-    await page.goto(`${PROD}?online`);
+    await page.goto(`${PROD}online/`);
     await page.getByLabel("Who are you?").fill("Checked");
     await page.getByRole("button", { name: "Play Online" }).click();
     await expect(page.getByText("Connecting…")).toBeVisible();
@@ -123,20 +123,22 @@ for (const [failure, respond] of [
     await expect(page.getByText("Connecting…")).toBeVisible();
     expect([...seen.keys()]).toEqual([]);
     await page.getByRole("button", { name: "Back" }).click();
-    await expect(page.getByRole("button", { name: /Play Offline/ })).toBeVisible();
+    await expect(page.locator(".landing-bar").getByRole("link", { name: "Go Offline" })).toBeVisible();
   });
 }
 
-test("a browser App Check refuses is sent home and told why, before anything goes to the server", async ({ page }) => {
+test("a browser App Check refuses is told why at the online home, and offered offline, before anything goes to the server", async ({ page }) => {
   const seen = await fakeServer(page);
   await fakeRecaptcha(page);
   await exchange(page, () => "refuse");
-  await page.goto(`${PROD}?online`);
-  await page.getByLabel("Who are you?").fill("Checked");
-  await page.getByRole("button", { name: "Play Online" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "isn't available" })).toBeVisible();
-  expect(new URL(page.url()).search).toBe("?online&refused");
+  await page.goto(`${PROD}online/`);
+  const alert = page.getByRole("alert").filter({ hasText: "isn't available" });
+  await expect(alert).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe("/online/");
+  expect(new URL(page.url()).search).toBe("?refused");
   expect([...seen.keys()]).toEqual([]);
+  await alert.getByRole("link", { name: "Go Offline" }).click();
+  await expect(page).toHaveURL(/\/offline\/$/);
 });
 
 test("App Check refusing mid-game ends it at the landing page", async ({ page }) => {
@@ -146,7 +148,7 @@ test("App Check refusing mid-game ends it at the landing page", async ({ page })
   await exchange(page, () => answer);
   await startOnlineGame(page);
   answer = "refuse";
-  await untilReturned(page, async () => new URL(page.url()).search === "?online&refused");
+  await untilReturned(page, async () => new URL(page.url()).search === "?refused");
   await expect(page.getByRole("alert").filter({ hasText: "isn't available" })).toBeVisible();
   // the landing page can show its alert before its own load event, which mustn't count as another
   await page.waitForLoadState("load");
@@ -192,7 +194,7 @@ test("a dev build doesn't use App Check", async ({ page }) => {
     if (/recaptcha|firebaseappcheck/.test(r.url())) appCheck.push(r.url());
   });
   await page.route(/^http:\/\/127\.0\.0\.1:9299\//, (route) => route.abort());
-  await page.goto("/");
+  await page.goto("/online/");
   await page.getByLabel("Who are you?").fill("Developer");
   const auth = page.waitForRequest(/^http:\/\/127\.0\.0\.1:9299\//);
   await page.getByRole("button", { name: "Play Online" }).click();

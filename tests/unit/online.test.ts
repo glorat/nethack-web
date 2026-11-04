@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { appCheckRefused, onlineAddress, onlineWanted, type OnlineDeps, type OnlineGame, OnlineSession } from "../../src/online/session";
+import { appCheckRefused, onlineAddress, type OnlineDeps, type OnlineGame, OnlineSession } from "../../src/online/session";
 import { chosenZone, zoneChoices, zoneLabel } from "../../src/online/zones";
 import { lastTurnIn, linesIn, replayable } from "../../src/port/recording";
 
@@ -169,10 +169,8 @@ test("lines are counted by their ends", () => {
 });
 
 test("the address says which mode and which game", () => {
-  expect(onlineWanted("?online&name=A")).toBe(true);
-  expect(onlineWanted("?name=A")).toBe(false);
-  expect(onlineAddress("/play/", "A b", { game: "g1" })).toBe("/play/?online=&name=A+b&game=g1");
-  expect(onlineAddress("/play/", "A", { utcOffset: -3600 })).toBe("/play/?online=&name=A&new=&tz=-3600");
+  expect(onlineAddress("A b", { game: "g1" })).toBe("/online/play/?name=A+b&game=g1");
+  expect(onlineAddress("A", { utcOffset: -3600 })).toBe("/online/play/?name=A&new=&tz=-3600");
 });
 
 test("the zone chosen beats the browser's, unless it makes no sense", () => {

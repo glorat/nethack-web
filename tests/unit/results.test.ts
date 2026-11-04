@@ -1,14 +1,14 @@
 import { expect, test } from "vitest";
-import { ascended, type FinishedGame, outcome, standing, watchAddress, watchedGame } from "../../src/online/results";
+import { ascended, type FinishedGame, outcome, standing, gameWatchAddress, watchedGame } from "../../src/online/results";
 
 const game: FinishedGame = { game: "g1", name: "Agnes", startedAt: 0, endedAt: 0, checked: false };
 
 test("a watch address names the online game, and reads back as it", () => {
-  const address = watchAddress("/play/", "abc-123");
+  const address = gameWatchAddress("abc-123");
+  expect(new URL(address, "https://x").pathname).toBe("/online/watch/");
   expect(watchedGame(new URL(address, "https://x").search)).toBe("abc-123");
-  expect(watchedGame("?replay")).toBeNull();
-  expect(watchedGame("?replay&online")).toBeNull();
-  expect(watchedGame("?online&game=abc")).toBeNull();
+  expect(watchedGame("")).toBeNull();
+  expect(watchedGame("?game=")).toBeNull();
 });
 
 test("a game says how it ended once scored, that its score is to come, or that it couldn't be scored", () => {

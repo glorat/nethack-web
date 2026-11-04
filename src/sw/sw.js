@@ -36,7 +36,12 @@ self.addEventListener("fetch", (event) => {
       const cached = await cache.match(request, { ignoreSearch: true, ignoreVary: true });
       if (cached) return cached;
       if (request.mode === "navigate") {
-        if (/\/play$/.test(new URL(request.url).pathname)) return (await cache.match("./play/")) ?? fetch(request);
+        // a page's address without its trailing slash, which the host would only redirect
+        const url = new URL(request.url);
+        if (!url.pathname.endsWith("/")) {
+          const page = await cache.match(new URL(`${url.pathname}/`, url), { ignoreSearch: true });
+          if (page) return page;
+        }
         // anywhere else is the host's to answer, with a 404 if nothing is there
         return fetch(request).catch(async () => (await cache.match("./")) ?? Response.error());
       }

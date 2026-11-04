@@ -24,7 +24,7 @@ const waiting = (page: Page) => page.evaluate(() => navigator.serviceWorker.getR
 test.beforeEach(({ page }) => page.clock.install());
 
 test("a new version waits out a game in progress, then the landing page moves to it", async ({ page, context }) => {
-  await page.goto(SITE);
+  await page.goto(`${SITE}offline/`);
   await expect(page.getByText("Ready to play offline")).toBeVisible({ timeout: 15_000 });
   await page.reload();
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
@@ -44,7 +44,7 @@ test("a new version waits out a game in progress, then the landing page moves to
   expect(await page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
 
   const landing = await context.newPage();
-  await landing.goto(SITE);
+  await landing.goto(`${SITE}offline/`);
   await holdsOff(landing);
   expect(await waiting(landing)).toBe(true);
   expect(await cacheNames(landing)).toContain(oldCache);
@@ -56,7 +56,7 @@ test("a new version waits out a game in progress, then the landing page moves to
 });
 
 test("the landing page holds off while something is being typed", async ({ page }) => {
-  await page.goto(SITE);
+  await page.goto(`${SITE}offline/`);
   await expect(page.getByText("Ready to play offline")).toBeVisible({ timeout: 15_000 });
   await page.reload();
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
@@ -74,7 +74,7 @@ test("the landing page holds off while something is being typed", async ({ page 
 });
 
 test("a tab open since the first install moves to a new version too", async ({ page }) => {
-  await page.goto(SITE);
+  await page.goto(`${SITE}offline/`);
   await expect(page.getByText("Ready to play offline")).toBeVisible({ timeout: 15_000 });
   await page.evaluate(() => ((window as unknown as { mark: boolean }).mark = true));
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
@@ -85,13 +85,13 @@ test("a tab open since the first install moves to a new version too", async ({ p
 });
 
 test("a landing tab being typed in isn't reloaded when another moves to a new version", async ({ page, context }) => {
-  await page.goto(SITE);
+  await page.goto(`${SITE}offline/`);
   await expect(page.getByText("Ready to play offline")).toBeVisible({ timeout: 15_000 });
   await page.reload();
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   const [oldCache] = (await cacheNames(page))!;
   const other = await context.newPage();
-  await other.goto(SITE);
+  await other.goto(`${SITE}offline/`);
   const name = other.getByLabel("Who are you?");
   await name.fill("Typing");
 
@@ -103,7 +103,7 @@ test("a landing tab being typed in isn't reloaded when another moves to a new ve
 });
 
 test("a second game tab, and one still at its start, hold off a new version", async ({ page, context }) => {
-  await page.goto(SITE);
+  await page.goto(`${SITE}offline/`);
   await expect(page.getByText("Ready to play offline")).toBeVisible({ timeout: 15_000 });
   await page.reload();
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
@@ -111,7 +111,7 @@ test("a second game tab, and one still at its start, hold off a new version", as
   await page.getByRole("button", { name: "Play Offline" }).click();
   await expect(page.getByRole("dialog", { name: "Choose your character" })).toBeVisible({ timeout: 15_000 });
   const second = await context.newPage();
-  await second.goto(`${SITE}play/`);
+  await second.goto(`${SITE}offline/play/`);
   await expect(second.locator(".dialog").first()).toBeVisible({ timeout: 15_000 });
   await page.close();
 
@@ -119,7 +119,7 @@ test("a second game tab, and one still at its start, hold off a new version", as
   await second.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r?.update()));
   await expect.poll(() => waiting(second), { timeout: 15_000 }).toBe(true);
   const landing = await context.newPage();
-  await landing.goto(SITE);
+  await landing.goto(`${SITE}offline/`);
   await holdsOff(landing);
   expect(await waiting(landing)).toBe(true);
 

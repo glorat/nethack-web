@@ -6,6 +6,9 @@
   --text: #e6e6e6;
   --muted: #9a9a9a;
   --accent: #3b82f6;
+  /* offline's own colours, so the two modes never look alike */
+  --offline: #8a7d63;
+  --offline-bar: #34312b;
   --hp: #3fb950;
   --pw: #4c8dff;
   --danger: #e5534b;
@@ -286,9 +289,21 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
 /* landing page */
 .landing { height: 100%; overflow-y: auto; }
-.landing-bar { display: flex; align-items: center; justify-content: space-between; padding: 4px 16px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
-.landing-title { font-weight: 600; }
-.landing-bar-end { display: flex; align-items: center; gap: 8px; }
+.landing-bar { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; justify-content: space-between; padding: 4px 16px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
+.landing-title { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.landing-bar.online { border-bottom: 2px solid var(--accent); }
+.landing-bar.offline { background: var(--offline-bar); border-bottom: 2px solid var(--offline); }
+.mode-badge { padding: 1px 8px; border-radius: 999px; background: var(--offline); color: #fff; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.mode-switch { display: inline-flex; align-items: center; padding: 2px 10px; border: 1px solid var(--accent); border-radius: 6px; color: var(--text); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.landing.online .mode-switch { border-color: var(--offline); }
+.mode-switch:hover { background: var(--border); }
+.landing-panel .mode-switch { margin-top: 4px; }
+.landing-panels > :only-child { grid-column: 1 / -1; }
+.landing-bar-end { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; }
+.landing-bar-end > * { white-space: nowrap; }
+/* in the page's flow, unlike the game's toast, so it never covers the bar's way out */
+.landing-note { margin: 12px max(16px, calc((100% - 1088px) / 2)) 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+.landing-note .mode-switch { margin-left: 8px; }
 .account-menu { position: relative; }
 .account-menu > .account::after { content: " ▾" / ""; }
 .account-popup {
@@ -370,7 +385,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
 /* a finger needs bigger targets than a mouse: Apple's 44pt minimum */
 @media (pointer: coarse) {
-  button:not(.equip-slot), .menu-items:not(.readonly) .menu-item { min-height: 44px; }
+  button:not(.equip-slot), .mode-switch, .menu-items:not(.readonly) .menu-item { min-height: 44px; }
   .menu-items.tabbed > .menu-item { align-items: center; }
   .menubar-list { max-height: calc(100vh - 56px); }
 }

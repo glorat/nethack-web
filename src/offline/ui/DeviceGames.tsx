@@ -1,5 +1,5 @@
 import { useState } from "preact/hooks";
-import { PLAY_PATH } from "../../port/name";
+import { watchAddress } from "../../port/modes";
 import { lastGame } from "../last-game";
 import { ascended, savedScores, scoreDate } from "../scores";
 
@@ -24,7 +24,7 @@ export function DeviceGames() {
           ))}
         </ol>
       ) : null}
-      {replayable ? <a href={`${PLAY_PATH}?replay`}>Watch your last game</a> : null}
+      {replayable ? <a href={watchAddress("offline")}>Watch your last game</a> : null}
     </section>
   );
 }
