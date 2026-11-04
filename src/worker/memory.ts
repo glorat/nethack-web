@@ -19,6 +19,7 @@ export interface NetHackModule {
   _nhweb_equip_tile(slot: number): number;
   _nhweb_inventory_key(): number;
   _nhweb_command_key(): number;
+  _nhweb_repeat_key(): number;
   _nhweb_wizard(): number;
   _nhweb_tile_file(): number;
   _nhweb_role_name(role: number, female: number): number;

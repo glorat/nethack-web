@@ -25,18 +25,14 @@ In landscape every iPad is at least 1133px wide, so it gets the desktop layout, 
 
 ### Commands
 
-- [ ] **Add the important missing commands to the menus:**
-  - Repeat (`^A`, `#repeat`);
-  - Quit without saving (`#quit`);
-  - Tip a container (`#tip`);
-  - Retravel (`#retravel`);
-  - Annotate the level (`#annotate`);
-  - an Extended Command item that opens the `#` dialog, for everything else.
+- [x] **The menus have the commands Cocoa's lacked:**
+  - Repeat and Extended Command... in Act;
+  - Travel Again (`#retravel`) in Move;
+  - Tip Container in Act;
+  - Annotate Level in Info;
+  - Quit Without Saving in Game.
 
-  Cocoa's menu bar comes from the 3.4.3-era port and was regrouped, not extended, in 2026, so it misses commands added since:
-  - `#tip` and `#annotate` arrived in 3.6.0, and `#retravel` in 5.0;
-  - Repeat dates from 3.4.3, and Cocoa players type `^A`;
-  - Cocoa has no Quit without saving, only the app's Quit, which saves.
+  Cocoa's menu bar comes from the 3.4.3-era port and was regrouped, not extended, in 2026, so it missed commands added since: `#tip` and `#annotate` arrived in 3.6.0, and `#retravel` in 5.0. Repeat dates from 3.4.3, but Cocoa players type `^A`, and Cocoa's only Quit is the app's, which saves. Repeat is sent as its key, as running it as an extended command would clear the command it repeats.
 
 ### The map
 
