@@ -1093,6 +1093,23 @@ test("Cmd-Option = and - change the text size, which is kept, and the sidebar gr
   expect(await page.evaluate(() => localStorage.getItem("nethack.textSize"))).toBeNull();
 });
 
+test("Cmd-period cancels as Escape does, for keyboards without Esc", async ({ page }) => {
+  await startGame(page, `Period${Date.now() % 100000}`);
+  const dialog = page.getByRole("dialog");
+  await page.keyboard.press("#");
+  await page.keyboard.type("e");
+  await expect(dialog.getByRole("textbox")).not.toHaveValue("");
+  await page.keyboard.press("Meta+Period");
+  await expect(dialog.getByRole("textbox")).toHaveValue("");
+  await page.keyboard.press("Meta+Period");
+  await expect(dialog).toBeHidden();
+  await untilCommand(page);
+  await page.keyboard.press("&");
+  await expect(dialog).toContainText("What command?");
+  await page.keyboard.press("Meta+Period");
+  await expect(dialog).toBeHidden();
+});
+
 test("the Act menu repeats the last command and opens the extended command list", async ({ page }) => {
   await startGame(page, `Again${Date.now() % 100000}`);
   const turn = async () => Number((await page.locator(".stat", { hasText: "T" }).last().innerText()).replace(/\D/g, ""));
