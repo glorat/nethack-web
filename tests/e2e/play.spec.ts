@@ -637,10 +637,16 @@ test("a count typed before an item's letter in a menu takes only that many", asy
 
   await page.keyboard.press("Shift+D");
   const dialog = page.getByRole("dialog");
+  const hint = dialog.getByText("Type a number, then a letter, for only that many.");
+  await expect(dialog).toContainText(/all types/i);
+  await expect(hint).toBeHidden();
   await dialog.locator(".menu-item", { hasText: /all types/i }).click();
   await dialog.getByRole("button", { name: "OK", exact: true }).click();
   await expect(dialog).toContainText("holy water");
-  await page.keyboard.type(`2${letter}`);
+  await expect(hint).toBeVisible();
+  await page.keyboard.type("2");
+  await expect(hint).toBeHidden();
+  await page.keyboard.type(letter);
   await expect(dialog.locator(".menu-item.selected")).toContainText("2 of");
   await page.keyboard.press("Enter");
   await expect(water).toContainText("2 potions");
@@ -832,7 +838,7 @@ test("in a menu of several picks, . or , picks everything, - or \\ nothing, and 
   await page.keyboard.type("5.");
   await expect(picked).toHaveCount(all);
   // the count was for one item
-  await expect(dialog.locator(".hint")).toBeHidden();
+  await expect(dialog.getByText(/^Count:/)).toBeHidden();
   await page.keyboard.press("-");
   await expect(picked).toHaveCount(0);
   await page.keyboard.press(",");
