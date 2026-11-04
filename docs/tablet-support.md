@@ -17,11 +17,11 @@ In landscape every iPad is at least 1133px wide, so it gets the desktop layout, 
 
 - [ ] **Every prompt gets a dialog, on desktop as well.**
   - This includes the prompts with no answer list or more than nine answers, which Cocoa asks in the message window.
-  - "Press a key" prompts (`#adjust`, the crystal ball, `&`) need a way to answer by touch, such as a one-character field that brings up the on-screen keyboard.
+  - "Press a key" prompts (`#adjust`, the crystal ball, `&`) have a Cancel button, but still need a way to answer by touch, such as a one-character field that brings up the on-screen keyboard. Whether iOS's on-screen keyboard sends key events the dialog can read needs a device.
 - [ ] **An Esc button on screen** whenever there's something to cancel: a dialog, a map position prompt, a prompt waiting for a key.
   - It also teaches new players on desktop that Esc cancels.
   - It covers iPad keyboards without an Esc key, such as the Magic Keyboard; also take ⌘. as Esc, as iPadOS apps do.
-- [ ] **The extended command dialog gets a Cancel button.** It has none, only the Esc key. Cocoa's has a window close button.
+- [x] **The extended command dialog has a Cancel button**, as Cocoa's has a window close button.
 
 ### Commands
 

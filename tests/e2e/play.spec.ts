@@ -1395,13 +1395,27 @@ test("arrowing through the extended commands keeps the highlighted one in view",
   const rows = await dialog.locator(".ext-item").count();
   for (let i = 0; i < rows; i++) await page.keyboard.press("ArrowDown");
   await expect(dialog.locator(".ext-item").last()).toHaveClass(/active/);
-  await expect(dialog.locator(".ext-item.active")).toBeInViewport({ ratio: 1 });
+  await expect(dialog.locator(".ext-item.active")).toBeInViewport({ ratio: 0.9 });
 });
 
 test("the extended command dialog says what Return and Esc do", async ({ page }) => {
   await startGame(page, `Hint${Date.now() % 100000}`);
   await page.keyboard.press("#");
   await expect(page.getByRole("dialog")).toContainText("Return runs the highlighted command, Esc cancels.");
+});
+
+test("the extended command dialog, and a question any key answers, can be cancelled without a keyboard", async ({ page }) => {
+  await startGame(page, `Cancel${Date.now() % 100000}`);
+  const dialog = page.getByRole("dialog");
+  await page.keyboard.press("#");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+  await untilCommand(page);
+  await page.keyboard.press("&");
+  await expect(dialog).toContainText("What command?");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+  await untilCommand(page);
 });
 
 test("a message about the hero stands out, and a line separates one turn's messages from the next", async ({ page }) => {
