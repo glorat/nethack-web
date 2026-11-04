@@ -70,6 +70,46 @@ Decided for the web:
 - [x] Closing the tab mid-game keeps the game (Cocoa saves on ⌘Q or closing the window, `terminateApplication`). A page can't wait on a save as it unloads, so the recording is kept as the game goes, and the next start brings the game back by replaying it, asking first only if the last replay didn't finish or another tab is open; see `docs/recording.md`.
 - [x] Importing a tile set, kept in the browser (`importTileSet`), in offline and online games alike, as tiles only change how the map is drawn. A set the browser won't keep, such as in a private window or with storage full, lasts until the page closes, and the View menu says so. Unlike Cocoa, which has a folder to delete from, the View menu removes the set in use.
 
+## Third pass
+
+Found by comparing the code of each window with Cocoa's.
+
+Extended commands:
+
+- [x] Nothing is highlighted until something is typed, so Return with an empty field runs nothing (`ExtCommandWindowController.m` `textChangedIn:`).
+- [x] The highlighted row is scrolled into view (`highlightRow:`).
+- [x] A hint under the list: "Return runs the highlighted command, Esc cancels."
+
+Messages:
+
+- [x] Message attributes: bold, underline for dim and underline, and inverse; a plain line mentioning "you" or "your" in blue (`iHack/NhWindow.m` `addLine:attr:`).
+- [x] A `------------` line between turns, after the core clears the message window.
+
+Menus:
+
+- [x] A row picked by its letter is scrolled into view (`reloadRowForItem`).
+- [x] Columns padded with two or more spaces line up, as tab-separated ones do (`SplitFields`).
+- [x] The current heading stays at the top while the list scrolls (group rows).
+- [x] No tile or letter column in a menu without tiles or letters.
+- [x] A text line indented four or more spaces starts where the items' text does.
+- [x] Close is the default button in a read-only menu.
+
+Status:
+
+- [x] HP and Pw bars warn below 2/3 as well as below 1/3 (`StatsView.m` `SetMeter`).
+- [x] Alignment, race and role, or the polymorphed form, and the dungeon's name with the level (`wincocoa.m` `RoleText`, `LevelText`).
+
+Map:
+
+- [x] The Rogue level is drawn as text even with tiles on (`MainView.m` `drawRect:`).
+
+To decide, by trying both:
+
+- [x] Every prompt gets a dialog, where Cocoa asks one with fewer than two or more than nine answers in the message window (`YesNoInput` `canAskWithChoices`), as a dialog can be answered by touch; see `docs/tablet-support.md`.
+- [x] Roles a chosen race can't play are disabled in the character picker, as races a chosen role can't be are (`PlayerSelectionWindowController.m` `selectRace`).
+- [x] Menus as wide as their contents, up to 90% of the window. Unlike Cocoa, text still wraps and a row too long for that scrolls sideways, so nothing is cut off on a narrow screen.
+- [x] Map tooltips kept as they are: shown after a short wait on a square and cleared each turn, where Cocoa waits for the pointer to rest and keeps them across turns (`MainView.m` `mouseMoved:`).
+
 ## Later
 
 - [ ] Sound: a core feature, not Cocoa's. 5.0 calls a sound library (`include/sndprocs.h`; `sound/macsound` and others) for effects, achievements, instrument tunes, ambience and user sounds. A web one would be a fork sound library passing these to Web Audio.

@@ -23,6 +23,8 @@ async function enterGame(page: Page, name: string) {
 
 /** Chooses the role, and the first of what's allowed for the rest, over the picker's random default. */
 async function pickCharacter(picker: Locator, role: RegExp) {
+  // a human can be any role, and roles the race can\'t play are disabled
+  await picker.getByRole("listbox", { name: "Race" }).getByRole("option", { name: "human" }).click();
   await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: role }).click();
   await picker.getByRole("listbox", { name: "Race" }).locator("button:not([disabled])").first().click();
   for (const name of ["Gender", "Alignment"]) await picker.getByRole("radiogroup", { name }).locator("button:not([disabled])").first().click();
@@ -321,8 +323,10 @@ test("arrow keys answer a direction prompt", async ({ page }) => {
 test("the character picker starts the chosen role", async ({ page }) => {
   await enterGame(page, `Pick${Date.now() % 100000}`);
   const picker = page.getByRole("dialog", { name: "Choose your character" });
+  await picker.getByRole("option", { name: "human" }).click();
   await picker.getByRole("option", { name: "Wizard" }).click();
   await picker.getByRole("option", { name: "elf" }).click();
+  await expect(picker.getByRole("option", { name: "Valkyrie" })).toBeDisabled();
   // elves are only chaotic
   await expect(picker.getByRole("radio", { name: "Lawful" })).toBeDisabled();
   await expect(picker.getByRole("radio", { name: "Chaotic" })).toHaveAttribute("aria-checked", "true");
@@ -331,6 +335,35 @@ test("the character picker starts the chosen role", async ({ page }) => {
   await untilPlaying(page);
 
   await expect(page.locator(".messages")).toContainText(/chaotic (male|female) elven Wizard/, { timeout: 15_000 });
+});
+
+test("the map keeps the browser's double-tap zoom, text selection and scroll bounce out of the way of taps", async ({ page }) => {
+  await startGame(page, `Tap${Date.now() % 100000}`);
+  const style = await page.locator(".map").evaluate((el) => {
+    const s = getComputedStyle(el);
+    return [s.touchAction, s.userSelect, s.overscrollBehavior];
+  });
+  expect(style).toEqual(["manipulation", "none", "none"]);
+});
+
+test.describe("on a touch screen", () => {
+  test.use({ viewport: { width: 1180, height: 820 }, hasTouch: true, isMobile: true });
+
+  test("buttons and menu rows are big enough to tap", async ({ page }) => {
+    await startGame(page, `Finger${Date.now() % 100000}`);
+    const height = async (l: Locator) => (await l.boundingBox())!.height;
+    expect(await height(page.getByRole("menubar").getByRole("menuitem", { name: "Act" }))).toBeGreaterThanOrEqual(44);
+    expect(await height(page.locator(".inv-item").first())).toBeGreaterThanOrEqual(44);
+    // the equipment grid is drawn to fit the top bar
+    expect(await height(page.locator(".equip-slot").first())).toBe(32);
+    await page.keyboard.press("i");
+    expect(await height(page.getByRole("dialog").locator(".menu-item").first())).toBeGreaterThanOrEqual(44);
+  });
+});
+
+test("with a mouse, buttons and menu rows keep their size", async ({ page }) => {
+  await startGame(page, `Mouse${Date.now() % 100000}`);
+  expect((await page.getByRole("menubar").getByRole("menuitem", { name: "Act" }).boundingBox())!.height).toBeLessThan(44);
 });
 
 test("hovering over the map describes the square", async ({ page }) => {
@@ -656,6 +689,135 @@ test("a command's menu of suitable items still takes any item's letter", async (
   await expect(page.locator(".messages")).toContainText(/silly thing to drink/);
 });
 
+test("a menu of several picks shows a checkbox on each row, ticked when picked", async ({ page }) => {
+  await startAs(page, `Box${Date.now() % 100000}`, /Priest/);
+  await page.keyboard.press("Shift+D");
+  const dialog = page.getByRole("dialog");
+  const row = dialog.getByRole("menuitemcheckbox", { name: /all types/i });
+  await expect(row.locator(".menu-check")).toBeVisible();
+  await expect(row).toHaveAttribute("aria-checked", "false");
+  await row.click();
+  await expect(row).toHaveAttribute("aria-checked", "true");
+  await row.click();
+  await expect(row).toHaveAttribute("aria-checked", "false");
+});
+
+test("an item picked by its letter in a menu of several picks is scrolled into view", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 420 });
+  await startAs(page, `Reveal${Date.now() % 100000}`, /Priest/);
+  await page.keyboard.press("Shift+D");
+  const dialog = page.getByRole("dialog");
+  await dialog.locator(".menu-item", { hasText: /all types/i }).click();
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(dialog).toContainText("holy water");
+  const last = dialog.locator(".menu-item").last();
+  await expect(last).not.toBeInViewport();
+  await page.keyboard.press((await last.locator(".inv-letter").innerText()).trim());
+  await expect(last).toHaveAttribute("aria-checked", "true");
+  await expect(last).toBeInViewport({ ratio: 0.9 });
+});
+
+test("a menu's heading stays at the top while its items scroll under it", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 420 });
+  await startGame(page, `Pin${Date.now() % 100000}`);
+  await page.keyboard.press("Shift+O");
+  const list = page.getByRole("dialog").locator(".menu-items");
+  await expect(list.locator(".menu-item").first()).toBeVisible();
+  const top = await list.evaluate((el) => {
+    el.scrollTop = el.scrollHeight / 2;
+    const box = el.getBoundingClientRect();
+    return document.elementFromPoint(box.left + 30, box.top + 4)?.closest(".menu-heading, .menu-item")?.className;
+  });
+  expect(top).toMatch(/menu-heading/);
+});
+
+test("a menu without tiles has no tile column, and one with tiles keeps it", async ({ page }) => {
+  await startAs(page, `Tiles${Date.now() % 100000}`, /Priest/);
+  const dialog = page.getByRole("dialog");
+  await page.keyboard.press("Shift+O");
+  await expect(dialog.locator(".menu-item").first()).toBeVisible();
+  await expect(dialog.locator(".inv-icon")).toHaveCount(0);
+  await expect(dialog.locator(".inv-letter").first()).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Shift+D");
+  await dialog.locator(".menu-item", { hasText: /all types/i }).click();
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(dialog).toContainText("holy water");
+  expect(await dialog.locator(".inv-icon").count()).toBe(await dialog.locator(".menu-item").count());
+});
+
+test("a menu's columns set apart by runs of spaces line up like tab-separated ones", async ({ page }) => {
+  await startGame(page, `Cols${Date.now() % 100000}`);
+  await page.keyboard.press("Shift+O");
+  const dialog = page.getByRole("dialog");
+  const row = (name: string) => dialog.locator(".menu-item", { hasText: name });
+  const left = async (name: string, n: number) => (await row(name).locator(".menu-field").nth(n).boundingBox())!.x;
+  await expect(row("dropped_nopick").locator(".menu-field")).toHaveText(["dropped_nopick", "[X]", "(for autopickup)"]);
+  expect(await left("dropped_nopick", 1)).toBeCloseTo(await left("fruit", 1), 0);
+  expect(await left("dropped_nopick", 2)).toBeCloseTo(await left("pickup_types", 2), 0);
+});
+
+test("a menu's text indented four spaces starts where the items' text does", async ({ page }) => {
+  await startGame(page, `Indent${Date.now() % 100000}`);
+  await page.keyboard.press("Shift+D");
+  const dialog = page.getByRole("dialog");
+  const note = dialog.locator(".menu-line", { hasText: "ignored unless" });
+  const noteStart = await note.evaluate((el) => el.getBoundingClientRect().left + parseFloat(getComputedStyle(el).paddingLeft));
+  const itemStart = (await dialog.locator(".menu-item", { hasText: "Auto-select" }).locator(".menu-text").boundingBox())!.x;
+  expect(noteStart).toBeCloseTo(itemStart, 0);
+});
+
+test("a menu widens to fit a long row", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 800 });
+  await startGame(page, `Wide${Date.now() % 100000}`);
+  await page.keyboard.type("#name");
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog");
+  await dialog.getByText("a particular object in inventory").click();
+  await dialog.getByText("+1 spear").click();
+  await dialog.locator("input").fill("Glorious Shining Blade of the Seventh Northern Kingdom of Asgard");
+  await page.keyboard.press("Enter");
+  await untilCommand(page);
+  for (let i = 0; i < 3; i++) {
+    await page.getByRole("menuitem", { name: "View" }).click();
+    await page.getByRole("menuitem", { name: /Bigger Text/ }).click();
+  }
+  await untilCommand(page);
+  await page.keyboard.press("i");
+  const items = dialog.locator(".menu-items");
+  await expect(items).toContainText("Asga (weapon in right hand)");
+  expect(await items.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
+  expect((await dialog.boundingBox())!.width).toBeGreaterThan(720);
+});
+
+test("arrowing up a long menu keeps the highlighted row clear of the pinned heading", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 420 });
+  await startAs(page, `Up${Date.now() % 100000}`, /Priest/);
+  await page.keyboard.press("Shift+D");
+  const dialog = page.getByRole("dialog");
+  await dialog.locator(".menu-item", { hasText: /all types/i }).click();
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(dialog).toContainText("holy water");
+  const rows = await dialog.locator(".menu-item").count();
+  for (let i = 0; i < rows; i++) await page.keyboard.press("ArrowDown");
+  for (let i = 1; i < rows; i++) {
+    await page.keyboard.press("ArrowUp");
+    const lit = dialog.locator(".menu-item.highlighted");
+    const hit = await lit.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      return el.contains(document.elementFromPoint(box.left + 40, box.top + 3));
+    });
+    expect(hit, `row ${rows - 1 - i}`).toBe(true);
+  }
+});
+
+test("the status panel gives the hero's alignment, race and role, and the dungeon's name with the level", async ({ page }) => {
+  await startAs(page, `Head${Date.now() % 100000}`, /Priest/);
+  const lines = page.locator(".stats .stats-sub");
+  await expect(lines.nth(0)).toHaveText(/^(Lawful|Neutral|Chaotic) (human|elven) priest(ess)?$/);
+  await expect(lines.nth(1)).toHaveText("The Dungeons of Doom: level 1");
+});
+
 test("in a menu of several picks, . or , picks everything, - or \\ nothing, and Select All everything", async ({ page }) => {
   await startAs(page, `All${Date.now() % 100000}`, /Priest/);
   await page.keyboard.press("Shift+D");
@@ -728,6 +890,13 @@ test("a short question from the game shows a button for each answer", async ({ p
   await dialog.getByRole("button", { name: /just start play/i }).click();
   await untilPlaying(page);
   await expect(page.locator(".stats-title")).toBeVisible();
+});
+
+test("a read-only list's Close is its default button", async ({ page }) => {
+  await startGame(page, `Close${Date.now() % 100000}`);
+  await page.keyboard.press("Control+x");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("button", { name: "Close" })).toHaveClass(/primary/);
 });
 
 test("a read-only list is text that can be selected and copied", async ({ page }) => {
@@ -952,6 +1121,40 @@ test("Cmd-Option = and - change the text size, which is kept, and the sidebar gr
   await expect.poll(size).toBe(13);
   // the default forgets the choice, so the options decide again
   expect(await page.evaluate(() => localStorage.getItem("nethack.textSize"))).toBeNull();
+});
+
+test("Cmd-period cancels as Escape does, for keyboards without Esc", async ({ page }) => {
+  await startGame(page, `Period${Date.now() % 100000}`);
+  const dialog = page.getByRole("dialog");
+  await page.keyboard.press("#");
+  await page.keyboard.type("e");
+  await expect(dialog.getByRole("textbox")).not.toHaveValue("");
+  await page.keyboard.press("Meta+Period");
+  await expect(dialog.getByRole("textbox")).toHaveValue("");
+  await page.keyboard.press("Meta+Period");
+  await expect(dialog).toBeHidden();
+  await untilCommand(page);
+  await page.keyboard.press("&");
+  await expect(dialog).toContainText("What command?");
+  await page.keyboard.press("Meta+Period");
+  await expect(dialog).toBeHidden();
+});
+
+test("the Act menu repeats the last command and opens the extended command list", async ({ page }) => {
+  await startGame(page, `Again${Date.now() % 100000}`);
+  const turn = async () => Number((await page.locator(".stat", { hasText: "T" }).last().innerText()).replace(/\D/g, ""));
+  const act = async (name: RegExp) => {
+    await page.getByRole("menubar").getByRole("menuitem", { name: "Act" }).click();
+    await page.getByRole("menu", { name: "Act" }).getByRole("menuitem", { name }).click();
+  };
+  await page.keyboard.press("s");
+  await untilCommand(page);
+  const before = await turn();
+  await act(/Repeat/);
+  await expect.poll(turn).toBe(before + 1);
+  await untilCommand(page);
+  await act(/Extended Command/);
+  await expect(page.getByRole("dialog")).toContainText("Return runs the highlighted command");
 });
 
 test("the menu bar runs commands by name while the game waits for one", async ({ page }) => {
@@ -1191,6 +1394,17 @@ test("when the game ends, a dialog offers a new game under the same name, or the
   expect(new URL(page.url()).search).toBe("?replay");
 });
 
+test("the help for new players is open for a new visitor, and folded away once they've played", async ({ page }) => {
+  await page.goto("/");
+  const help = page.locator("details", { has: page.getByRole("heading", { name: "New to NetHack?" }) });
+  await expect(help).toHaveAttribute("open", "");
+  await startGame(page, `Hp${Date.now() % 100000}`);
+  await page.keyboard.press("S");
+  await expect(help).not.toHaveAttribute("open");
+  await help.getByText("New to NetHack?").click();
+  await expect(help.getByText("The NetHack Wiki covers everything.")).toBeVisible();
+});
+
 test("a saved game is what the landing page offers first, and a new visitor sees no games of their own", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /best games/ })).toHaveCount(0);
@@ -1292,6 +1506,71 @@ test("an extended command only one name starts with completes as it's typed, and
   await expect(dialog).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
+});
+
+test("an extended command highlights nothing until something is typed, so Return alone runs nothing", async ({ page }) => {
+  await startGame(page, `Bare${Date.now() % 100000}`);
+  await page.keyboard.press("#");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("textbox")).toBeFocused();
+  await expect(dialog.locator(".ext-item").first()).toBeVisible();
+  await expect(dialog.locator(".ext-item.active")).toHaveCount(0);
+  await page.keyboard.press("Enter");
+  await expect(dialog).toBeHidden();
+  // had a command run, its own prompt would be up instead
+  await page.keyboard.press("#");
+  await expect(dialog.getByRole("textbox")).toBeFocused();
+  await page.keyboard.press("e");
+  await expect(dialog.locator(".ext-item.active")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(dialog.locator(".ext-item.active")).toHaveCount(0);
+  await page.keyboard.press(" ");
+  await expect(dialog.locator(".ext-item.active")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("ArrowDown");
+  await expect(dialog.locator(".ext-item").first()).toHaveClass(/active/);
+});
+
+test("arrowing through the extended commands keeps the highlighted one in view", async ({ page }) => {
+  await startGame(page, `Scroll${Date.now() % 100000}`);
+  await page.keyboard.press("#");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("textbox")).toBeFocused();
+  const list = dialog.locator(".ext-list");
+  expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  const rows = await dialog.locator(".ext-item").count();
+  for (let i = 0; i < rows; i++) await page.keyboard.press("ArrowDown");
+  await expect(dialog.locator(".ext-item").last()).toHaveClass(/active/);
+  await expect(dialog.locator(".ext-item.active")).toBeInViewport({ ratio: 0.9 });
+});
+
+test("the extended command dialog says what Return and Esc do", async ({ page }) => {
+  await startGame(page, `Hint${Date.now() % 100000}`);
+  await page.keyboard.press("#");
+  await expect(page.getByRole("dialog")).toContainText("Return runs the highlighted command, Esc cancels.");
+});
+
+test("the extended command dialog, and a question any key answers, can be cancelled without a keyboard", async ({ page }) => {
+  await startGame(page, `Cancel${Date.now() % 100000}`);
+  const dialog = page.getByRole("dialog");
+  await page.keyboard.press("#");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+  await untilCommand(page);
+  await page.keyboard.press("&");
+  await expect(dialog).toContainText("What command?");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+  await untilCommand(page);
+});
+
+test("a message about the hero stands out, and a line separates one turn's messages from the next", async ({ page }) => {
+  await startGame(page, `Msg${Date.now() % 100000}`);
+  const messages = page.locator(".messages");
+  await expect(messages.locator(".message.hero", { hasText: /\bYou\b/ }).first()).toBeVisible();
+  await page.keyboard.press(":");
+  await page.keyboard.press(":");
+  await expect(messages.locator(".message.separator").last()).toHaveText("------------");
 });
 
 test("the game beeps at a click on unexplored ground far away, and at an inventory pick it can't take", async ({ page }) => {

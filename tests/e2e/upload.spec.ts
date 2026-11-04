@@ -21,6 +21,8 @@ async function untilPlaying(page: Page, name: string, mode: "online" | "offline"
   }
   const picker = page.getByRole("dialog", { name: "Choose your character" });
   await picker.waitFor();
+  // a human can be any role, and roles the race can\'t play are disabled
+  await picker.getByRole("listbox", { name: "Race" }).getByRole("option", { name: "human" }).click();
   await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: /Valkyrie/ }).click();
   await picker.getByRole("listbox", { name: "Race" }).locator("button:not([disabled])").first().click();
   for (const group of ["Gender", "Alignment"]) await picker.getByRole("radiogroup", { name: group }).locator("button:not([disabled])").first().click();
@@ -518,6 +520,8 @@ test("the landing page lists games in flight, goes back to one, and starts a new
   await page.getByRole("button", { name: `Start New Game as ${name}` }).click();
   const picker = page.getByRole("dialog", { name: "Choose your character" });
   await picker.waitFor({ timeout: 15_000 });
+  // a human can be any role, and roles the race can\'t play are disabled
+  await picker.getByRole("listbox", { name: "Race" }).getByRole("option", { name: "human" }).click();
   await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: /Valkyrie/ }).click();
   await picker.getByRole("listbox", { name: "Race" }).locator("button:not([disabled])").first().click();
   for (const group of ["Gender", "Alignment"]) await picker.getByRole("radiogroup", { name: group }).locator("button:not([disabled])").first().click();
@@ -563,6 +567,15 @@ test("the landing page can be left while the server hangs, and focus follows the
   await expect(page.getByRole("button", { name: /^Play Online/ })).toBeFocused();
   await expect(page.getByRole("button", { name: /^Play Offline/ })).toBeVisible();
   await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
+test("starting an online game says what a dropped connection costs, and what not signing in does", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Who are you?").fill(`Nt${Date.now() % 100000}`);
+  await page.getByRole("button", { name: "Play Online" }).click();
+  await page.getByRole("button", { name: /^Start New Game/ }).waitFor();
+  await expect(page.getByText("If your connection drops, you may lose your last few moves.")).toBeVisible();
+  await expect(page.getByText("Until you sign in, your online games are kept for this browser only, and clearing this site's data loses them.")).toBeVisible();
 });
 
 test("a long name fits on a phone", async ({ page }) => {
@@ -649,7 +662,7 @@ test("a finished online game is listed on the landing page, scored once validate
 
   await page.goto("/");
   const row = page.locator(".online-scores li", { hasText: name });
-  await expect(row).toContainText("scored once the server has replayed the game", { timeout: 20_000 });
+  await expect(row).toContainText("score not ready yet", { timeout: 20_000 });
 
   expect(sweepAndRead(game).result).toBeTruthy();
   await page.reload();
@@ -700,6 +713,10 @@ test("signing in keeps the anonymous player's games, and the name they chose", a
   // a name was kept from before, so it stays the player's choice
   await page.getByRole("button", { name: "Change Name" }).click();
   await expect(page.getByLabel("Who are you?")).toHaveValue(name);
+
+  await page.getByRole("button", { name: "Play Online" }).click();
+  await page.getByRole("button", { name: /^Start New Game/ }).waitFor();
+  await expect(page.getByText(/Until you sign in/)).toHaveCount(0);
 });
 
 test("a handle someone else has is refused, and another can be chosen", async ({ browser }) => {
@@ -724,4 +741,104 @@ test("a handle someone else has is refused, and another can be chosen", async ({
     }
     await context.close();
   }
+});
+
+test("the leaderboard ranks a game under its player's handle, never the character's name", async ({ page }) => {
+  await online(page);
+  const name = `Lb${Date.now() % 100000}`;
+  await untilPlaying(page, name);
+  const game = await gameId(page);
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.serverUid)).toBeTruthy();
+  const uid = await page.evaluate(() => document.documentElement.dataset.serverUid!);
+
+  await page.goto("/");
+  await signInWithGoogle(page, `${crypto.randomUUID()}@example.com`);
+  const handle = `Lb${crypto.randomUUID().slice(0, 8).replaceAll("-", "")}`;
+  await page.getByLabel("Handle").fill(handle);
+  await page.getByRole("button", { name: "Request Handle" }).click();
+  await expect(page.locator(".landing-bar")).toContainText(`Signed in as ${handle}`);
+
+  // far above any real score, so it leads whatever else the emulator holds; the validator would write it from a replay
+  const points = 2e12 + Math.floor(Math.random() * 1e9);
+  const result = (fields: object) =>
+    page.request.patch(`${FIRESTORE}/v1/projects/demo-nethack/databases/(default)/documents/users/${uid}/games/${game}?updateMask.fieldPaths=projection.result`, {
+      headers: { Authorization: "Bearer owner" },
+      data: { fields },
+    });
+  const text = (value: string) => ({ stringValue: value });
+  await result({ projection: { mapValue: { fields: { result: { mapValue: { fields: { points: { integerValue: String(points) }, role: text("Val"), race: text("Hum"), death: text("ascended"), name: text(name), endedAt: text(new Date().toISOString()) } } } } } } });
+  try {
+    await page.reload();
+    const first = page.locator(".leaderboard li").first();
+    await expect(first).toContainText(points.toLocaleString(), { timeout: 20_000 });
+    await expect(first).toContainText(`${handle} (Val-Hum): ascended`);
+    await expect(first).toContainText("(yours)");
+    await expect(first).not.toContainText(name);
+  } finally {
+    await result({});
+  }
+});
+
+test("the landing page lists every online game in progress, latest first, once there's more than the one to continue", async ({ page }) => {
+  await online(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("nethack-web.lastMode", "online");
+    localStorage.setItem("nethack-web.name", "Someone");
+  });
+  const game = (n: number, name: string) => ({ game: `${n}${n}${n}${n}${n}${n}${n}${n}-${n}${n}${n}${n}-4${n}${n}${n}-8${n}${n}${n}-${`${n}`.repeat(12)}`, name, startedAt: Date.UTC(2026, 10, n), lastPlayedAt: Date.UTC(2026, 10, n, 12) });
+  let games = [game(1, "Older")];
+  await page.route(/\/europe-west1\/user$/, async (route) => {
+    if ((route.request().postDataJSON() as { data?: { method?: string } }).data?.method !== "listGames") return route.fallback();
+    await route.fulfill({ json: { result: { games } } });
+  });
+  const heading = page.getByRole("heading", { name: "Your online games in progress" });
+  await page.goto("/");
+  await expect(page.locator("form button").first()).toHaveText("Continue Online as Older");
+  await expect(heading).toHaveCount(0);
+
+  games = [game(1, "Older"), game(3, "Latest"), game(2, "Middle")];
+  await page.goto("/");
+  await expect(page.locator("form button").first()).toHaveText("Continue Online as Latest");
+  const links = page.locator("section", { has: heading }).getByRole("link");
+  await expect(page.locator("section", { has: heading }).getByRole("listitem").locator("strong")).toHaveText(["Latest", "Middle", "Older"]);
+  await expect(links).toHaveText(["Continue", "Continue", "Continue"]);
+  await expect(links.first()).toHaveAttribute("href", new RegExp(`[?&]game=${games[1]!.game}`));
+});
+
+test("the landing page shows the player's latest achievements once they've earned one, and all of them under their headings", async ({ page }) => {
+  await online(page);
+  await untilPlaying(page, `Ac${Date.now() % 100000}`);
+  const earnedAt = Date.UTC(2026, 10, 1);
+  const mines = { id: "entered-mines", name: "Into the Mines", description: "Entered the Gnomish Mines", group: "The Dungeon" };
+  const ascended = { id: "ascended", name: "Ascended", description: "Ascended to demigodhood", group: "The Amulet" };
+  let achievements: object[] = [mines, { hidden: true }, ascended];
+  await page.route(/\/europe-west1\/user$/, async (route) => {
+    if ((route.request().postDataJSON() as { data?: { method?: string } }).data?.method !== "achievements") return route.fallback();
+    await route.fulfill({ json: { result: { achievements } } });
+  });
+  const heading = page.getByRole("heading", { name: /Your achievements/ });
+  const answered = page.waitForResponse((r) => /\/europe-west1\/user$/.test(r.url()) && (r.request().postDataJSON() as { data?: { method?: string } }).data?.method === "achievements");
+  await page.goto("/");
+  await answered;
+  await page.waitForTimeout(200);
+  await expect(heading).toHaveCount(0);
+
+  const game = "11111111-1111-4111-8111-111111111111";
+  achievements = [{ ...mines, earned: { at: earnedAt, game, turn: 1234 } }, { hidden: true }, ascended];
+  await page.goto("/");
+  const panel = page.locator("section", { has: heading });
+  await expect(heading).toHaveText("Your achievements 1 of 3 earned");
+  const date = await page.evaluate((at) => `${new Date(at).toLocaleDateString(undefined, { dateStyle: "medium" })}, turn ${(1234).toLocaleString()}`, earnedAt);
+  await expect(panel.getByRole("listitem")).toHaveText([`Into the MinesEntered the Gnomish Mines${date} · Watch`]);
+  await expect(panel.getByRole("link", { name: "Watch the game that earned Into the Mines" })).toHaveAttribute("href", new RegExp(`[?&]game=${game}`));
+
+  const all = panel.getByRole("button", { name: "See All Achievements" });
+  await all.click();
+  const dialog = page.getByRole("dialog", { name: "Your achievements" });
+  await expect(dialog.getByRole("heading")).toHaveText(["The Dungeon 1 of 1 earned", "The Amulet 0 of 1 earned"]);
+  await expect(dialog.getByRole("listitem")).toHaveText([`Into the MinesEntered the Gnomish Mines${date} · Watch`, "AscendedAscended to demigodhoodNot yet"]);
+  await expect(dialog.getByText("1 more is hidden until you earn it.")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(all).toBeFocused();
 });

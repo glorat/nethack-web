@@ -1,12 +1,15 @@
 import type { ComponentChildren } from "preact";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { MenuHow, MenuItem, MenuSelection } from "../../protocol";
-import { isHeading, isQuestion } from "../../port/question";
+import { isHeading, isQuestion, splitFields } from "../../port/question";
 import { sortedOrder } from "../../port/sort";
 import { tileStyle, type TileSheet } from "../../tiles";
 import { textStyle } from "../colors";
 
 const ICON = 24;
+const CHECK = 14;
+const LETTER = 12;
+const GAP = 6;
 const ATR_BOLD = 1;
 const ATR_INVERSE = 7;
 const MAX_COUNT = 0x7fffffff;
@@ -117,19 +120,20 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     highlight.current = i;
     update();
   };
+  const reveal = (i: number) => list.current?.children[order.indexOf(i)]?.scrollIntoView({ block: "nearest" });
   const moveHighlight = (step: 1 | -1) => {
     const rows = order.filter((i) => items[i].identifier !== 0);
     if (!rows.length) return;
     const at = highlight.current === null ? -1 : rows.indexOf(highlight.current);
     const next = at < 0 ? (step > 0 ? 0 : rows.length - 1) : Math.min(rows.length - 1, Math.max(0, at + step));
     highlight.current = rows[next];
-    list.current?.children[order.indexOf(rows[next])]?.scrollIntoView({ block: "nearest" });
+    reveal(rows[next]);
     update();
   };
 
   // sorting moves the highlighted row
   useLayoutEffect(() => {
-    if (highlight.current !== null) list.current?.children[order.indexOf(highlight.current)]?.scrollIntoView({ block: "nearest" });
+    if (highlight.current !== null) reveal(highlight.current);
   }, [sorted]);
 
   // layout effect: listen before the dialog is painted, or a fast key press is lost
@@ -171,25 +175,66 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
       if (!hits.length) return;
       if (how === "one") return choose(hits[0]);
       toggle(hits);
+      reveal(hits[0]);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   });
 
-  // with menu_tab_sep the core separates columns with tabs; a grid lines them up,
-  // and a heading row of columns starts where the items' text does
-  const columns = Math.max(...items.map((item) => item.text.split("\t").length));
-  const fields = (text: string, style?: Record<string, string>, before?: ComponentChildren) =>
-    text.split("\t").map((f, n) => (
+  // the core separates columns with tabs or runs of spaces; a grid lines up every row's,
+  // and a row of columns that isn't an item starts where the items' text does
+  const split = (item: MenuItem) => splitFields(item.text.trim());
+  const columns = Math.max(...items.map((item) => split(item).length));
+  const fields = (item: MenuItem, style?: Record<string, string>, before?: ComponentChildren) =>
+    split(item).map((f, n) => (
       <span class="menu-field" style={style}>
         {n === 0 ? before : null}
         {f}
       </span>
     ));
+  // a tile or letter column only if some item has one
+  const hasTiles = items.some((item) => item.identifier !== 0 && item.tile >= 0);
+  const hasLetters = items.some((item) => item.identifier !== 0 && item.accelerator.trim() !== "");
+  const lead = [how === "any" && CHECK, hasTiles && ICON, hasLetters && LETTER].filter((w): w is number => !!w);
+  const grid = {
+    // auto, as a subgrid row's padding goes into its edge tracks
+    gridTemplateColumns: `repeat(${lead.length + columns}, auto) 1fr`,
+  };
+  // as in tty, text indented four spaces lines up with the items' text after "a - "
+  const indented = (item: MenuItem) => {
+    const spaces = item.text.length - item.text.trimStart().length;
+    return spaces >= 4 && lead.length > 0 && items.some((other) => other.identifier !== 0);
+  };
+  const itemStart = `${lead.reduce((sum, w) => sum + w + GAP, 0)}px`;
   // inside the text, so a column menu's grid keeps its columns
   const taken = (i: number) => {
     const n = selected.current.get(i) ?? -1;
     return n > 0 ? <span class="menu-count">{n} of </span> : null;
+  };
+
+  // a heading or a line of text
+  const line = (item: MenuItem, i: number) => {
+    const heading = isHeading(item, items[i + 1]);
+    const strong = heading && (item.attr === ATR_INVERSE || item.attr === ATR_BOLD);
+    const kind = heading ? `menu-heading${strong ? " strong" : ""}` : "menu-line";
+    const style = heading ? headingStyle(item) : textStyle(item.color, item.attr);
+    if (columns > 1 && split(item).length > 1)
+      return (
+        <div class={`${kind} columns`} style={{ "--menu-lead": lead.length + 1 }}>
+          {fields(item, style)}
+        </div>
+      );
+    if (!heading && indented(item))
+      return (
+        <div class={kind} style={{ ...style, paddingLeft: `calc(14px + ${itemStart})` }}>
+          {item.text.slice(4) || " "}
+        </div>
+      );
+    return (
+      <div class={kind} style={style}>
+        {item.text || " "}
+      </div>
+    );
   };
 
   // a list to read is text to select and copy, not buttons
@@ -228,21 +273,12 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
           ref={list}
           onCopy={how === "none" ? copyList : undefined}
           onMouseLeave={how === "one" ? () => setHighlight(null) : undefined}
-          class={`menu-items${columns > 1 ? " tabbed" : ""}${how === "none" ? " readonly" : ""}`}
-          style={{ "--menu-columns": columns }}
+          class={`menu-items${columns > 1 ? " tabbed" : ""}${how === "none" ? " readonly" : ""}${how === "any" ? " pick-any" : ""}`}
+          style={columns > 1 ? grid : undefined}
         >
           {order.map((i) => [items[i], i] as const).map(([item, i]) =>
-            item.identifier === 0 && !item.text.includes("\t") && !isHeading(item, items[i + 1]) ? (
-              <div class="menu-line" style={textStyle(item.color, item.attr)}>
-                {item.text || " "}
-              </div>
-            ) : item.identifier === 0 ? (
-              <div
-                class={`menu-heading${item.attr === ATR_INVERSE || item.attr === ATR_BOLD ? " strong" : ""}${item.text.includes("\t") ? " columns" : ""}`}
-                style={item.text.includes("\t") ? undefined : headingStyle(item)}
-              >
-                {item.text.includes("\t") ? fields(item.text, headingStyle(item)) : item.text || " "}
-              </div>
+            item.identifier === 0 ? (
+              line(item, i)
             ) : (
               <Row
                 class={`menu-item${selected.current.has(i) ? " selected" : ""}${highlight.current === i ? " highlighted" : ""}`}
@@ -255,11 +291,14 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
                       }
                 }
                 onMouseMove={how === "one" ? () => setHighlight(i) : undefined}
+                role={how === "any" ? "menuitemcheckbox" : undefined}
+                aria-checked={how === "any" ? selected.current.has(i) : undefined}
               >
-                <span class="inv-icon" style={tileStyle(sheet, item.tile, ICON)} />
-                <span class="inv-letter">{item.accelerator}</span>
+                {how === "any" ? <span class="menu-check" /> : null}
+                {hasTiles ? <span class="inv-icon" style={tileStyle(sheet, item.tile, ICON)} /> : null}
+                {hasLetters ? <span class="inv-letter">{item.accelerator}</span> : null}
                 {columns > 1 ? (
-                  fields(item.text, textStyle(item.color, item.attr), taken(i))
+                  fields(item, textStyle(item.color, item.attr), taken(i))
                 ) : (
                   <span class="menu-text" style={textStyle(item.color, item.attr)}>
                     {taken(i)}
@@ -281,7 +320,13 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
             ) : null}
           </div>
           {count.current > 0 ? <span class="hint">Count: {count.current}</span> : null}
-          <button onClick={() => onDone(null)}>{how === "none" ? "Close" : "Cancel"}</button>
+          {how === "none" ? (
+            <button class="primary" onClick={() => onDone(null)}>
+              Close
+            </button>
+          ) : (
+            <button onClick={() => onDone(null)}>Cancel</button>
+          )}
           {how === "any" ? (
             <button class="primary" onClick={() => finish(selected.current)}>
               OK

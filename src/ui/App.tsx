@@ -324,8 +324,11 @@ export function App({ handedOver, onReplay }: Props) {
     setCommanding(key !== 0);
   };
   const pendingCommand = useRef<string | null>(null);
+  const repeatKey = useRef(0);
   const runCommand = (name: string) => {
     if (!commandKey.current || pendingRef.current) return;
+    // as an extended command it would clear the command it repeats
+    if (name === "repeat" && repeatKey.current) return sendCode(repeatKey.current);
     pendingCommand.current = name;
     sendCode(commandKey.current);
   };
@@ -392,6 +395,7 @@ export function App({ handedOver, onReplay }: Props) {
             waitingForKey.current = true;
             setInventoryKey(request.kind === "poskey" ? request.inventoryKey : 0);
             setCommandKey(request.kind === "poskey" ? request.commandKey : 0);
+            repeatKey.current = request.kind === "poskey" ? request.repeatKey : 0;
             if (request.kind === "poskey") setWizard(request.wizard);
             return;
           }
@@ -563,7 +567,7 @@ export function App({ handedOver, onReplay }: Props) {
     if (state.asciiMap !== null && !replay) saveAscii(state.asciiMap);
   }, [state.asciiMap]);
 
-  // zoom keys, text size keys and Ctrl-Cmd-S work with a dialog open too, as Cocoa's menu shortcuts do: this listener is
+  // zoom keys, text size keys, Cmd-period and Ctrl-Cmd-S work with a dialog open too, as Cocoa's menu shortcuts do: this listener is
   // added before any dialog's, and the browser would zoom the page otherwise
   useEffect(() => {
     if (!playing) return;
@@ -575,6 +579,13 @@ export function App({ handedOver, onReplay }: Props) {
         e.preventDefault();
         e.stopImmediatePropagation();
         return setTextSize(textStep(textSizeNow.current), true);
+      }
+      // Cmd-period cancels, as in macOS and iPadOS apps, for keyboards without Esc
+      if (e.metaKey && !e.ctrlKey && !e.altKey && e.key === ".") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        (e.target ?? window).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true, cancelable: true }));
+        return;
       }
       // Ctrl-Cmd-S, as Cocoa's View menu has it
       if (e.ctrlKey && e.metaKey && e.key.toLowerCase() === "s") {

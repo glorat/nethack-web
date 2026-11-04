@@ -3,7 +3,10 @@ import { WIKI_URL } from "../port/describe";
 import { playerName, PLAY_PATH, savedName, saveName } from "../port/name";
 import { type GameSummary, onlineAddress, onlineWanted } from "../online/session";
 import { OnlineChoice } from "../online/ui/OnlineChoice";
+import { Leaderboard } from "../online/ui/Leaderboard";
 import { OnlineGames } from "../online/ui/OnlineGames";
+import { GamesInProgress } from "../online/ui/GamesInProgress";
+import { Achievements } from "../online/ui/Achievements";
 import { saveOptions, savedOptions } from "../port/options";
 import { keepLastMode, lastMode } from "../port/last-mode";
 import type { Profile } from "../online/account";
@@ -27,7 +30,7 @@ export function Landing() {
   const [choosingOnline, setChoosingOnline] = useState(false);
   const [offered] = useState(onlineOffered);
   const [refused] = useState(() => new URLSearchParams(location.search).has("refused"));
-  const [latestOnline, setLatestOnline] = useState<GameSummary | null>(null);
+  const [inProgress, setInProgress] = useState<GameSummary[]>([]);
   const [returning] = useState(lastMode);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [signingIn, setSigningIn] = useState(false);
@@ -37,7 +40,7 @@ export function Landing() {
     // asking again would only be refused again, and send this page back to itself
     if (!offered || returning !== "online" || refused) return;
     listOnlineGames().then(
-      (games) => setLatestOnline(games.reduce<GameSummary | null>((a, g) => (a && a.lastPlayedAt >= g.lastPlayedAt ? a : g), null)),
+      setInProgress,
       (e) => console.warn("couldn't list online games", e),
     );
     loadProfile().then(setProfile, (e) => console.warn("couldn't read the profile", e));
@@ -63,6 +66,7 @@ export function Landing() {
   useEffect(() => {
     if (profile?.handle && !name) setName(profile.handle);
   }, [profile?.handle]);
+  const latestOnline = inProgress.reduce<GameSummary | null>((a, g) => (a && a.lastPlayedAt >= g.lastPlayedAt ? a : g), null);
   const offlineInProgress = !changing && offlineGameUnder(remembered);
   const continueOnline = latestOnline && !changing ? () => location.assign(onlineAddress(PLAY_PATH, latestOnline.name, { game: latestOnline.game })) : null;
   const mainAction = continueOnline ?? (offlineInProgress || !offered ? "offline" : "online");
@@ -92,6 +96,7 @@ export function Landing() {
     if (import.meta.env.PROD) navigator.serviceWorker?.ready.then(() => setOfflineReady(true));
   }, []);
   const valid = playerName(name).length > 0;
+  const onlinePanels = offered && returning === "online" && !refused;
   return (
     <div class="landing">
       <header class="landing-bar">
@@ -167,11 +172,21 @@ export function Landing() {
           </form>
           <img class="landing-shot" src={`${import.meta.env.BASE_URL}screenshot.jpg`} alt="A NetHack game: the dungeon map in painted tiles, with stats, equipment, messages and inventory around it" />
         </section>
-        {offered && returning === "online" && !refused ? <OnlineGames /> : null}
+        {/* one is already the Continue button */}
+        {onlinePanels && inProgress.length > 1 ? <GamesInProgress games={inProgress} /> : null}
+        {onlinePanels ? <OnlineGames /> : null}
         <DeviceGames />
+        {onlinePanels ? (
+          <>
+            <Achievements />
+            <Leaderboard />
+          </>
+        ) : null}
         <section class="landing-panels">
-          <div class="landing-panel">
-            <h2>New to NetHack?</h2>
+          <details class={`landing-panel landing-help${returning ? " secondary" : ""}`} open={!returning}>
+            <summary>
+              <h2>New to NetHack?</h2>
+            </summary>
             <ul>
               <li>Move with the arrow keys or <kbd>h j k l</kbd>, and <kbd>y u b n</kbd> for diagonals.</li>
               <li>Click the map to walk somewhere, and right-click to look at it.</li>
@@ -179,17 +194,23 @@ export function Landing() {
               <li><kbd>?</kbd> opens the game's help, and <kbd>S</kbd> saves and brings you back here.</li>
             </ul>
             <p>The <a href={WIKI_URL} target="_blank" rel="noopener">NetHack Wiki</a> covers everything.</p>
-          </div>
-          <div class="landing-panel">
+          </details>
+          <div class={`landing-panel${returning ? " secondary" : ""}`}>
             <h2>{offered ? "Online or offline?" : "Where your game is kept"}</h2>
             {offered ? (
+              <>
+                <p>
+                  <strong>Online</strong> games are kept for you, so you can have several on the go, and the ones you finish count for the high scores. They need a connection.
+                </p>
+                <p>
+                  <strong>Offline</strong> games stay on this device and play without a connection, but they aren't backed up anywhere.
+                </p>
+              </>
+            ) : (
               <p>
-                <strong>Online</strong> games are kept for you, so start as many as you like and pick any of them up again. You need a connection, and may lose your last few moves if it drops. Sign in to keep them with your account, and to choose the handle your scores are shown under; until then they stay linked to this browser, so clearing this site's data loses access to them. Shared high scores are on the way, for online games only.
+                <strong>Offline</strong> games are kept on this device. You can play without an internet connection, and your game is waiting whenever you come back. It isn't backed up anywhere, though, so it can be lost, for example if you clear your browsing data.
               </p>
-            ) : null}
-            <p>
-              <strong>Offline</strong> games are kept on this device. You can play without an internet connection, and your game is waiting whenever you come back. It isn't backed up anywhere, though, so it can be lost, for example if you clear your browsing data.{offered ? " Play online to keep your games safe." : ""}
-            </p>
+            )}
           </div>
         </section>
       </main>

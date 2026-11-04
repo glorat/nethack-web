@@ -58,6 +58,8 @@ export interface ExtCommand {
 export type GameEvent =
   | { type: "ready" }
   | { type: "message"; text: string; attr: number }
+  /** The core cleared the message window, as it does each turn. */
+  | { type: "message_clear" }
   | { type: "map"; cells: MapCell[] }
   | { type: "map_clear" }
   | { type: "cursor"; x: number; y: number }
@@ -113,10 +115,10 @@ export interface PlayerChoices {
 export type GameRequest =
   | { kind: "key" }
   /**
-   * inventoryKey and commandKey (the extended command key) are 0 unless the core is waiting for a command,
+   * inventoryKey, commandKey (the extended command key) and repeatKey are 0 unless the core is waiting for a command,
    * or if nothing is bound to them.
    */
-  | { kind: "poskey"; inventoryKey: number; commandKey: number; wizard: boolean }
+  | { kind: "poskey"; inventoryKey: number; commandKey: number; repeatKey: number; wizard: boolean }
   /** directions: for "In what direction?", the keys for W NW N NE E SE S SW down up. */
   | { kind: "yn"; query: string; choices: string; defaultChoice: string; directions?: string }
   | { kind: "getlin"; query: string }

@@ -20,7 +20,7 @@ export function OnlineGames() {
   if (!games?.length) return null;
   return (
     <section class="landing-panel landing-device">
-      <h2>Your online games</h2>
+      <h2>Your finished online games</h2>
       <ol class="device-scores online-scores">
         {games.map((g) => (
           <Row key={g.game} {...g} />

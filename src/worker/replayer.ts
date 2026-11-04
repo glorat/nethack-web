@@ -1,7 +1,7 @@
 // Plays a recorded game again: each session runs the core afresh, answered
 // from the recording instead of the player. See docs/recording.md.
 import type { Answer, GameEvent, GameRequest, MenuItem, MenuSelection } from "../protocol";
-import type { Game, GameHost, Input } from "./game";
+import type { CoreEvent, Game, GameHost, Input } from "./game";
 import type { NetHackModule } from "./memory";
 import { ALIGNS, ANSWER_TAGS, checkLine, FORMAT, GENDERS, levelsHash, turnSum, zoneSeconds } from "./recorder";
 
@@ -225,6 +225,9 @@ export function parseInput(line: Line): Input {
   return line.tag === "k" ? { key: n[0] } : { click: { x: n[0], y: n[1], button: n[2] } };
 }
 
+/** A core event as a replay met it: in which session, counting from 0, and at which line of the recording, the last one read before it. */
+export type ReplayedEvent = CoreEvent & { session: number; line: number };
+
 export interface ReplayHooks {
   /** The events the game shows, as it would to a player. */
   post(events: GameEvent[]): void;
@@ -242,6 +245,8 @@ export interface ReplayHooks {
   sameBuild?: boolean;
   /** For a recording still being written: resolves when there are more lines, in place of ending where they run out. */
   more?(): Promise<void>;
+  /** Each event the core reports, in the order it reports them. */
+  event?(event: ReplayedEvent): void;
 }
 
 /** How a session's replay stopped: at its recorded end, or where its recording ran out. */
@@ -273,6 +278,7 @@ export class ReplayHost implements GameHost {
     private readonly offset: number,
     private readonly hooks: ReplayHooks,
     private readonly passed: Passed = { full: 0, any: 0 },
+    private readonly index = 0,
   ) {
     void this.failure.catch(() => {});
   }
@@ -365,6 +371,12 @@ export class ReplayHost implements GameHost {
   }
 
   bonesLeft(): void {}
+
+  gameEvent(event: CoreEvent): void {
+    if (this.done) return;
+    const line = this.session.recorded.get(Math.max(0, this.at - 1))?.at ?? 0;
+    this.guard(() => this.hooks.event?.({ ...event, session: this.index, line }));
+  }
 
   delayOutput(): Promise<void> {
     return this.hooks.delay?.() ?? new Promise((resolve) => setTimeout(resolve, DELAY_MS));
@@ -556,6 +568,7 @@ export async function replay(
           more: next ? undefined : hooks.more,
         },
         passed,
+        i,
       );
       return host;
     });

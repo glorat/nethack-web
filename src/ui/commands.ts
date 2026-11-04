@@ -30,6 +30,7 @@ export const GAME_MENU: (CommandItem | null)[] = [
   c("History", "history"),
   null,
   c("Save & Quit", "save", "S"),
+  c("Quit Without Saving", "quit"),
 ];
 
 export const HELP_MENU: (CommandItem | null)[] = [c("Help", "help", "?")];
@@ -65,6 +66,7 @@ export const COMMAND_MENUS: Menu[] = [
       c("Down", "down", ">"),
       null,
       c("Travel", "travel", "_"),
+      c("Travel Again", "retravel", "^_"),
       null,
       c("Rest", "wait", "."),
       c("Search", "search", "s"),
@@ -113,6 +115,9 @@ export const COMMAND_MENUS: Menu[] = [
   {
     title: "Act",
     items: [
+      c("Repeat", "repeat", "^A"),
+      c("Extended Command...", "#", "#"),
+      null,
       c("Fight", "fight", "F"),
       c("Fire From Quiver", "fire", "f"),
       c("Throw", "throw", "t"),
@@ -123,6 +128,7 @@ export const COMMAND_MENUS: Menu[] = [
       c("Close Door", "close", "c"),
       c("Untrap", "untrap", "M-u"),
       c("Loot", "loot", "M-l"),
+      c("Tip Container", "tip", "M-T"),
       null,
       c("Chat", "chat", "M-c"),
       c("Pay", "pay", "p"),
@@ -170,6 +176,7 @@ export const COMMAND_MENUS: Menu[] = [
       c("Known Spells", "showspells", "+"),
       null,
       c("Dungeon Overview", "overview", "^O"),
+      c("Annotate Level", "annotate", "M-A"),
       c("Journal", "chronicle", "v"),
       c("Terrain", "terrain"),
     ],

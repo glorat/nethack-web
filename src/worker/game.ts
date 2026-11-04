@@ -53,6 +53,36 @@ interface Window {
 
 export type Input = { key: number } | { click: { x: number; y: number; button: number } };
 
+/** What the core reports of the game as it happens, each with the turn it happened on. See NHWEB_EVENT in the core's extern.h. */
+export type CoreEvent =
+  /** `id` is an ACH_* value, negated for a rank title reached as female */
+  | { kind: "achievement"; id: number; turn: number }
+  /** A #chronicle entry: `flags` are LL_* bits, and `format` the call's format string, the same whatever went into `text` */
+  | { kind: "chronicle"; flags: number; format: string; text: string; turn: number }
+  | { kind: "uevent"; field: string; value: number; turn: number }
+  /** Just before the game's final scoring: `conduct` as xlogfile's bits, `roleplay` as nhweb_roleplay()'s */
+  | { kind: "end"; conduct: number; roleplay: number; turn: number };
+
+const CORE_EVENT_KINDS = [undefined, "achievement", "chronicle", "uevent", "end"] as const;
+
+/** Decodes the shim's `shim_game_event(kind, a, b, turn, format, text)`. */
+export function coreEvent(args: unknown[]): CoreEvent | null {
+  const [kind, a, b, turn] = args as number[];
+  const [format, text] = [String(args[4] ?? ""), String(args[5] ?? "")];
+  switch (CORE_EVENT_KINDS[kind]) {
+    case "achievement":
+      return { kind: "achievement", id: a, turn };
+    case "chronicle":
+      return { kind: "chronicle", flags: a, format, text, turn };
+    case "uevent":
+      return { kind: "uevent", field: text, value: a, turn };
+    case "end":
+      return { kind: "end", conduct: a, roleplay: b, turn };
+    default:
+      return null;
+  }
+}
+
 export interface GameHost extends Authority {
   post(events: GameEvent[]): void;
   request(request: GameRequest): Promise<Answer | null>;
@@ -67,6 +97,8 @@ export interface GameHost extends Authority {
   resume?(): Promise<boolean>;
   /** The core's pause in an animation; a short wait if not given. */
   delayOutput?(): Promise<void>;
+  /** Something the core reports of the game, which needs no answer. */
+  gameEvent?(event: CoreEvent): void;
 }
 
 /** "FOODPOIS" style names of the bits set in a BL_CONDITION mask, in `order`. */
@@ -151,6 +183,7 @@ export class Game {
       kind: "poskey",
       inventoryKey: this.m._nhweb_inventory_key(),
       commandKey: this.m._nhweb_command_key(),
+      repeatKey: this.m._nhweb_repeat_key(),
       wizard: !!this.m._nhweb_wizard(),
     });
   }
@@ -306,6 +339,11 @@ export class Game {
         this.m.FS.unlink(path);
         return 0;
       }
+      case "shim_game_event": {
+        const event = coreEvent(args);
+        if (event) this.host.gameEvent?.(event);
+        return 0;
+      }
       case "shim_doprev_message":
         return 0;
       case "shim_exit_nhwindows":
@@ -345,6 +383,7 @@ export class Game {
       this.monsters.clear();
       this.emit({ type: "map_clear" });
     }
+    if (w.kind === NHW_MESSAGE) this.emit({ type: "message_clear" });
     w.lines = [];
     w.menu = null;
     return 0;
@@ -615,6 +654,14 @@ export class Game {
 
   private statusWithChanges(): Record<string, StatusValue> {
     const fields = { ...this.status };
+    // not core fields: what the status panel says of the hero and where they are
+    if (this.m._nhweb_in_play()) {
+      const text = (text: string) => ({ text, color: 0, percent: 0 });
+      fields.hero_kind = text(this.m.UTF8ToString(this.m._nhweb_hero_kind()));
+      fields.dungeon_name = text(this.m.UTF8ToString(this.m._nhweb_dungeon_name()));
+      fields.dungeon_level = text(String(this.m._nhweb_dungeon_level()));
+      if (this.m._nhweb_rogue_level()) fields.rogue_level = text("1");
+    }
     const now = this.m._nhweb_moves();
     for (const [name, { direction, improved, turn }] of this.changes) {
       // a field the core has stopped showing shows no change either

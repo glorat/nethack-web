@@ -1,4 +1,6 @@
 import { conditionSeverity, encumbranceSeverity, hungerSeverity, type Severity } from "../port/badges";
+import { meterLevel } from "../port/meter";
+import { heroText, levelText } from "../port/status-header";
 import type { StatusValue } from "../protocol";
 import { nhColor } from "./colors";
 
@@ -25,9 +27,8 @@ function Meter({ label, cur, max, kind }: { label: string; cur: string; max: str
   const c = Number(cur);
   const m = Number(max);
   const pct = m > 0 ? Math.max(0, Math.min(100, (c / m) * 100)) : 0;
-  const low = m > 0 && c / m < 1 / 3;
   return (
-    <div class={`meter ${kind}${low ? " low" : ""}`}>
+    <div class={`meter ${kind} ${meterLevel(c, m)}`}>
       <span class="meter-label">{label}</span>
       <div class="meter-bar">
         <div class="meter-fill" style={{ width: `${pct}%` }} />
@@ -69,9 +70,8 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
   return (
     <div class="stats">
       <div class="stats-title">{value(fields, "BL_TITLE")}</div>
-      <div class="stats-sub">
-        {value(fields, "BL_ALIGN")} · {value(fields, "BL_LEVELDESC")}
-      </div>
+      <div class="stats-sub">{heroText(value(fields, "BL_ALIGN"), value(fields, "hero_kind"))}</div>
+      <div class="stats-sub">{levelText(value(fields, "BL_LEVELDESC"), value(fields, "dungeon_name"), Number(value(fields, "dungeon_level")))}</div>
       <Meter label="HP" cur={value(fields, "BL_HP")} max={value(fields, "BL_HPMAX")} kind="hp" />
       <Meter label="Pw" cur={value(fields, "BL_ENE")} max={value(fields, "BL_ENEMAX")} kind="pw" />
       <div class="stat-grid">

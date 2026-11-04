@@ -27,11 +27,12 @@ async function fakeServer(page: Page): Promise<Map<string, string | undefined>> 
   const idToken = `${jwtPart({ alg: "none" })}.${jwtPart({ sub: "player", exp: 4102444800 })}.x`;
   await answer("https://identitytoolkit.googleapis.com/**", "auth", () => ({ idToken, refreshToken: "r", expiresIn: "3600", localId: "player", users: [{ localId: "player" }] }));
   await answer("https://firestore.googleapis.com/**", "firestore", () => ({ writeResults: [{}], commitTime: new Date().toISOString() }));
-  await answer("https://europe-west1-nethack-web-server.cloudfunctions.net/user", "functions", ({ method, input }) => {
+  await answer("https://europe-west1-nethack-web-server.cloudfunctions.net/{user,publicApi}", "functions", ({ method, input }) => {
     const now = Math.floor(Date.now() / 1000);
     const answers: Record<string, object> = {
       listGames: { games: [] },
       profile: { signedIn: false, handle: null, request: null },
+      leaderboard: { entries: [] },
       startGame: { game: "game", utcOffset: 0, options: input?.options, config: input?.config, now },
       seed: { seed: 1, now, validTurns: 1000 },
     };
@@ -47,6 +48,8 @@ async function startOnlineGame(page: Page) {
   await page.getByRole("button", { name: /^Start New Game/ }).click();
   const picker = page.getByRole("dialog", { name: "Choose your character" });
   await picker.waitFor({ timeout: 30_000 });
+  // a human can be any role, and roles the race can\'t play are disabled
+  await picker.getByRole("listbox", { name: "Race" }).getByRole("option", { name: "human" }).click();
   await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: /Valkyrie/ }).click();
   await picker.getByRole("listbox", { name: "Race" }).locator("button:not([disabled])").first().click();
   for (const group of ["Gender", "Alignment"]) await picker.getByRole("radiogroup", { name: group }).locator("button:not([disabled])").first().click();
@@ -145,6 +148,8 @@ test("App Check refusing mid-game ends it at the landing page", async ({ page })
   answer = "refuse";
   await untilReturned(page, async () => new URL(page.url()).search === "?online&refused");
   await expect(page.getByRole("alert").filter({ hasText: "isn't available" })).toBeVisible();
+  // the landing page can show its alert before its own load event, which mustn't count as another
+  await page.waitForLoadState("load");
   let loads = 0;
   page.on("load", () => loads++);
   await page.waitForTimeout(3000);

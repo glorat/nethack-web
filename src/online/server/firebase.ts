@@ -5,7 +5,8 @@ import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc } 
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 import { appCheckRefused, type OnlineDeps, refusedAddress } from "../session";
 import type { Profile } from "../account";
-import type { FinishedGame } from "../results";
+import type { Achievement } from "../achievements";
+import type { FinishedGame, LeaderboardEntry } from "../results";
 import type { WriteResult } from "../upload";
 
 // Not a secret: a web app's Firebase config is public, and security rules decide what it may do.
@@ -75,6 +76,13 @@ async function userRequest<Output>(method: string, input: object): Promise<Outpu
   return (await httpsCallable<unknown, Output>(functions, "user")({ method, input })).data;
 }
 
+/** Needs no sign-in, but sends one if there is one, so the server knows who's asking. */
+async function publicRequest<Output>(method: string, input: object): Promise<Output> {
+  await holdingToken();
+  await auth.authStateReady();
+  return (await httpsCallable<unknown, Output>(functions, "publicApi")({ method, input })).data;
+}
+
 /**
  * Links a Google account to the anonymous player here, so their uid and games carry over. An account that's already
  * someone's is signed in to instead, leaving this browser's anonymous games with the anonymous uid.
@@ -107,6 +115,10 @@ export const listGames: OnlineDeps["listGames"] = (input) => userRequest("listGa
 export const resumeGame: OnlineDeps["resumeGame"] = (input) => userRequest("resumeGame", input);
 
 export const finishedGames = (input: { sentAt: number }) => userRequest<{ games: FinishedGame[] }>("finishedGames", input);
+
+export const leaderboard = (input: { sentAt: number }) => publicRequest<{ entries: LeaderboardEntry[] }>("leaderboard", input);
+
+export const achievements = () => userRequest<{ achievements: Achievement[] }>("achievements", {});
 
 export const gameRecording = (input: { game: string; sentAt: number }) => userRequest<{ recording: string } | null>("gameRecording", input);
 

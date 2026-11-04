@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { ascended, type FinishedGame, outcome, watchAddress, watchedGame } from "../../src/online/results";
+import { ascended, type FinishedGame, outcome, standing, watchAddress, watchedGame } from "../../src/online/results";
 
 const game: FinishedGame = { game: "g1", name: "Agnes", startedAt: 0, endedAt: 0, checked: false };
 
@@ -13,8 +13,8 @@ test("a watch address names the online game, and reads back as it", () => {
 
 test("a game says how it ended once scored, that its score is to come, or that it couldn't be scored", () => {
   expect(outcome({ ...game, checked: true, result: { role: "Val", race: "Dwa", death: "killed by a newt", turns: 1200 } })).toBe(`Agnes (Val-Dwa): killed by a newt, turn ${(1200).toLocaleString()}`);
-  expect(outcome(game)).toMatch(/^Agnes: scored once the server has replayed the game/);
-  expect(outcome({ ...game, checked: true })).toBe("Agnes: the server couldn't score this game");
+  expect(outcome(game)).toBe("Agnes: score not ready yet. It will appear here.");
+  expect(outcome({ ...game, checked: true })).toBe("Agnes: this game couldn't be scored");
 });
 
 test("a result missing fields still reads as words", () => {
@@ -25,4 +25,10 @@ test("only an ascension counts as one", () => {
   expect(ascended({ death: "ascended" })).toBe(true);
   expect(ascended({ death: "killed by an ascended being" })).toBe(false);
   expect(ascended(undefined)).toBe(false);
+});
+
+test("a leaderboard entry goes under the player's handle, never the character's name", () => {
+  const result = { role: "Val", race: "Hum", death: "ascended", turns: 50000 };
+  expect(standing({ handle: "Boardtop", yours: false, result })).toBe(`Boardtop (Val-Hum): ascended, turn ${(50000).toLocaleString()}`);
+  expect(standing({ handle: null, yours: true, result })).toMatch(/^Anonymous \(Val-Hum\)/);
 });

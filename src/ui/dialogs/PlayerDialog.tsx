@@ -39,6 +39,7 @@ export function PlayerDialog({ choices, sheet, onDone }: Props) {
                 role="option"
                 aria-selected={ro === pick.role}
                 class={ro === pick.role ? "player-item selected" : "player-item"}
+                disabled={!choices.validRace[ro][pick.race]}
                 onClick={() => setPick(withRole(choices, pick, ro))}
               >
                 <span class="player-icon" style={tileStyle(sheet, female ? r.femaleTile : r.tile, ICON)} />
