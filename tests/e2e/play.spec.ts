@@ -345,6 +345,26 @@ test("the map keeps the browser's double-tap zoom, text selection and scroll bou
   expect(style).toEqual(["manipulation", "none", "none"]);
 });
 
+test.describe("on a touch screen", () => {
+  test.use({ viewport: { width: 1180, height: 820 }, hasTouch: true, isMobile: true });
+
+  test("buttons and menu rows are big enough to tap", async ({ page }) => {
+    await startGame(page, `Finger${Date.now() % 100000}`);
+    const height = async (l: Locator) => (await l.boundingBox())!.height;
+    expect(await height(page.getByRole("menubar").getByRole("menuitem", { name: "Act" }))).toBeGreaterThanOrEqual(44);
+    expect(await height(page.locator(".inv-item").first())).toBeGreaterThanOrEqual(44);
+    // the equipment grid is drawn to fit the top bar
+    expect(await height(page.locator(".equip-slot").first())).toBe(32);
+    await page.keyboard.press("i");
+    expect(await height(page.getByRole("dialog").locator(".menu-item").first())).toBeGreaterThanOrEqual(44);
+  });
+});
+
+test("with a mouse, buttons and menu rows keep their size", async ({ page }) => {
+  await startGame(page, `Mouse${Date.now() % 100000}`);
+  expect((await page.getByRole("menubar").getByRole("menuitem", { name: "Act" }).boundingBox())!.height).toBeLessThan(44);
+});
+
 test("hovering over the map describes the square", async ({ page }) => {
   await startGame(page, `Look${Date.now() % 100000}`);
   // the map scrolls to keep the hero in view, so aim at the middle of what's showing
