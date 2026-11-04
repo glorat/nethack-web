@@ -315,8 +315,11 @@ export function App({ handedOver, onReplay }: Props) {
     setCommanding(key !== 0);
   };
   const pendingCommand = useRef<string | null>(null);
+  const repeatKey = useRef(0);
   const runCommand = (name: string) => {
     if (!commandKey.current || pendingRef.current) return;
+    // as an extended command it would clear the command it repeats
+    if (name === "repeat" && repeatKey.current) return sendCode(repeatKey.current);
     pendingCommand.current = name;
     sendCode(commandKey.current);
   };
@@ -383,6 +386,7 @@ export function App({ handedOver, onReplay }: Props) {
             waitingForKey.current = true;
             setInventoryKey(request.kind === "poskey" ? request.inventoryKey : 0);
             setCommandKey(request.kind === "poskey" ? request.commandKey : 0);
+            repeatKey.current = request.kind === "poskey" ? request.repeatKey : 0;
             if (request.kind === "poskey") setWizard(request.wizard);
             return;
           }

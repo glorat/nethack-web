@@ -1093,6 +1093,23 @@ test("Cmd-Option = and - change the text size, which is kept, and the sidebar gr
   expect(await page.evaluate(() => localStorage.getItem("nethack.textSize"))).toBeNull();
 });
 
+test("the Act menu repeats the last command and opens the extended command list", async ({ page }) => {
+  await startGame(page, `Again${Date.now() % 100000}`);
+  const turn = async () => Number((await page.locator(".stat", { hasText: "T" }).last().innerText()).replace(/\D/g, ""));
+  const act = async (name: RegExp) => {
+    await page.getByRole("menubar").getByRole("menuitem", { name: "Act" }).click();
+    await page.getByRole("menu", { name: "Act" }).getByRole("menuitem", { name }).click();
+  };
+  await page.keyboard.press("s");
+  await untilCommand(page);
+  const before = await turn();
+  await act(/Repeat/);
+  await expect.poll(turn).toBe(before + 1);
+  await untilCommand(page);
+  await act(/Extended Command/);
+  await expect(page.getByRole("dialog")).toContainText("Return runs the highlighted command");
+});
+
 test("the menu bar runs commands by name while the game waits for one", async ({ page }) => {
   await startGame(page, `Bar${Date.now() % 100000}`);
   const bar = page.getByRole("menubar");
