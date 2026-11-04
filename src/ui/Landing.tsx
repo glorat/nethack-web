@@ -42,6 +42,7 @@ export function Landing() {
   const [changing, setChanging] = useState(!remembered);
   const [name, setName] = useState(remembered);
   const [editingOptions, setEditingOptions] = useState(false);
+  const [deletions, setDeletions] = useState(0);
   const [about, setAbout] = useState(false);
   const [choosingOnline, setChoosingOnline] = useState(false);
   const returning = RETURNING;
@@ -267,9 +268,10 @@ export function Landing() {
           <>
             {/* one is already the Continue button */}
             {inProgress.length > 1 ? <GamesInProgress games={inProgress} /> : null}
-            <OnlineGames />
-            <Achievements />
-            <Leaderboard />
+            <OnlineGames onDeleted={() => setDeletions((n) => n + 1)} />
+            {/* a deletion can change both */}
+            <Achievements reload={deletions} />
+            <Leaderboard reload={deletions} />
           </>
         ) : null}
         {online ? null : <DeviceGames />}

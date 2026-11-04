@@ -5,11 +5,11 @@ import { loadLeaderboard } from "../server/api";
 const endedOn = (at: number) => new Date(at).toLocaleDateString(undefined, { dateStyle: "medium" });
 
 /** Everyone's best online games, as the server's replay scored them. */
-export function Leaderboard() {
+export function Leaderboard({ reload }: { reload: number }) {
   const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
   useEffect(() => {
     loadLeaderboard().then(setEntries, (e) => console.warn("couldn't load the leaderboard", e));
-  }, []);
+  }, [reload]);
   if (!entries) return null;
   return (
     <section class="landing-panel landing-device secondary">

@@ -133,6 +133,8 @@ export const resumeGame: OnlineDeps["resumeGame"] = (input) => userRequest("resu
 
 export const finishedGames = (input: { sentAt: number }) => userRequest<{ games: FinishedGame[] }>("finishedGames", input);
 
+export const deleteGame = (input: { game: string; sentAt: number }) => userRequest<{ status: "deleted" }>("deleteGame", input);
+
 export const leaderboard = (input: { sentAt: number }) => publicRequest<{ entries: LeaderboardEntry[] }>("leaderboard", input);
 
 export const achievements = () => userRequest<{ achievements: Achievement[] }>("achievements", {});

@@ -104,6 +104,58 @@ test("before an online game starts, the player is told finished games are public
   await expect(page).toHaveTitle("Terms of Use · NetHack");
 });
 
+test("a finished online game can be deleted from the home, after saying what that means, and is told when it can't be yet", async ({ page }) => {
+  await fakeServer(page);
+  await page.route(RECAPTCHA, (route) => route.fulfill({ contentType: "text/javascript", body: FAKE_RECAPTCHA }));
+  await page.route("https://content-firebaseappcheck.googleapis.com/**", (route) =>
+    route.request().method() === "OPTIONS" ? route.fulfill({ status: 204, headers: cors }) : route.fulfill({ json: { token: "app-check-token", ttl: "3600s" }, headers: cors }),
+  );
+  const at = Date.parse("2026-11-01T12:00:00Z");
+  const finished = (game: string, name: string, points: number) => ({ game, name, startedAt: at, endedAt: at, checked: true, result: { points, death: "killed by a newt", turns: 9 } });
+  const games = [finished("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "Agnes", 50), finished("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "Bert", 40)];
+  const deletes: string[] = [];
+  let boards = 0;
+  await page.route("https://europe-west1-nethack-web-server.cloudfunctions.net/{user,publicApi}", (route) => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") return route.fallback();
+    const { method, input } = request.postDataJSON().data;
+    if (method === "leaderboard") boards++;
+    if (method === "finishedGames") return route.fulfill({ json: { result: { games } }, headers: cors });
+    if (method !== "deleteGame") return route.fallback();
+    deletes.push(input.game);
+    if (deletes.length === 1) return route.fulfill({ status: 400, json: { error: { status: "FAILED_PRECONDITION", message: "not saved" } }, headers: cors });
+    return route.fulfill({ json: { result: { status: "deleted" } }, headers: cors });
+  });
+  await page.goto(`${PROD}online/`);
+  const panel = page.locator("section", { has: page.getByRole("heading", { name: "Your finished online games" }) });
+  await expect(panel.getByRole("listitem")).toHaveCount(2);
+  const remove = panel.getByRole("button", { name: /^Delete Agnes's game/ });
+  await remove.click();
+  const asking = panel.getByRole("group", { name: /^Delete Agnes's game/ });
+  await expect(asking).toContainText("you can't undo it");
+  await expect(asking.getByRole("button", { name: "Keep It" })).toBeFocused();
+  await asking.getByRole("button", { name: "Keep It" }).click();
+  await expect(asking).toHaveCount(0);
+  await expect(remove).toBeFocused();
+  expect(deletes).toEqual([]);
+
+  await remove.click();
+  await asking.getByRole("button", { name: "Delete Game" }).press("Enter");
+  await expect(asking.getByRole("alert")).toContainText("still being saved");
+  await expect(asking.getByRole("button", { name: "Delete Game" })).toBeFocused();
+  await asking.getByRole("button", { name: "Keep It" }).click();
+  await expect(panel.getByRole("listitem")).toHaveCount(2);
+
+  const before = boards;
+  await remove.click();
+  await asking.getByRole("button", { name: "Delete Game" }).click();
+  await expect(panel.getByRole("status")).toHaveText(/^Deleted Agnes's game of /);
+  await expect(panel.getByRole("listitem")).toHaveCount(1);
+  await expect(panel.getByRole("listitem")).toContainText("Bert");
+  expect(deletes).toEqual([games[0]!.game, games[0]!.game]);
+  await expect.poll(() => boards).toBeGreaterThan(before);
+});
+
 const exchange = (page: Page, answer: () => "token" | "brief" | "refuse" | "unreachable") =>
   page.route("https://content-firebaseappcheck.googleapis.com/**", (route) => {
     if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });

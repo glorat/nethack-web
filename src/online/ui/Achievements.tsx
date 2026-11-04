@@ -8,7 +8,7 @@ const LATEST = 4;
 const earnedOn = (at: number) => new Date(at).toLocaleDateString(undefined, { dateStyle: "medium" });
 
 /** The player's achievements from online games, shown once they've earned one: the latest, with the rest a click away. */
-export function Achievements() {
+export function Achievements({ reload }: { reload: number }) {
   const [list, setList] = useState<Achievement[] | null>(null);
   const [all, setAll] = useState(false);
   const opener = useRef<HTMLButtonElement>(null);
@@ -18,7 +18,7 @@ export function Achievements() {
       // offline play has to work without the server, so this says nothing
       (e) => console.warn("couldn't load achievements", e),
     );
-  }, []);
+  }, [reload]);
   if (!list || !earned(list).length) return null;
   const count = earned(list).length;
   return (
