@@ -701,11 +701,11 @@ test("signing in keeps the anonymous player's games, and the name they chose", a
 
   await page.goto("/");
   await signInWithGoogle(page, `${crypto.randomUUID()}@example.com`);
-  await expect(page.locator(".landing-bar")).toContainText("Signed in");
+  await expect(page.locator(".landing-bar .account")).toHaveText("Signed in");
   const handle = `Hd${crypto.randomUUID().slice(0, 8).replaceAll("-", "")}`;
   await page.getByLabel("Handle").fill(handle);
   await page.getByRole("button", { name: "Request Handle" }).click();
-  await expect(page.locator(".landing-bar")).toContainText(`Signed in as ${handle}`);
+  await expect(page.locator(".landing-bar .account")).toHaveText(handle);
   await expect(page.getByLabel("Handle")).toHaveCount(0);
 
   // the same uid, so the game played before signing in is still there to go back to
@@ -730,17 +730,46 @@ test("a handle someone else has is refused, and another can be chosen", async ({
     await page.getByLabel("Handle").fill(handle);
     await page.getByRole("button", { name: "Request Handle" }).click();
     if (outcome === "granted") {
-      await expect(page.locator(".landing-bar")).toContainText(`Signed in as ${handle}`);
+      await expect(page.locator(".landing-bar .account")).toHaveText(handle);
       // with no name of their own yet, the handle is where the player's starts
       await expect(page.getByLabel("Who are you?")).toHaveValue(handle);
     } else {
       await expect(page.getByRole("alert")).toHaveText(`${handle} is taken. Choose another.`);
       await page.getByLabel("Handle").fill(`${handle}b`);
       await page.getByRole("button", { name: "Request Handle" }).click();
-      await expect(page.locator(".landing-bar")).toContainText(`Signed in as ${handle}b`);
+      await expect(page.locator(".landing-bar .account")).toHaveText(`${handle}b`);
     }
     await context.close();
   }
+});
+
+test("signing out comes home as a new player, and signing in again brings the account back", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("nethack-web.lastMode", "online"));
+  await page.goto("/");
+  const email = `${crypto.randomUUID()}@example.com`;
+  await signInWithGoogle(page, email);
+  const handle = `So${crypto.randomUUID().slice(0, 8).replaceAll("-", "")}`;
+  await page.getByLabel("Handle").fill(handle);
+  await page.getByRole("button", { name: "Request Handle" }).click();
+  const account = page.locator(".landing-bar .account");
+  await expect(account).toHaveText(handle);
+
+  await account.click();
+  await expect(page.locator(".account-who")).toContainText(email);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menuitem", { name: "Sign Out" })).toHaveCount(0);
+  await expect(account).toBeFocused();
+
+  await account.click();
+  await Promise.all([page.waitForEvent("load"), page.getByRole("menuitem", { name: "Sign Out" }).click()]);
+  await expect(page.getByRole("status")).toHaveText("You're signed out. Your online games and handle are kept for when you sign in again.");
+  await expect(page.getByRole("button", { name: "Sign In with Google" })).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.has("signedout")).toBe(false);
+
+  const [popup] = await Promise.all([page.waitForEvent("popup"), page.getByRole("button", { name: "Sign In with Google" }).click()]);
+  await popup.waitForLoadState();
+  await Promise.all([page.waitForEvent("load"), popup.getByText(email).click()]);
+  await expect(account).toHaveText(handle);
 });
 
 test("the leaderboard ranks a game under its player's handle, never the character's name", async ({ page }) => {
@@ -756,7 +785,7 @@ test("the leaderboard ranks a game under its player's handle, never the characte
   const handle = `Lb${crypto.randomUUID().slice(0, 8).replaceAll("-", "")}`;
   await page.getByLabel("Handle").fill(handle);
   await page.getByRole("button", { name: "Request Handle" }).click();
-  await expect(page.locator(".landing-bar")).toContainText(`Signed in as ${handle}`);
+  await expect(page.locator(".landing-bar .account")).toHaveText(handle);
 
   // far above any real score, so it leads whatever else the emulator holds; the validator would write it from a replay
   const points = 2e12 + Math.floor(Math.random() * 1e9);

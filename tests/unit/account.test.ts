@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { HANDLE_FORMAT, type Profile, requestNote } from "../../src/online/account";
 
-const profile = (over: Partial<Profile>): Profile => ({ signedIn: true, handle: null, request: null, ...over });
+const profile = (over: Partial<Profile>): Profile => ({ signedIn: true, handle: null, email: null, request: null, ...over });
 
 describe("accounts", () => {
   test.each([
