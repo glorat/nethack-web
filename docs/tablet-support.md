@@ -44,10 +44,10 @@ In landscape every iPad is at least 1133px wide, so it gets the desktop layout, 
   - The tap that ends a long press must not also reach the core as a click, or the hero moves.
   - It must not affect the mouse, so check `pointerType`.
   - There's no downside beyond that care. Map tooltips on touch aren't needed.
-- [ ] **Stop Safari's own touch handling on the map**, so it doesn't fight the game's:
-  - `touch-action: pan-x pan-y` stops double-tap zooming the page and leaves panning, while pinches still arrive as Safari's gesture events;
-  - `-webkit-touch-callout: none` and `user-select: none` stop a long press selecting text or opening the callout;
-  - `overscroll-behavior: none` stops the page bouncing.
+- [x] **Safari's own touch handling is kept off the map**, so it doesn't fight the game's taps:
+  - `touch-action: manipulation` stops double-tap zooming the page and keeps panning. A pinch still reaches the map's own zoom through Safari's gesture events, which the map stops from zooming the page. That's untried on a device.
+  - `-webkit-touch-callout: none` and `user-select: none` stop a long press selecting text or opening the callout.
+  - `overscroll-behavior: none` stops the map bouncing.
 
 ### Touch targets
 

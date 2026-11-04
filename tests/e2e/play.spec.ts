@@ -336,6 +336,15 @@ test("the character picker starts the chosen role", async ({ page }) => {
   await expect(page.locator(".messages")).toContainText(/chaotic (male|female) elven Wizard/, { timeout: 15_000 });
 });
 
+test("the map keeps the browser's double-tap zoom, text selection and scroll bounce out of the way of taps", async ({ page }) => {
+  await startGame(page, `Tap${Date.now() % 100000}`);
+  const style = await page.locator(".map").evaluate((el) => {
+    const s = getComputedStyle(el);
+    return [s.touchAction, s.userSelect, s.overscrollBehavior];
+  });
+  expect(style).toEqual(["manipulation", "none", "none"]);
+});
+
 test("hovering over the map describes the square", async ({ page }) => {
   await startGame(page, `Look${Date.now() % 100000}`);
   // the map scrolls to keep the hero in view, so aim at the middle of what's showing
