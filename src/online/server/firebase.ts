@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getToken, initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
-import { connectAuthEmulator, getAuth, GoogleAuthProvider, linkWithPopup, signInAnonymously, signInWithCredential, signOut as authSignOut } from "firebase/auth";
+import { connectAuthEmulator, getAuth, getRedirectResult, GoogleAuthProvider, linkWithRedirect, signInAnonymously, signInWithCredential, signOut as authSignOut } from "firebase/auth";
 import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore/lite";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 import { appCheckRefused, type OnlineDeps, refusedAddress } from "../session";
@@ -85,24 +85,30 @@ async function publicRequest<Output>(method: string, input: object): Promise<Out
 }
 
 /**
- * Links a Google account to the anonymous player here, so their uid and games carry over. An account that's already
- * someone's is signed in to instead, leaving this browser's anonymous games with the anonymous uid.
+ * Sends the player to Google to link their account to the anonymous player here, so their uid and games carry over.
+ * The page comes back with the answer, for `finishSignIn`.
  */
 export async function signInWithGoogle(): Promise<void> {
   await signedIn();
-  const provider = new GoogleAuthProvider();
   const current = auth.currentUser!;
-  if (current.isAnonymous) {
-    try {
-      await linkWithPopup(current, provider);
-    } catch (e) {
-      const credential = GoogleAuthProvider.credentialFromError(e as Parameters<typeof GoogleAuthProvider.credentialFromError>[0]);
-      if ((e as { code?: string }).code !== "auth/credential-already-in-use" || !credential) throw e;
-      await signInWithCredential(auth, credential);
-    }
+  if (current.isAnonymous) await linkWithRedirect(current, new GoogleAuthProvider());
+}
+
+/**
+ * Whether coming back from Google signed the player in. An account that's already someone's is signed in to instead,
+ * leaving this browser's anonymous games with the anonymous uid.
+ */
+export async function finishSignIn(): Promise<boolean> {
+  try {
+    if (!(await getRedirectResult(auth))) return false;
+  } catch (e) {
+    const credential = GoogleAuthProvider.credentialFromError(e as Parameters<typeof GoogleAuthProvider.credentialFromError>[0]);
+    if ((e as { code?: string }).code !== "auth/credential-already-in-use" || !credential) throw e;
+    await signInWithCredential(auth, credential);
   }
   // the server reads how the player signed in from the token, which has to say so now
   await auth.currentUser?.getIdToken(true);
+  return true;
 }
 
 /** Forgets the account in this browser, in every tab. The next request makes a new anonymous player. */
