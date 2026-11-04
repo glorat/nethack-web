@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getToken, initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
+import { CustomProvider, getToken, initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { connectAuthEmulator, getAuth, getRedirectResult, GoogleAuthProvider, linkWithRedirect, signInAnonymously, signInWithCredential, signOut as authSignOut } from "firebase/auth";
 import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore/lite";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
@@ -21,13 +21,18 @@ const app = initializeApp({
   appId: "1:1055631746678:web:ad062b1b08d70120a06157",
 });
 
-// a dev build's emulators don't check tokens, and this would call out to Google
-const appCheck = import.meta.env.DEV
-  ? null
-  : initializeAppCheck(app, {
-      provider: new ReCaptchaEnterpriseProvider("6LdcDAwuAAAAAA81qI1LoGLPgWlCU6hMogns6GWM"),
-      isTokenAutoRefreshEnabled: true,
-    });
+// the emulators require a token but don't verify its signature, and reCAPTCHA would call out to Google
+const appCheck = initializeAppCheck(app, {
+  provider: import.meta.env.DEV
+    ? new CustomProvider({ getToken: async () => ({ token: unsignedAppCheckToken(), expireTimeMillis: Date.now() + 3_600_000 }) })
+    : new ReCaptchaEnterpriseProvider("6LdcDAwuAAAAAA81qI1LoGLPgWlCU6hMogns6GWM"),
+  isTokenAutoRefreshEnabled: true,
+});
+
+function unsignedAppCheckToken(): string {
+  const part = (value: object) => btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${part({ alg: "none", typ: "JWT" })}.${part({ sub: "1:0:web:dev", aud: ["projects/demo-nethack"], exp: Math.floor(Date.now() / 1000) + 3600 })}.`;
+}
 
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -43,7 +48,6 @@ if (import.meta.env.DEV) {
  * won't change by retrying, so it ends the page; anything else throws, for the caller's usual retry.
  */
 async function holdingToken(): Promise<void> {
-  if (!appCheck) return;
   try {
     await getToken(appCheck);
   } catch (e) {
