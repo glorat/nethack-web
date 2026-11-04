@@ -1,4 +1,5 @@
 // An offline game, from the page's side: the browser keeps everything, and nothing goes anywhere.
+import { watchAddress } from "../../port/modes";
 import type { PageMode } from "../../ui/mode";
 import { SAVED_FAREWELL } from "../../ui/mode";
 import { gameAuthority } from "../fixed-inputs";
@@ -30,7 +31,7 @@ export function offlineMode(notice: (text: string | null) => void): PageMode {
     finished(text) {
       keepLastGame(text);
     },
-    replayAddress: () => `${location.pathname}?replay`,
+    replayAddress: () => watchAddress("offline"),
     seed: async () => null,
     leaving: async () => {},
     closing() {},

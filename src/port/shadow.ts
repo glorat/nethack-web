@@ -1,6 +1,6 @@
 const KEY = "nethack.shadow";
 
-/** Whether a developer has asked for the game to be shadowed, by /play/?shadow; ?shadow=0 stops it. */
+/** Whether a developer has asked for the game to be shadowed, by ?shadow on a game page; ?shadow=0 stops it. */
 export function shadowWanted(): boolean {
   const asked = new URLSearchParams(location.search).get("shadow");
   try {

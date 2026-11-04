@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { PLAY_PATH } from "../../port/name";
 import { listOnlineGames, loadProfile } from "../server/api";
 import { type GameSummary, onlineAddress } from "../session";
 import { zoneChoices, zoneLabel } from "../zones";
@@ -63,7 +62,7 @@ export function OnlineChoice({ name, onBack }: { name: string; onBack: () => voi
           <ul class="online-games">
             {games.map((g) => (
               <li key={g.game}>
-                <a href={onlineAddress(PLAY_PATH, g.name, { game: g.game })}>
+                <a href={onlineAddress(g.name, { game: g.game })}>
                   <strong>{g.name}</strong>
                   <small>Last played {playedOn(g.lastPlayedAt)}</small>
                 </a>
@@ -83,7 +82,7 @@ export function OnlineChoice({ name, onBack }: { name: string; onBack: () => voi
       </select>
       <p class="start-sub">Sets the date and hour in your game, which the moon and some monsters care about. It can't change once the game has started.</p>
       <p class="start-sub">If your connection drops, you may lose your last few moves.</p>
-      <button type="button" class="primary" onClick={() => location.assign(onlineAddress(PLAY_PATH, name, { utcOffset: zone }))}>
+      <button type="button" class="primary" onClick={() => location.assign(onlineAddress(name, { utcOffset: zone }))}>
         Start New Game as {name}
       </button>
       <button type="button" onClick={onBack}>

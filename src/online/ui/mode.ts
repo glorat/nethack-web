@@ -2,6 +2,7 @@
 import type { PageMode } from "../../ui/mode";
 import { linesIn } from "../../port/recording";
 import { createOnlineSession, createUploader } from "../server/api";
+import { gameWatchAddress } from "../results";
 import type { OnlineSession } from "../session";
 import type { LogUploader, UploadNotice } from "../upload";
 import { chosenZone } from "../zones";
@@ -94,10 +95,7 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
       uploader?.finished(text);
     },
     replayAddress() {
-      // watchedGame's address, from the server
-      const params = new URLSearchParams(location.search);
-      params.set("replay", "");
-      return `${location.pathname}?${params}`;
+      return gameWatchAddress(new URLSearchParams(location.search).get("game") ?? "");
     },
     async seed() {
       if (!session) return null;

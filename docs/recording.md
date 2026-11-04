@@ -84,13 +84,13 @@ The web build never reads the high score list during play, only to rank a finish
 
 ## Watching a recording
 
-In the browser, `/play/?replay` plays the last finished game, which each game over replaces, and only the end screen offers a button for it. Recordings aren't versioned: one that no longer plays, as after an upgrade that changed the game, or that's corrupted, is reported only as no longer available. `src/worker/replay-runner.ts` plays it at a chosen number of turns a second, flashing each prompt the player answered at 1× and slower. Faster, it sends the page what happened about every 30 ms, without the bells, as a browser can't redraw the map for every event at speed. It seeks by playing again from the start without showing the way.
+In the browser, `/offline/watch/` plays the last finished offline game, and `/online/watch/?game=…` a finished online game from the server. Each offline game over replaces the last one's recording, and only the end screen offers a button for it. Recordings aren't versioned: one that no longer plays, as after an upgrade that changed the game, or that's corrupted, is reported only as no longer available. `src/worker/replay-runner.ts` plays it at a chosen number of turns a second, flashing each prompt the player answered at 1× and slower. Faster, it sends the page what happened about every 30 ms, without the bells, as a browser can't redraw the map for every event at speed. It seeks by playing again from the start without showing the way.
 
 `tests/headless/golden/` holds long recorded games that every test run replays, so a change that alters how the game plays fails there. `GOLDEN=write pnpm test golden` records them afresh, after a change meant to alter play.
 
 ## Shadowing a game
 
-For developers. `/play/?shadow` turns it on for this browser and `?shadow=0` turns it off. A second worker runs its own core, replaying the recording as it's written (`src/worker/shadow.ts`) and checking every mark, so a game that wouldn't replay shows up while it's played. It only reads, and can't affect the game. A bar shows how it's getting on.
+For developers. `?shadow` on a game page, such as `/offline/play/?shadow`, turns it on for this browser and `?shadow=0` turns it off. A second worker runs its own core, replaying the recording as it's written (`src/worker/shadow.ts`) and checking every mark, so a game that wouldn't replay shows up while it's played. It only reads, and can't affect the game. A bar shows how it's getting on.
 
 The bar's **Download Debug Package** gives a JSON file with the recording so far, the bones it names, the build, and both sides' files of this game if it found a difference. It holds the character's name and options and all that was typed, and is only ever shared by hand. To replay one on the headless core:
 

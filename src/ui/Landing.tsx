@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { WIKI_URL } from "../port/describe";
-import { playerName, PLAY_PATH, savedName, saveName } from "../port/name";
-import { type GameSummary, onlineAddress, onlineWanted } from "../online/session";
+import { playerName, savedName, saveName } from "../port/name";
+import { type GameMode, homeAddress, keepLastMode, lastMode, placeOf, playAddress } from "../port/modes";
+import { type GameSummary, onlineAddress } from "../online/session";
 import { OnlineChoice } from "../online/ui/OnlineChoice";
 import { Leaderboard } from "../online/ui/Leaderboard";
 import { OnlineGames } from "../online/ui/OnlineGames";
 import { GamesInProgress } from "../online/ui/GamesInProgress";
 import { Achievements } from "../online/ui/Achievements";
 import { saveOptions, savedOptions } from "../port/options";
-import { keepLastMode, lastMode } from "../port/last-mode";
 import type { Profile } from "../online/account";
 import { AccountBar, HandlePrompt } from "../online/ui/Account";
 import { offlineGameUnder } from "../offline/progress";
@@ -18,8 +18,12 @@ import { updateWhenIdle } from "../sw/register";
 import { AboutDialog } from "./dialogs/AboutDialog";
 import { OptionsDialog } from "./dialogs/OptionsDialog";
 
-/** Online stays out of sight in a production build until it's ready for players; `?online` shows it, for trying it there. */
-const onlineOffered = () => import.meta.env.DEV || onlineWanted(location.search);
+// each mode's home loads this; only the online one reaches the network
+const MODE: GameMode = placeOf(location.pathname)?.mode ?? "online";
+const OTHER: GameMode = MODE === "online" ? "offline" : "online";
+// read before this visit is kept, so a first visit opens the help; kept at once, as the page may be left before it paints
+const RETURNING = lastMode();
+keepLastMode(MODE);
 
 /** This page's address without the given parameters. */
 function addressWithout(...names: string[]): string {
@@ -30,75 +34,64 @@ function addressWithout(...names: string[]): string {
 }
 
 export function Landing() {
+  const online = MODE === "online";
   const [remembered] = useState(savedName);
   const [changing, setChanging] = useState(!remembered);
   const [name, setName] = useState(remembered);
   const [editingOptions, setEditingOptions] = useState(false);
   const [about, setAbout] = useState(false);
   const [choosingOnline, setChoosingOnline] = useState(false);
-  const [offered] = useState(onlineOffered);
-  const [refused] = useState(() => new URLSearchParams(location.search).has("refused"));
+  const returning = RETURNING;
+  const [refused] = useState(() => online && new URLSearchParams(location.search).has("refused"));
   const [inProgress, setInProgress] = useState<GameSummary[]>([]);
-  const [returning, setReturning] = useState(lastMode);
   const [profile, setProfile] = useState<Profile | null>(null);
-  // only a page back from Google loads the server's code to read its answer, so other visits stay off the server
-  const [finishing, setFinishing] = useState(() => new URLSearchParams(location.search).has("signingin"));
+  const [unreachable, setUnreachable] = useState(() => online && navigator.onLine === false);
+  // asking again would only be refused again
+  const [finishing, setFinishing] = useState(online && !refused);
   const [signingIn, setSigningIn] = useState(false);
   const [signInFailed, setSignInFailed] = useState(false);
-  const [signedOut] = useState(() => new URLSearchParams(location.search).has("signedout"));
+  const [signedOut] = useState(() => online && new URLSearchParams(location.search).has("signedout"));
   const [signOutFailed, setSignOutFailed] = useState(false);
   useEffect(() => {
-    // the notes are for coming here from Google or signing out, not for a reload later
-    const params = new URLSearchParams(location.search);
-    if (params.has("signedout") || params.has("signingin")) history.replaceState(history.state, "", addressWithout("signedout", "signingin"));
+    // the note is for coming here from signing out, not for a reload later
+    if (new URLSearchParams(location.search).has("signedout")) history.replaceState(history.state, "", addressWithout("signedout"));
   }, []);
   useEffect(() => {
     if (!finishing) return;
+    // a page Google sent back after signing in has its answer to read first; any other has none, and asks nothing
     finishSignIn()
-      .then(
-        (signedIn) => {
-          if (!signedIn) return;
-          // the account's games and handle are the server's to show, which this page asks for after an online game
-          keepLastMode("online");
-          setReturning("online");
-        },
-        (e) => {
-          console.warn("couldn't sign in", e);
-          setSignInFailed(true);
-        },
-      )
+      .catch((e) => {
+        console.warn("couldn't sign in", e);
+        setSignInFailed(true);
+      })
       .finally(() => setFinishing(false));
   }, []);
   useEffect(() => {
-    // anyone else's visit doesn't touch the server
-    // asking again would only be refused again, and send this page back to itself
     // until a sign-in is finished, the player's games and profile are still the anonymous player's
-    if (finishing || !offered || returning !== "online" || refused) return;
-    listOnlineGames().then(
-      setInProgress,
-      (e) => console.warn("couldn't list online games", e),
-    );
-    loadProfile().then(setProfile, (e) => console.warn("couldn't read the profile", e));
-  }, [finishing, returning]);
+    if (!online || finishing || refused) return;
+    const lost = (what: string) => (e: unknown) => {
+      console.warn(`couldn't ${what}`, e);
+      setUnreachable(true);
+    };
+    listOnlineGames().then(setInProgress, lost("list online games"));
+    loadProfile().then(setProfile, lost("read the profile"));
+  }, [finishing]);
+  useEffect(() => {
+    if (!online) return;
+    const gone = () => setUnreachable(true);
+    addEventListener("offline", gone);
+    return () => removeEventListener("offline", gone);
+  }, []);
   useEffect(() => {
     // back from Google without signing in, the browser may show this page as it was left
-    const shown = (e: PageTransitionEvent) => {
-      if (!e.persisted) return;
-      history.replaceState(history.state, "", addressWithout("signingin"));
-      setSigningIn(false);
-    };
+    const shown = (e: PageTransitionEvent) => e.persisted && setSigningIn(false);
     addEventListener("pageshow", shown);
     return () => removeEventListener("pageshow", shown);
   }, []);
   const signIn = () => {
     setSigningIn(true);
     setSignInFailed(false);
-    // Google sends the player back to this address, which then says to finish
-    const params = new URLSearchParams(location.search);
-    params.set("signingin", "");
-    history.replaceState(history.state, "", `${location.pathname}?${params}`);
     signInWithGoogle().catch((e) => {
-      history.replaceState(history.state, "", addressWithout("signingin"));
       setSigningIn(false);
       console.warn("couldn't sign in", e);
       setSignInFailed(true);
@@ -107,11 +100,7 @@ export function Landing() {
   const signOutHere = () => {
     setSignOutFailed(false);
     signOut().then(
-      () => {
-        const params = new URLSearchParams(location.search);
-        params.set("signedout", "");
-        location.assign(`${import.meta.env.BASE_URL}?${params}`);
-      },
+      () => location.assign(`${homeAddress("online")}?signedout`),
       (e) => {
         console.warn("couldn't sign out", e);
         setSignOutFailed(true);
@@ -123,9 +112,8 @@ export function Landing() {
     if (profile?.handle && !name) setName(profile.handle);
   }, [profile?.handle]);
   const latestOnline = inProgress.reduce<GameSummary | null>((a, g) => (a && a.lastPlayedAt >= g.lastPlayedAt ? a : g), null);
-  const offlineInProgress = !changing && offlineGameUnder(remembered);
-  const continueOnline = latestOnline && !changing ? () => location.assign(onlineAddress(PLAY_PATH, latestOnline.name, { game: latestOnline.game })) : null;
-  const mainAction = continueOnline ?? (offlineInProgress || !offered ? "offline" : "online");
+  const offlineInProgress = !online && !changing && offlineGameUnder(remembered);
+  const continueOnline = latestOnline && !changing ? () => location.assign(onlineAddress(latestOnline.name, { game: latestOnline.game })) : null;
   const playButton = useRef<HTMLButtonElement>(null);
   const backFromOnline = () => {
     setChoosingOnline(false);
@@ -135,7 +123,8 @@ export function Landing() {
     const n = playerName(name);
     if (!n) return;
     // where the browser won't keep the name, the address carries it to the game
-    location.assign(saveName(n) ? PLAY_PATH : `${PLAY_PATH}?name=${encodeURIComponent(n)}`);
+    const path = playAddress("offline");
+    location.assign(saveName(n) ? path : `${path}?name=${encodeURIComponent(n)}`);
   };
   const chooseOnline = () => {
     const n = playerName(name);
@@ -152,51 +141,67 @@ export function Landing() {
     if (import.meta.env.PROD) navigator.serviceWorker?.ready.then(() => setOfflineReady(true));
   }, []);
   const valid = playerName(name).length > 0;
-  const onlinePanels = offered && returning === "online" && !refused;
+  const onlinePanels = online && !refused;
+  const goOther = (label: string) => (
+    <a class="mode-switch" href={homeAddress(OTHER)}>
+      {label}
+    </a>
+  );
   return (
-    <div class="landing">
-      <header class="landing-bar">
-        <span class="landing-title">NetHack</span>
+    <div class={`landing ${MODE}`}>
+      <header class={`landing-bar ${MODE}`}>
+        <span class="landing-title">
+          NetHack{online ? null : <span class="mode-badge">Offline</span>}
+        </span>
         <span class="landing-bar-end">
-          {offered && !refused ? <AccountBar profile={profile} onSignIn={signIn} signingIn={signingIn || finishing} onSignOut={signOutHere} /> : null}
+          {onlinePanels ? <AccountBar profile={profile} onSignIn={signIn} signingIn={signingIn || finishing} onSignOut={signOutHere} /> : null}
+          {goOther(online ? "Go Offline" : "Go Online")}
           <button onClick={() => setAbout(true)}>About</button>
         </span>
       </header>
       {signInFailed && (
-        <p class="server-waiting" role="alert">
+        <p class="landing-note" role="alert">
           Couldn't sign in. Try again, or keep playing as you are.
         </p>
       )}
       {signOutFailed && (
-        <p class="server-waiting" role="alert">
+        <p class="landing-note" role="alert">
           Couldn't sign out. Try again.
         </p>
       )}
       {signedOut && (
-        <p class="server-waiting" role="status">
+        <p class="landing-note" role="status">
           You're signed out. Your online games and handle are kept for when you sign in again.
         </p>
       )}
-      {refused && (
-        <p class="server-waiting" role="alert">
-          Online play isn't available in this browser right now, and your latest moves may not have been saved. Offline play still works.
+      {refused ? (
+        <p class="landing-note" role="alert">
+          Online play isn't available in this browser right now, and your latest moves may not have been saved. Offline play still works. {goOther("Go Offline")}
         </p>
-      )}
+      ) : unreachable ? (
+        <p class="landing-note" role="alert">
+          Can't reach the server right now. Your online games are safe and will be here when you're back. {goOther("Play Offline Instead")}
+        </p>
+      ) : null}
       <main class="landing-main">
-        {offered && !refused && profile?.signedIn && !profile.handle ? <HandlePrompt profile={profile} onProfile={setProfile} /> : null}
+        {onlinePanels && profile?.signedIn && !profile.handle ? <HandlePrompt profile={profile} onProfile={setProfile} /> : null}
         <section class="landing-hero">
           <form
             class="start-card"
             onSubmit={(e) => {
               e.preventDefault();
               // Enter does what's highlighted
-              if (continueOnline) continueOnline();
-              else if (mainAction === "online") chooseOnline();
-              else playOffline();
+              if (!online) playOffline();
+              else if (continueOnline) continueOnline();
+              else chooseOnline();
             }}
           >
             <h1>NetHack</h1>
-            <p class="start-sub">The classic dungeon crawl with painted tiles, in your browser. Nothing to install, and it plays even with no connection.</p>
+            <p class="start-sub">
+              {online
+                ? "Your games are kept for you, so you can pick them up on any device, and the ones you finish count for the high scores. Needs a connection."
+                : "Games stay on this device and play with no connection. They aren't backed up or scored, and they're separate from your online games."}
+            </p>
             {choosingOnline ? (
               <OnlineChoice name={playerName(name)} onBack={backFromOnline} />
             ) : (
@@ -207,21 +212,22 @@ export function Landing() {
                     <input id="name" value={name} autofocus maxLength={31} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
                   </>
                 ) : null}
-                {continueOnline && latestOnline ? (
-                  <button type="submit" class="primary">
-                    Continue Online as {latestOnline.name}
-                  </button>
-                ) : null}
-                {[
-                  offered ? (
-                    <button key="online" type={mainAction === "online" ? "submit" : "button"} class={mainAction === "online" ? "primary" : undefined} disabled={!valid} ref={playButton} onClick={mainAction === "online" ? undefined : chooseOnline}>
+                {online ? (
+                  <>
+                    {continueOnline && latestOnline ? (
+                      <button type="submit" class="primary">
+                        Continue Online as {latestOnline.name}
+                      </button>
+                    ) : null}
+                    <button type={continueOnline ? "button" : "submit"} class={continueOnline ? undefined : "primary"} disabled={!valid} ref={playButton} onClick={continueOnline ? chooseOnline : undefined}>
                       {changing ? "Play Online" : `Play Online as ${remembered}`}
                     </button>
-                  ) : null,
-                  <button key="offline" type={mainAction === "offline" ? "submit" : "button"} class={mainAction === "offline" ? "primary" : undefined} disabled={!valid} onClick={mainAction === "offline" ? undefined : playOffline}>
+                  </>
+                ) : (
+                  <button type="submit" class="primary" disabled={!valid}>
                     {changing ? "Play Offline" : `${offlineInProgress ? "Continue" : "Play"} Offline as ${remembered}`}
-                  </button>,
-                ].sort((a, b) => Number(b?.key === mainAction) - Number(a?.key === mainAction))}
+                  </button>
+                )}
                 <div class="start-links">
                   {changing ? null : (
                     <button type="button" onClick={() => setChanging(true)}>
@@ -234,20 +240,20 @@ export function Landing() {
                 </div>
               </>
             )}
-            {offlineReady ? <p class="landing-ready">✓ Ready to play offline</p> : null}
+            {!online && offlineReady ? <p class="landing-ready">✓ Ready to play offline</p> : null}
           </form>
           <img class="landing-shot" src={`${import.meta.env.BASE_URL}screenshot.jpg`} alt="A NetHack game: the dungeon map in painted tiles, with stats, equipment, messages and inventory around it" />
         </section>
-        {/* one is already the Continue button */}
-        {onlinePanels && inProgress.length > 1 ? <GamesInProgress games={inProgress} /> : null}
-        {onlinePanels ? <OnlineGames /> : null}
-        <DeviceGames />
         {onlinePanels ? (
           <>
+            {/* one is already the Continue button */}
+            {inProgress.length > 1 ? <GamesInProgress games={inProgress} /> : null}
+            <OnlineGames />
             <Achievements />
             <Leaderboard />
           </>
         ) : null}
+        {online ? null : <DeviceGames />}
         <section class="landing-panels">
           <details class={`landing-panel landing-help${returning ? " secondary" : ""}`} open={!returning}>
             <summary>
@@ -261,23 +267,13 @@ export function Landing() {
             </ul>
             <p>The <a href={WIKI_URL} target="_blank" rel="noopener">NetHack Wiki</a> covers everything.</p>
           </details>
-          <div class={`landing-panel${returning ? " secondary" : ""}`}>
-            <h2>{offered ? "Online or offline?" : "Where your game is kept"}</h2>
-            {offered ? (
-              <>
-                <p>
-                  <strong>Online</strong> games are kept for you, so you can have several on the go, and the ones you finish count for the high scores. They need a connection.
-                </p>
-                <p>
-                  <strong>Offline</strong> games stay on this device and play without a connection, but they aren't backed up anywhere.
-                </p>
-              </>
-            ) : (
-              <p>
-                <strong>Offline</strong> games are kept on this device. You can play without an internet connection, and your game is waiting whenever you come back. It isn't backed up anywhere, though, so it can be lost, for example if you clear your browsing data.
-              </p>
-            )}
-          </div>
+          {online ? null : (
+            <div class="landing-panel">
+              <h2>Play online</h2>
+              <p>Online games are kept for you, so you can pick them up on any device, and the ones you finish count for the high scores. They're separate from the games on this device.</p>
+              {goOther("Go Online")}
+            </div>
+          )}
         </section>
       </main>
       <footer class="landing-footer">

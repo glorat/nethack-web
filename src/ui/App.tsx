@@ -3,18 +3,17 @@ import { GameClient, ShadowClient } from "../client";
 import { WIKI_URL } from "../port/describe";
 import { commandToRun, listCommands } from "../port/extcmd";
 import { ArrowChords, keyCode, takeLine, type KeyLike } from "../port/keys";
-import { playerName, PLAY_PATH, savedName } from "../port/name";
+import { playerName, savedName } from "../port/name";
 import { configFile, OPTIONS_KEY, savedOptions, savedOptionsFile, saveOptions as keepOptions } from "../port/options";
 import { applyEvents, initialState, nextBatch } from "../port/state";
 import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, textSizeFromOptions } from "../port/textsize";
 import type { Answer, GameRequest, ReplayProgress, ShadowStatus } from "../protocol";
 import { buildDebugPackage, debugPackageName, namedBones } from "../port/debug-package";
-import { keepLastMode } from "../port/last-mode";
+import { homeAddress, keepLastMode, placeOf, playAddress } from "../port/modes";
 import { lastGame } from "../offline/last-game";
 import { offlineMode } from "../offline/ui/mode";
 import { downloadRecording, downloadText, lastTurnIn, replayable } from "../port/recording";
 import { shadowWanted } from "../port/shadow";
-import { onlineWanted } from "../online/session";
 import { onlineMode } from "../online/ui/mode";
 import { watchedGame } from "../online/results";
 import { finishedGameRecording } from "../online/server/api";
@@ -73,7 +72,10 @@ const ASCII_FONT_KEY = "nethack.asciiFont";
 const INVENTORY_KEY = "nethack.showInventory";
 const INVENTORY_WIDTH_KEY = "nethack.inventoryWidth";
 const TEXT_SIZE_KEY = "nethack.textSize";
-const LANDING_PATH = import.meta.env.BASE_URL;
+// only the game and watch pages load this, so anywhere else is taken as offline, which reaches nothing
+const PLACE = placeOf(location.pathname) ?? { mode: "offline", page: "play" };
+const LANDING_PATH = homeAddress(PLACE.mode);
+keepLastMode(PLACE.mode);
 // with Cmd or Ctrl and Option, as Cocoa's View menu has them; 0 is back to the default
 const TEXT_SIZE_KEYS: Record<string, (size: number) => number> = {
   Equal: biggerTextSize,
@@ -185,14 +187,14 @@ interface Props {
 
 export function App({ handedOver, onReplay }: Props) {
   // the address asks for a replay, in place of playing: of the last finished game here, or of an online game from the server
-  const [watched] = useState(() => watchedGame(location.search));
+  const [watched] = useState(() => (PLACE.mode === "online" && PLACE.page === "watch" ? watchedGame(location.search) : null));
   const [replay, setReplay] = useState<{ text: string | null; loading?: boolean } | null>(() =>
     handedOver !== undefined
       ? { text: handedOver }
-      : !new URLSearchParams(location.search).has("replay")
+      : PLACE.page !== "watch"
         ? null
-        : watched
-          ? { text: null, loading: true }
+        : PLACE.mode === "online"
+          ? { text: null, loading: !!watched }
           : { text: lastGame() },
   );
   useEffect(() => {
@@ -216,7 +218,7 @@ export function App({ handedOver, onReplay }: Props) {
   const [shadowStatus, setShadowStatus] = useState<ShadowStatus | null>(null);
   const [shadowing] = useState(() => !replay && shadowWanted());
   const [notice, setNotice] = useState<string | null>(null);
-  const [mode] = useState<PageMode | null>(() => (replay ? null : onlineWanted(location.search) ? onlineMode(setNotice) : offlineMode(setNotice)));
+  const [mode] = useState<PageMode | null>(() => (replay ? null : PLACE.mode === "online" ? onlineMode(setNotice) : offlineMode(setNotice)));
   const [gameLost, setGameLost] = useState(false);
   const unseen = useRef(!!mode?.dropsUnseenKeys);
   const [sheet, setSheet] = useState<TileSheet | null>(null);
@@ -646,7 +648,6 @@ export function App({ handedOver, onReplay }: Props) {
     const options = `name:${name}`;
     const config = configFile(`${BASE_OPTIONS}${ascii ? ",ascii_map" : ""}`, savedOptions());
     if (!mode) return;
-    keepLastMode(mode.kind);
     const start = await mode.start({ name, assetBase, options, config, shadowed: shadowing });
     if (start) client.start(start);
   };
@@ -706,7 +707,8 @@ export function App({ handedOver, onReplay }: Props) {
         {
           title: "New Game",
           disabled: !replay && state.gameOver === null,
-          run: () => (replay ? location.assign(watched ? LANDING_PATH : PLAY_PATH) : location.reload()),
+          // a new online game is chosen at home, where its time zone is
+          run: () => (replay ? location.assign(PLACE.mode === "online" ? LANDING_PATH : playAddress("offline")) : location.reload()),
         },
       ],
     },

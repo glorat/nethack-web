@@ -12,7 +12,7 @@ async function startGame(page: Page, name: string) {
 
 /** Goes through the landing page as this character, whatever name it remembers. */
 async function enterGame(page: Page, name: string) {
-  await page.goto("/");
+  await page.goto("/offline/");
   const play = page.getByRole("button", { name: /^(Play|Continue) Offline/ });
   await play.waitFor();
   const change = page.getByRole("button", { name: "Change Name" });
@@ -142,7 +142,7 @@ test("Save & Quit goes to the landing page, and Play and a reload both bring the
   await page.keyboard.press("S");
   const play = page.getByRole("button", { name: `Continue Offline as ${name}` });
   await expect(play).toBeVisible();
-  expect(new URL(page.url()).pathname).toBe("/");
+  expect(new URL(page.url()).pathname).toBe("/offline/");
 
   await play.click();
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
@@ -157,47 +157,78 @@ test("Save & Quit goes to the landing page, and Play and a reload both bring the
 test("the landing page opens without loading the game, and Back returns to it from a game", async ({ page }) => {
   const core: string[] = [];
   page.on("request", (r) => /nethack\.(js|wasm)/.test(r.url()) && core.push(r.url()));
-  await page.goto("/");
+  await page.goto("/offline/");
   await expect(page.getByRole("heading", { name: "NetHack", exact: true })).toBeVisible();
   await expect(page.getByText(/unofficial web port/)).toBeVisible();
   await expect(page.locator(".landing-shot")).toHaveJSProperty("complete", true);
   expect(core).toEqual([]);
 
   for (const asset of ["/favicon.png", "/apple-touch-icon.png", "/social.jpg"]) expect((await page.request.get(asset)).ok()).toBe(true);
-  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", "https://nethack.app/social.jpg");
+  // the root's, which link previews read without running its redirect
+  expect(await (await page.request.get("/")).text()).toContain('<meta property="og:image" content="https://nethack.app/social.jpg" />');
 
   const licence = await page.request.get("/license.txt");
   expect(await licence.text()).toContain("NETHACK GENERAL PUBLIC LICENSE");
 
   await enterGame(page, `Back${Date.now() % 100000}`);
   await untilPlaying(page);
-  expect(new URL(page.url()).pathname).toBe("/play/");
+  expect(new URL(page.url()).pathname).toBe("/offline/play/");
   await page.goBack();
   await expect(page.getByRole("button", { name: /^Continue Offline as Back/ })).toBeVisible();
 });
 
-test("the landing page asks the server nothing for someone whose last game was offline", async ({ page }) => {
-  const server: string[] = [];
-  page.on("request", (r) => {
-    const { host, pathname } = new URL(r.url());
-    if (/:(9299|8299|5299|9399)$|googleapis|firebase|gstatic|recaptcha/.test(host) || /server\/firebase|deps\/firebase/.test(pathname)) server.push(r.url());
-  });
-  await page.goto("/");
-  await page.evaluate(() => {
-    localStorage.setItem("nethack-web.name", "Mixed");
-    localStorage.setItem("nethack-web.lastMode", "offline");
-  });
+test("the offline home asks nothing of anywhere but this site, before or after a reload, and offers no sign-in", async ({ page }) => {
+  const outside: string[] = [];
+  page.on("request", (r) => new URL(r.url()).host !== "127.0.0.1:5199" && outside.push(r.url()));
+  await page.goto("/offline/");
+  await page.evaluate(() => localStorage.setItem("nethack-web.name", "Quiet"));
   await page.reload();
-  await expect(page.getByRole("button", { name: /^Play Online as Mixed/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign In with Google" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Play Offline as Quiet/ })).toBeVisible();
+  await expect(page.locator(".mode-badge")).toHaveText("Offline");
+  await expect(page.getByRole("button", { name: "Sign In with Google" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Online/ })).toHaveCount(0);
   await page.waitForTimeout(1000);
-  expect(server).toEqual([]);
+  expect(outside).toEqual([]);
+});
+
+test("the site's root opens online the first time, then whichever mode was visited last", async ({ page }) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/online\/$/);
+  await page.goto("/offline/");
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/offline\/$/);
+  await expect(page.locator(".mode-badge")).toHaveText("Offline");
+});
+
+test("Go Offline and Go Online move between the two homes, and Back returns", async ({ page }) => {
+  await page.goto("/online/");
+  await expect(page.locator(".mode-badge")).toHaveCount(0);
+  await expect(page.locator(".start-sub")).toContainText("count for the high scores");
+  await page.locator(".landing-bar").getByRole("link", { name: "Go Offline" }).click();
+  await expect(page).toHaveURL(/\/offline\/$/);
+  await expect(page.locator(".start-sub")).toContainText("separate from your online games");
+  await page.locator(".landing-bar").getByRole("link", { name: "Go Online" }).click();
+  await expect(page).toHaveURL(/\/online\/$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/offline\/$/);
+  // the offline home's own invitation goes there too
+  await page.locator(".landing-panel").getByRole("link", { name: "Go Online" }).click();
+  await expect(page).toHaveURL(/\/online\/$/);
+});
+
+test("an online home that can't reach the server says the games are safe, and offers offline play", async ({ page }) => {
+  // no emulators here, so the server can't be reached
+  await page.goto("/online/");
+  const banner = page.getByRole("alert").filter({ hasText: "Can't reach the server right now" });
+  await expect(banner).toContainText("Your online games are safe");
+  await banner.getByRole("link", { name: "Play Offline Instead" }).click();
+  await expect(page).toHaveURL(/\/offline\/$/);
 });
 
 test("the game page without a name goes to the landing page", async ({ page }) => {
-  await page.goto("/play/");
+  await page.goto("/offline/play/");
   await expect(page.getByLabel("Who are you?")).toBeVisible();
-  expect(new URL(page.url()).pathname).toBe("/");
+  expect(new URL(page.url()).pathname).toBe("/offline/");
 });
 
 test("a browser that won't keep the name still starts the game, from the address", async ({ page }) => {
@@ -1214,7 +1245,7 @@ test("a menu's lines of text read as text, its headings as headings", async ({ p
 });
 
 test("the options file is edited in the browser and read when a game starts", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/offline/");
   await page.getByRole("button", { name: "Edit Options File..." }).click();
   const editor = page.getByRole("dialog", { name: "Options file" });
   const text = editor.locator("textarea");
@@ -1345,7 +1376,7 @@ test("a tile set the browser won't keep is used until the page closes, and says 
 
 test("tile_file in the options file chooses the tile set, and an unknown one falls back to the default", async ({ page }) => {
   const play = async (name: string, options: string) => {
-    await page.goto("/");
+    await page.goto("/offline/");
     await page.evaluate((options) => localStorage.setItem("nethack.options", options), options);
     await enterGame(page, name);
     await untilPlaying(page);
@@ -1388,7 +1419,7 @@ test("when the game ends, a dialog offers a new game under the same name, or the
   // Return starts another game at once, without going through the landing page
   await page.keyboard.press("Enter");
   await untilPlaying(page);
-  expect(new URL(page.url()).pathname).toBe("/play/");
+  expect(new URL(page.url()).pathname).toBe("/offline/play/");
 
   // Escape goes to the landing page
   await quitGame();
@@ -1397,11 +1428,11 @@ test("when the game ends, a dialog offers a new game under the same name, or the
 
   await page.getByRole("link", { name: "Watch your last game" }).click();
   await expect(page.locator(".stats-title")).toBeVisible({ timeout: 15_000 });
-  expect(new URL(page.url()).search).toBe("?replay");
+  expect(new URL(page.url()).pathname).toBe("/offline/watch/");
 });
 
 test("the help for new players is open for a new visitor, and folded away once they've played", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/offline/");
   const help = page.locator("details", { has: page.getByRole("heading", { name: "New to NetHack?" }) });
   await expect(help).toHaveAttribute("open", "");
   await startGame(page, `Hp${Date.now() % 100000}`);
@@ -1412,7 +1443,7 @@ test("the help for new players is open for a new visitor, and folded away once t
 });
 
 test("a saved game is what the landing page offers first, and a new visitor sees no games of their own", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/offline/");
   await expect(page.getByRole("heading", { name: /best games/ })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Watch your last game" })).toHaveCount(0);
   const name = `First${Date.now() % 100000}`;
@@ -1691,7 +1722,7 @@ test("a finished game can be replayed from its end screen or its address, reload
 
   await over.getByRole("button", { name: "Replay" }).click();
   const playing = page.url();
-  expect(new URL(playing).search).toBe("?replay");
+  expect(new URL(playing).pathname).toBe("/offline/watch/");
   const bar = page.getByRole("toolbar", { name: "Replay" });
   await expect(bar).toBeVisible();
 
@@ -1766,7 +1797,7 @@ test("a finished game the browser won't keep still replays from its end screen, 
 
   // nothing kept to come back to
   await page.reload();
-  await expect(page).not.toHaveURL(/play/);
+  await expect(page).toHaveURL(/\/offline\/$/);
   await expect(page.getByRole("link", { name: "Watch your last game" })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
@@ -1801,9 +1832,9 @@ test.describe("shadowing a game", () => {
   test("is off for players, and a developer's address turns it on and off", async ({ page }) => {
     await startGame(page, `Off${Date.now() % 100000}`);
     await expect(bar(page)).toHaveCount(0);
-    await page.goto(`/play/?shadow&name=On${Date.now() % 100000}`);
+    await page.goto(`/offline/play/?shadow&name=On${Date.now() % 100000}`);
     await expect(bar(page)).toBeVisible();
-    await page.goto(`/play/?shadow=0&name=On${Date.now() % 100000}`);
+    await page.goto(`/offline/play/?shadow=0&name=On${Date.now() % 100000}`);
     await expect(bar(page)).toHaveCount(0);
   });
 
@@ -1930,7 +1961,7 @@ test("a game that met bones comes back after the page closes, by its replay read
   // a game looks for bones on one level in three, by the dice, so seeds are tried until one does
   let name = "";
   for (let seed = 100; seed < 130 && !name; seed++) {
-    await page.goto("/");
+    await page.goto("/offline/");
     await page.evaluate((seed) => {
       const inputs = JSON.parse(localStorage.getItem("nethack.fixedInputs")!);
       localStorage.setItem("nethack.fixedInputs", JSON.stringify({ ...inputs, seed }));

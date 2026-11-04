@@ -47,7 +47,7 @@ async function holdingToken(): Promise<void> {
   try {
     await getToken(appCheck);
   } catch (e) {
-    if (appCheckRefused(e)) location.replace(refusedAddress(import.meta.env.BASE_URL));
+    if (appCheckRefused(e)) location.replace(refusedAddress());
     throw e;
   }
 }
