@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { sortKey } from "../../src/port/sort";
 import { clipAround } from "../../src/ui/scroll";
@@ -1252,6 +1253,88 @@ test("the View menu switches between the painted and classic tiles, and the choi
   await enterGame(page, `${name}b`);
   await untilPlaying(page);
   await expect(page.locator(".inv-icon").first()).toHaveCSS("background-image", /tiles16\.bmp/);
+});
+
+test("an imported tile set is kept in the browser, used, and can be removed", async ({ page }) => {
+  const name = `Imp${Date.now() % 100000}`;
+  await startGame(page, name);
+  const classic = readFileSync("public/tiles/tiles16.bmp");
+  const icon = page.locator(".inv-icon").first();
+  const bar = page.getByRole("menubar");
+  const view = page.getByRole("menu", { name: "View" });
+  const importSets = async (files: { name: string; mimeType: string; buffer: Buffer }[]) => {
+    await bar.getByRole("menuitem", { name: "View" }).click();
+    const chooser = page.waitForEvent("filechooser");
+    await view.getByRole("menuitem", { name: "Import Tile Set..." }).click();
+    await (await chooser).setFiles(files);
+  };
+
+  await importSets([
+    { name: "notes.png", mimeType: "image/png", buffer: Buffer.from("not an image") },
+    { name: "mine.bmp", mimeType: "image/bmp", buffer: classic },
+  ]);
+  await expect(page.locator(".messages")).toContainText(/"notes\.png" can't be used as a tile set\. It isn't an image/);
+  await expect(icon).toHaveCSS("background-image", /blob:/);
+  await bar.getByRole("menuitem", { name: "View" }).click();
+  await expect(view.getByRole("menuitemcheckbox", { name: "mine.bmp" })).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Escape");
+
+  // kept for the next game
+  await enterGame(page, `${name}b`);
+  await untilPlaying(page);
+  await expect(page.locator(".inv-icon").first()).toHaveCSS("background-image", /blob:/);
+
+  page.on("dialog", (d) => d.accept());
+  await bar.getByRole("menuitem", { name: "View" }).click();
+  await view.getByRole("menuitem", { name: 'Remove "mine.bmp"...' }).click();
+  await expect(page.locator(".inv-icon").first()).toHaveCSS("background-image", /tiles64\.png/);
+  await bar.getByRole("menuitem", { name: "View" }).click();
+  await expect(view.getByRole("menuitemcheckbox", { name: "mine.bmp" })).toHaveCount(0);
+});
+
+test("an imported tile set the browser can't read this time stays the saved choice", async ({ page }) => {
+  const name = `Kept${Date.now() % 100000}`;
+  await startGame(page, name);
+  await page.getByRole("menubar").getByRole("menuitem", { name: "View" }).click();
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("menu", { name: "View" }).getByRole("menuitem", { name: "Import Tile Set..." }).click();
+  await (await chooser).setFiles({ name: "mine.bmp", mimeType: "image/bmp", buffer: readFileSync("public/tiles/tiles16.bmp") });
+  await expect(page.locator(".inv-icon").first()).toHaveCSS("background-image", /blob:/);
+
+  await page.addInitScript(() => {
+    const open = IDBFactory.prototype.open;
+    IDBFactory.prototype.open = function (this: IDBFactory, name: string, version?: number) {
+      if (name === "nethack-tile-sets") throw new DOMException("refused", "UnknownError");
+      return open.call(this, name, version);
+    };
+  });
+  await enterGame(page, `${name}b`);
+  await untilPlaying(page);
+  await expect(page.locator(".messages")).toContainText(/"mine\.bmp" couldn't be read from this browser just now/);
+  expect(await page.evaluate(() => localStorage.getItem("nethack.tileSet"))).toBe("imported:mine.bmp");
+});
+
+test("a tile set the browser won't keep is used until the page closes, and says so", async ({ page }) => {
+  await page.addInitScript(() => {
+    const open = IDBFactory.prototype.open;
+    IDBFactory.prototype.open = function (this: IDBFactory, name: string, version?: number) {
+      if (name === "nethack-tile-sets") throw new DOMException("refused", "SecurityError");
+      return open.call(this, name, version);
+    };
+  });
+  await startGame(page, `Visit${Date.now() % 100000}`);
+  const bar = page.getByRole("menubar");
+  const view = page.getByRole("menu", { name: "View" });
+  await bar.getByRole("menuitem", { name: "View" }).click();
+  const chooser = page.waitForEvent("filechooser");
+  await view.getByRole("menuitem", { name: "Import Tile Set..." }).click();
+  await (await chooser).setFiles({ name: "mine.bmp", mimeType: "image/bmp", buffer: readFileSync("public/tiles/tiles16.bmp") });
+  await expect(page.locator(".messages")).toContainText(/the tile set "mine\.bmp" will be gone when you close this page/);
+  await expect(page.locator(".inv-icon").first()).toHaveCSS("background-image", /blob:/);
+  await bar.getByRole("menuitem", { name: "View" }).click();
+  await expect(view.getByRole("menuitemcheckbox", { name: "mine.bmp (until you close this page)" })).toHaveAttribute("aria-checked", "true");
+  // not kept as the choice, which the next page couldn't load
+  expect(await page.evaluate(() => localStorage.getItem("nethack.tileSet"))).toBeNull();
 });
 
 test("tile_file in the options file chooses the tile set, and an unknown one falls back to the default", async ({ page }) => {

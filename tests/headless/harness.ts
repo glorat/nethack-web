@@ -330,6 +330,11 @@ export class Session {
     return describeSquare(this.m, x, y);
   }
 
+  /** The tile a glyph is drawn with; -1 past the last glyph. */
+  glyphTile(glyph: number): number {
+    return this.m._nhweb_glyph_tile(glyph);
+  }
+
   /** A hash of the core's main random generator, which any use of it changes. */
   get rng(): number {
     return this.m._nhweb_rng_fingerprint();
