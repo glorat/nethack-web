@@ -86,6 +86,24 @@ test("a production build sends App Check tokens with every kind of call", async 
   expect(Object.fromEntries(seen)).toEqual({ auth: "app-check-token", firestore: "app-check-token", functions: "app-check-token" });
 });
 
+test("before an online game starts, the player is told finished games are public, and can read the terms and privacy policy", async ({ page }) => {
+  await fakeServer(page);
+  await page.route(RECAPTCHA, (route) => route.fulfill({ contentType: "text/javascript", body: FAKE_RECAPTCHA }));
+  await page.route("https://content-firebaseappcheck.googleapis.com/**", (route) =>
+    route.request().method() === "OPTIONS" ? route.fulfill({ status: 204, headers: cors }) : route.fulfill({ json: { token: "app-check-token", ttl: "3600s" }, headers: cors }),
+  );
+  await page.goto(`${PROD}online/`);
+  await page.getByLabel("Who are you?").fill("Checked");
+  await page.getByRole("button", { name: "Play Online" }).click();
+  await expect(page.getByRole("button", { name: /^Start New Game/ })).toBeVisible({ timeout: 30_000 });
+  const notice = page.locator(".online-notice");
+  await expect(notice).toContainText("Finished online games are public");
+  await notice.getByRole("link", { name: "Privacy Policy" }).click();
+  await expect(page).toHaveTitle("Privacy Policy · NetHack");
+  await page.getByRole("link", { name: "Terms of Use" }).click();
+  await expect(page).toHaveTitle("Terms of Use · NetHack");
+});
+
 const exchange = (page: Page, answer: () => "token" | "brief" | "refuse" | "unreachable") =>
   page.route("https://content-firebaseappcheck.googleapis.com/**", (route) => {
     if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });

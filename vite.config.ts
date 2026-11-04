@@ -16,7 +16,7 @@ function publicFiles(dir: string): string[] {
 }
 
 /** Every page, by its directory: the root, which opens the last mode, and each mode's home, game and replay. */
-const PAGES = ["", ...["online", "offline"].flatMap((mode) => [`${mode}/`, `${mode}/play/`, `${mode}/watch/`])];
+const PAGES = ["", ...["online", "offline"].flatMap((mode) => [`${mode}/`, `${mode}/play/`, `${mode}/watch/`]), "terms/", "privacy/"];
 
 /** Emits sw.js with a precache list of everything the built game loads. */
 function serviceWorker(): Plugin {

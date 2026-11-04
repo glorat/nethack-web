@@ -40,6 +40,8 @@ test("a production build has each mode's pages, and its root only sends the visi
     "offline/": "NetHack Offline",
     "offline/play/": "NetHack Offline",
     "offline/watch/": "Watching · NetHack Offline",
+    "terms/": "Terms of Use · NetHack",
+    "privacy/": "Privacy Policy · NetHack",
   };
   for (const [path, title] of Object.entries(titles)) {
     const response = await page.request.get(`${PROD}${path}`);

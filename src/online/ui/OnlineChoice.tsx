@@ -82,6 +82,10 @@ export function OnlineChoice({ name, onBack }: { name: string; onBack: () => voi
       </select>
       <p class="start-sub">Sets the date and hour in your game, which the moon and some monsters care about. It can't change once the game has started.</p>
       <p class="start-sub">If your connection drops, you may lose your last few moves.</p>
+      <p class="start-sub online-notice">
+        Finished online games are public, under your handle or as “Anonymous”, including every action you take in them and when they were played. By playing online you agree to the <a href={`${import.meta.env.BASE_URL}terms/`}>Terms of Use</a> and{" "}
+        <a href={`${import.meta.env.BASE_URL}privacy/`}>Privacy Policy</a>.
+      </p>
       <button type="button" class="primary" onClick={() => location.assign(onlineAddress(name, { utcOffset: zone }))}>
         Start New Game as {name}
       </button>

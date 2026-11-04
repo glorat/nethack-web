@@ -370,6 +370,15 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .start-links button:hover { color: var(--text, inherit); }
 .landing-footer { max-width: 1120px; margin: 0 auto; padding: 8px 16px 24px; color: var(--muted); font-size: 12px; }
 .landing-footer p { margin: 4px 0; }
+a.landing-title { color: inherit; text-decoration: none; }
+.legal { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; font-size: 14px; line-height: 1.55; }
+.legal h1 { margin: 0; font-size: 24px; }
+.legal h2 { margin: 24px 0 4px; font-size: 16px; }
+.legal p, .legal ul { margin: 8px 0; }
+.legal li + li { margin-top: 4px; }
+.legal a { color: var(--accent); }
+.legal-date { color: var(--muted); }
+.online-notice a { color: var(--accent); }
 .landing-panel ul { margin-top: 8px; }
 
 /* start screen */
