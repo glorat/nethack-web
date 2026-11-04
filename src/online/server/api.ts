@@ -49,6 +49,19 @@ export const listOnlineGames = (): Promise<GameSummary[]> => loadGames({ now: ()
 /** The player's finished games, latest first; asking waits for no one, as there's nothing to hold up. */
 export const listFinishedGames = async (): Promise<FinishedGame[]> => (await (await server()).finishedGames({ sentAt: Date.now() })).games;
 
+/** Deletes a finished online game, or says it's still being saved and can't be yet. One already gone counts as deleted. */
+export async function deleteFinishedGame(game: string): Promise<"deleted" | "unsaved"> {
+  try {
+    await (await server()).deleteGame({ game, sentAt: Date.now() });
+    return "deleted";
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (code === "functions/failed-precondition") return "unsaved";
+    if (code === "functions/not-found") return "deleted";
+    throw e;
+  }
+}
+
 /** The best-scoring games on the server, best first. */
 export const loadLeaderboard = async (): Promise<LeaderboardEntry[]> => (await (await server()).leaderboard({ sentAt: Date.now() })).entries;
 
