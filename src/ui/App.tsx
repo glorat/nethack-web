@@ -18,8 +18,9 @@ import { onlineWanted } from "../online/session";
 import { onlineMode } from "../online/ui/mode";
 import { watchedGame } from "../online/results";
 import { finishedGameRecording } from "../online/server/api";
-import { DEFAULT_TILE_SET, TILE_SETS, type TileSet, tileSetNamed } from "../port/tilesets";
-import { loadTileSheet, type TileSheet } from "../tiles";
+import { DEFAULT_TILE_SET, importedTileSet, TILE_SETS, type TileSet, tileSetFileName, tileSetNamed } from "../port/tilesets";
+import { loadImportedSheet, loadTileSheet, type TileSheet } from "../tiles";
+import { forgetTileSet, importedTileSets, keepTileSet, keptThisVisitOnly, tileSetFile } from "./imported-tiles";
 import { beep, wakeBeep } from "./beep";
 import type { AsciiFont } from "./ascii";
 import { AboutDialog } from "./dialogs/AboutDialog";
@@ -46,13 +47,21 @@ import { ShadowBar } from "./ShadowBar";
 import { StatsView } from "./StatsView";
 
 const TILE_SET_KEY = "nethack.tileSet";
+// before an imported set's name in TILE_SET_KEY, so one named like a shipped set stays the player's
+const IMPORTED_PREFIX = "imported:";
 
 function savedTileSet(): TileSet {
   try {
-    return tileSetNamed(localStorage.getItem(TILE_SET_KEY) ?? "") ?? DEFAULT_TILE_SET;
+    const saved = localStorage.getItem(TILE_SET_KEY) ?? "";
+    if (saved.startsWith(IMPORTED_PREFIX)) return importedTileSet(saved.slice(IMPORTED_PREFIX.length));
+    return tileSetNamed(saved) ?? DEFAULT_TILE_SET;
   } catch {
     return DEFAULT_TILE_SET;
   }
+}
+
+function sameTileSet(a: TileSet, b: TileSet): boolean {
+  return a.file === b.file && !!a.imported === !!b.imported;
 }
 const MAP_CELLS = [16, 24, 32, 48, 64];
 const ZOOM_KEY = "nethack.mapCell";
@@ -439,30 +448,48 @@ export function App({ handedOver, onReplay }: Props) {
   };
 
   const [tileSet, setTileSetState] = useState(savedTileSet);
+  const [imported, setImported] = useState<string[]>([]);
+  const listImported = () => importedTileSets().then(setImported);
+  useEffect(() => void listImported(), []);
   /** save: chosen in the View menu; tile_file's choice isn't kept, as it is the option's. */
   const setTileSet = (set: TileSet, save: boolean) => {
     setTileSetState(set);
     if (save)
       try {
-        localStorage.setItem(TILE_SET_KEY, set.file);
+        localStorage.setItem(TILE_SET_KEY, set.imported ? IMPORTED_PREFIX + set.file : set.file);
       } catch {}
   };
+  const say = (text: string) => setState((s) => applyEvents(s, [{ type: "message", text, attr: 0 }]));
   /** forget: the saved choice can't load, so it is replaced, not tried again at every start. */
-  const tileSetProblem = (name: string, forget: boolean) => {
-    setState((s) =>
-      applyEvents(s, [{ type: "message", text: `The tile set "${name}" can't be used, so the default tile set is shown instead.`, attr: 0 }]),
-    );
+  const tileSetProblem = (name: string, forget: boolean, why?: string) => {
+    say(why ?? `The tile set "${name}" can't be used, so the default tile set is shown instead.`);
     setTileSet(DEFAULT_TILE_SET, forget);
   };
   useEffect(() => {
     // a choice made while this one loads wins, whichever arrives first
     let live = true;
-    loadTileSheet(new URL(`${import.meta.env.BASE_URL}tiles/${tileSet.file}`, location.href).href, tileSet.size)
+    // the saved choice is forgotten only if the set is gone or broken, not if the browser couldn't be asked this time
+    let forget = true;
+    const loading = tileSet.imported
+      ? tileSetFile(tileSet.file).then(
+          (file) => {
+            if (!file) throw new Error(`The tile set "${tileSet.file}" isn't in this browser any more, so the default tile set is shown instead.`);
+            return loadImportedSheet(tileSet.file, file).catch((e: Error) => {
+              throw new Error(`The tile set "${tileSet.file}" can't be used, so the default tile set is shown instead. ${e.message}`);
+            });
+          },
+          () => {
+            forget = false;
+            throw new Error(`The tile set "${tileSet.file}" couldn't be read from this browser just now, so the default tile set is shown instead.`);
+          },
+        )
+      : loadTileSheet(new URL(`${import.meta.env.BASE_URL}tiles/${tileSet.file}`, location.href).href, tileSet.size);
+    loading
       .then((loaded) => live && setSheet(loaded))
       .catch((e) => {
         if (!live) return;
         if (tileSet === DEFAULT_TILE_SET) setState((s) => ({ ...s, error: String(e) }));
-        else tileSetProblem(tileSet.file, true);
+        else tileSetProblem(tileSet.file, forget, tileSet.imported ? e.message : undefined);
       });
     return () => {
       live = false;
@@ -471,10 +498,41 @@ export function App({ handedOver, onReplay }: Props) {
   // tile_file overrides the menu's choice, as the Guidebook says it overrides the default
   useEffect(() => {
     if (state.tileFile === null) return;
-    const named = tileSetNamed(state.tileFile);
-    if (named) setTileSet(named, false);
-    else tileSetProblem(state.tileFile.split(/[/\\]/).pop()!, false);
+    const tileFile = state.tileFile;
+    void importedTileSets().then((mine) => {
+      const named = tileSetNamed(tileFile, mine);
+      if (named) setTileSet(named, false);
+      else tileSetProblem(tileSetFileName(tileFile), false);
+    });
   }, [state.tileFile]);
+  const importInput = useRef<HTMLInputElement>(null);
+  const importTileSets = async (files: File[]) => {
+    let chosen: string | null = null;
+    for (const file of files) {
+      const name = file.name;
+      try {
+        URL.revokeObjectURL((await loadImportedSheet(name, file)).image.src);
+      } catch (e) {
+        say(`"${name}" can't be used as a tile set. ${(e as Error).message}`);
+        continue;
+      }
+      if (imported.includes(name) && !confirm(`A tile set named "${name}" is already imported. Replace it?`)) continue;
+      if (!(await keepTileSet(name, file)))
+        say(`This browser isn't keeping files for this site, so the tile set "${name}" will be gone when you close this page.`);
+      chosen = name;
+    }
+    await listImported();
+    if (chosen === null) return;
+    // the same set again still has to show its new image
+    setTileSet(importedTileSet(chosen), !keptThisVisitOnly(chosen));
+    if (ascii) toggleAscii?.(false);
+  };
+  const removeTileSet = async (set: TileSet) => {
+    if (!confirm(`Remove the tile set "${set.file}" from this browser?`)) return;
+    await forgetTileSet(set.file);
+    await listImported();
+    if (sameTileSet(tileSet, set)) setTileSet(DEFAULT_TILE_SET, true);
+  };
 
   useEffect(() => {
     const type = (keys: KeyLike[]) => {
@@ -645,17 +703,19 @@ export function App({ handedOver, onReplay }: Props) {
       title: "View",
       entries: [
         { title: "Use ASCII Mode", checked: ascii, disabled: !toggleAscii, run: () => toggleAscii?.(!ascii) },
-        ...TILE_SETS.map((set) => ({
-          title: `${set.title} Tiles`,
-          checked: !ascii && set.file === tileSet.file,
+        ...[...TILE_SETS, ...imported.map(importedTileSet)].map((set) => ({
+          title: set.imported ? (keptThisVisitOnly(set.file) ? `${set.file} (until you close this page)` : set.file) : `${set.title} Tiles`,
+          checked: !ascii && sameTileSet(set, tileSet),
           indent: true,
           // choosing tiles is choosing to see them, which waits as switching ASCII mode does
           disabled: ascii && !toggleAscii,
           run: () => {
-            setTileSet(set, true);
+            setTileSet(set, !(set.imported && keptThisVisitOnly(set.file)));
             if (ascii) toggleAscii?.(false);
           },
         })),
+        { title: "Import Tile Set...", disabled: ascii && !toggleAscii, run: () => importInput.current?.click() },
+        ...(tileSet.imported && !ascii ? [{ title: `Remove "${tileSet.file}"...`, run: () => void removeTileSet(tileSet) }] : []),
         {
           title: "Choose Font...",
           // it switches to ASCII mode, and no question should come up over it
@@ -726,6 +786,20 @@ export function App({ handedOver, onReplay }: Props) {
         </div>
       ) : null}
       <MenuBar menus={menus} />
+      <input
+        ref={importInput}
+        type="file"
+        accept=".png,.bmp,image/png,image/bmp"
+        multiple
+        hidden
+        onChange={(e) => {
+          const input = e.currentTarget;
+          const files = [...(input.files ?? [])];
+          // so choosing the same file again is still a change
+          input.value = "";
+          void importTileSets(files);
+        }}
+      />
       <div class="game">
         <div class="main-area">
           <header class="top">

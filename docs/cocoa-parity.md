@@ -8,7 +8,7 @@ Decided for the web:
 - Right-click opens a small context menu with the wiki search, and keeps the secondary click to the core as an item.
 - Options are a raw `.nethackrc` editor, as in Cocoa.
 - Ship the 64px and classic 16px tile sheets; no 128px.
-- Speech, notes, sound and tile-set import are later phases, not dropped.
+- Speech, notes and sound are later phases, not dropped.
 
 ## Map
 
@@ -68,10 +68,10 @@ Decided for the web:
 - [x] Choose the ASCII map's font and size, remembered; choosing one switches to ASCII (`changeFont`).
 - [x] An About box: NetHack, this port and the painted tiles by Kevin Tam, the Cocoa interface it follows, the classic tiles, the licence.
 - [x] Closing the tab mid-game keeps the game (Cocoa saves on ⌘Q or closing the window, `terminateApplication`). A page can't wait on a save as it unloads, so the recording is kept as the game goes, and the next start brings the game back by replaying it, asking first only if the last replay didn't finish or another tab is open; see `docs/recording.md`.
+- [x] Importing a tile set, kept in the browser (`importTileSet`), in offline and online games alike, as tiles only change how the map is drawn. A set the browser won't keep, such as in a private window or with storage full, lasts until the page closes, and the View menu says so. Unlike Cocoa, which has a folder to delete from, the View menu removes the set in use.
 
 ## Later
 
-- [ ] Importing a tile set, kept in the browser (`importTileSet`).
 - [ ] Sound: a core feature, not Cocoa's. 5.0 calls a sound library (`include/sndprocs.h`; `sound/macsound` and others) for effects, achievements, instrument tunes, ambience and user sounds. A web one would be a fork sound library passing these to Web Audio.
   - **Clips:** the core ships 61 clips in `sound/wav` as uuencoded `.uu` files, about 6 MB. Decode them at build time, as `sys/unix/hints/include/multisnd2-pre.500` does, and consider a compressed format.
   - **Credits:** some clips are CC BY 4.0 (`sound/wav/attributions.txt`), so the About box needs a credit.

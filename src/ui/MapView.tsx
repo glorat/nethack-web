@@ -85,7 +85,7 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
   useLayoutEffect(() => {
     const ctx = canvas.current?.getContext("2d");
     if (!ctx) return;
-    ctx.imageSmoothingEnabled = cell < sheet.size;
+    ctx.imageSmoothingEnabled = cell < Math.max(sheet.width, sheet.height);
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, COLNO * width, ROWNO * height);
     for (let y = 0; y < ROWNO; y++) {
