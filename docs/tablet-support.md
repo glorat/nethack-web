@@ -20,7 +20,9 @@ In landscape every iPad is at least 1133px wide, so it gets the desktop layout, 
   - "Press a key" prompts (`#adjust`, the crystal ball, `&`) have a Cancel button, but still need a way to answer by touch, such as a one-character field that brings up the on-screen keyboard. Whether iOS's on-screen keyboard sends key events the dialog can read needs a device.
 - [ ] **An Esc button on screen** whenever there's something to cancel: a dialog, a map position prompt, a prompt waiting for a key.
   - It also teaches new players on desktop that Esc cancels.
-  - It covers iPad keyboards without an Esc key, such as the Magic Keyboard; also take ⌘. as Esc, as iPadOS apps do.
+  - It covers iPad keyboards without an Esc key, such as the Magic Keyboard.
+  - Left for later: the core gives no sign that a map position prompt is waiting, so the button can't yet tell when there's something to cancel there.
+- [x] **⌘. works as Esc**, as in iPadOS and macOS apps, for keyboards without an Esc key.
 - [x] **The extended command dialog has a Cancel button**, as Cocoa's has a window close button.
 
 ### Commands
