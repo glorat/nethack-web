@@ -12,6 +12,7 @@ pnpm exec playwright test play.spec -g "<test name>"
 ## Rules of the code
 
 - `src/port/` holds no DOM code, so put logic there and test it there.
+- Offline play must not depend on any outside service, and should make no network calls. Online code may only reach the network once the player is using online play.
 - Code for one mode goes in `src/online/` or `src/offline/`. Neither imports the other, and common code imports neither, except the files that choose a mode; `tests/unit/mode-boundaries.test.ts` checks this.
 - Anything from outside the core that can change a game must go through `Authority` (`src/worker/authority.ts`, with each mode's in `src/online/` and `src/offline/`), or replays diverge.
 - Read `docs/recording.md` before changing `recorder.ts`, `replayer.ts`, `replay-runner.ts`, `shadow.ts` or `resume.ts`. A change to what gets recorded also affects how unfinished games come back.
@@ -44,7 +45,7 @@ pnpm exec playwright test play.spec -g "<test name>"
 
 - `pnpm test`: unit tests and headless scenarios on the real core in Node (about 6s). `pnpm run test:e2e`: Playwright (about 30s). Run both before committing; CI runs both too.
 - `pnpm run test:e2e:update`: how a new version of the service worker takes over (about 45s). Not part of `test:e2e` or CI, so run it after changing the service worker or the update flow.
-- Online games: dev builds use the emulators from `../nethack-server`, and production builds the real project. The page only loads Firebase for an online game, on the landing page for someone whose last game was online, or when the player chooses Sign In or comes back from it, so offline play never talks to it, though the service worker caches the file with everything else.
+- Online games: dev builds use the emulators from `../nethack-server`, and production builds the real project.
 - `pnpm run test:e2e:upload`: online games and Google sign-in, through the Auth emulator's stand-in sign-in page, against the emulators from `../nethack-server` (about 2 minutes). Not part of `test:e2e` or CI, so run it after changing `src/online/` or what gets recorded.
 - Prefer a headless scenario (`tests/headless`, via `Session` in `harness.ts`) to an e2e test unless the behaviour lives in the UI.
 - Scenarios are deterministic: `seed` sets `NETHACK_SEED`, `date` fakes `Date`, `wizard: true` allows debug-mode commands, and `failPost` makes a window callback throw once.
