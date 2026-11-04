@@ -239,6 +239,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .menu-items.readonly .menu-item { cursor: text; }
 .menu-items.readonly .menu-item:hover { background: none; }
 .menu-text { white-space: pre; }
+.menu-dialog { max-width: 90vw; }
 .menu-dialog.question { width: calc(380px * var(--text-scale)); }
 .answers { display: flex; flex-direction: column; gap: 8px; }
 .answers .hint { margin: 0; font-size: 12px; }

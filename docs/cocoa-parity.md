@@ -106,7 +106,7 @@ To decide, by trying both:
 
 - [ ] A prompt with fewer than two or more than nine answers goes to the message window instead of a dialog (`YesNoInput` `canAskWithChoices`).
 - [x] Roles a chosen race can't play are disabled in the character picker, as races a chosen role can't be are (`PlayerSelectionWindowController.m` `selectRace`).
-- [ ] Menus as wide as their contents, up to 90% of the screen, clipped rather than wrapped.
+- [x] Menus as wide as their contents, up to 90% of the window. Unlike Cocoa, text still wraps and a row too long for that scrolls sideways, so nothing is cut off on a narrow screen.
 - [ ] Map tooltips shown only once the pointer rests, and kept across turns (`MainView.m` `mouseMoved:`).
 
 ## Later
