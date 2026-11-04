@@ -12,7 +12,8 @@ import type { WriteResult } from "../upload";
 // Not a secret: a web app's Firebase config is public, and security rules decide what it may do.
 const app = initializeApp({
   apiKey: "AIzaSyBwQKEX0nHFghDaYRhTK8QilSvWZbtNCRA",
-  authDomain: "nethack-web-server.firebaseapp.com",
+  // Google only accepts listed redirect addresses, and a preview deploy's random one can't be listed
+  authDomain: location.hostname === "nethack.app" ? "nethack.app" : "nethack-web-server.firebaseapp.com",
   // a dev build uses the emulators' project, which can't reach the real one
   projectId: import.meta.env.DEV ? "demo-nethack" : "nethack-web-server",
   storageBucket: "nethack-web-server.firebasestorage.app",
