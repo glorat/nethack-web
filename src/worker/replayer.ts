@@ -35,7 +35,7 @@ export function sameCheck(a: string, b: string): boolean {
 
 /** A promise that never settles; a fresh one each time, as one shared would keep every core waiting on it alive. */
 export const never = <T>() => new Promise<T>(() => {});
-const MARKS = new Set(["ckpt", "T", "=", "lv", "asc", "back", "now"]);
+const MARKS = new Set(["ckpt", "T", "=", "lv", "asc", "back", "now", "reseed"]);
 // as long as Game pauses for the core's delay_output
 const DELAY_MS = 50;
 
@@ -461,6 +461,9 @@ export class ReplayHost implements GameHost {
         this.game?.setAsciiMap(first === "1");
         return true;
       case "back":
+        return true;
+      case "reseed":
+        if (!/^\d+$/.test(first) || !this.m._nhweb_reseed(Number(first))) this.fail(line, "the core can't take this seed now");
         return true;
       default:
         return false;
