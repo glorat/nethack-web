@@ -127,6 +127,21 @@ for (const [failure, respond] of [
   });
 }
 
+for (const [failure, respond] of [
+  ["can't load", (route) => route.abort()],
+  ["never gets ready", (route) => route.fulfill({ contentType: "text/javascript", body: "window.grecaptcha = { enterprise: { ready() {} } };" })],
+] as [string, Parameters<Page["route"]>[1]][]) {
+  test(`an online home whose reCAPTCHA ${failure} says it can't reach the server, and offers offline`, async ({ page }) => {
+    const seen = await fakeServer(page);
+    await page.route(RECAPTCHA, respond);
+    await page.goto(`${PROD}online/`);
+    const note = page.getByRole("alert").filter({ hasText: "Can't reach the server right now" });
+    await expect(note).toBeVisible({ timeout: 15_000 });
+    await expect(note.getByRole("link", { name: "Play Offline Instead" })).toBeVisible();
+    expect([...seen.keys()]).toEqual([]);
+  });
+}
+
 test("a browser App Check refuses is told why at the online home, and offered offline, before anything goes to the server", async ({ page }) => {
   const seen = await fakeServer(page);
   await fakeRecaptcha(page);

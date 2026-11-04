@@ -19,7 +19,10 @@ import { AboutDialog } from "./dialogs/AboutDialog";
 import { OptionsDialog } from "./dialogs/OptionsDialog";
 
 // each mode's home loads this; only the online one reaches the network
-const MODE: GameMode = placeOf(location.pathname)?.mode ?? "online";
+// an address it doesn't know is taken as offline, which reaches nothing
+const MODE: GameMode = placeOf(location.pathname)?.mode ?? "offline";
+// how long the online home waits before saying it can't reach the server; reCAPTCHA blocked never answers at all
+const SLOW_MS = 8000;
 const OTHER: GameMode = MODE === "online" ? "offline" : "online";
 // read before this visit is kept, so a first visit opens the help; kept at once, as the page may be left before it paints
 const RETURNING = lastMode();
@@ -46,6 +49,12 @@ export function Landing() {
   const [inProgress, setInProgress] = useState<GameSummary[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [unreachable, setUnreachable] = useState(() => online && navigator.onLine === false);
+  const loaded = useRef(false);
+  useEffect(() => {
+    if (!online || refused) return;
+    const slow = setTimeout(() => !loaded.current && setUnreachable(true), SLOW_MS);
+    return () => clearTimeout(slow);
+  }, []);
   // asking again would only be refused again
   const [finishing, setFinishing] = useState(online && !refused);
   const [signingIn, setSigningIn] = useState(false);
@@ -69,12 +78,20 @@ export function Landing() {
   useEffect(() => {
     // until a sign-in is finished, the player's games and profile are still the anonymous player's
     if (!online || finishing || refused) return;
+    let failed = false;
     const lost = (what: string) => (e: unknown) => {
       console.warn(`couldn't ${what}`, e);
+      failed = true;
       setUnreachable(true);
     };
-    listOnlineGames().then(setInProgress, lost("list online games"));
-    loadProfile().then(setProfile, lost("read the profile"));
+    void Promise.all([
+      listOnlineGames().then(setInProgress, lost("list online games")),
+      loadProfile().then(setProfile, lost("read the profile")),
+    ]).then(() => {
+      loaded.current = true;
+      // answered after all, if slowly
+      if (!failed) setUnreachable(false);
+    });
   }, [finishing]);
   useEffect(() => {
     if (!online) return;
@@ -142,6 +159,8 @@ export function Landing() {
   }, []);
   const valid = playerName(name).length > 0;
   const onlinePanels = online && !refused;
+  // each asks once, as it appears, which has to be as the signed-in player
+  const accountPanels = onlinePanels && !finishing;
   const goOther = (label: string) => (
     <a class="mode-switch" href={homeAddress(OTHER)}>
       {label}
@@ -244,7 +263,7 @@ export function Landing() {
           </form>
           <img class="landing-shot" src={`${import.meta.env.BASE_URL}screenshot.jpg`} alt="A NetHack game: the dungeon map in painted tiles, with stats, equipment, messages and inventory around it" />
         </section>
-        {onlinePanels ? (
+        {accountPanels ? (
           <>
             {/* one is already the Continue button */}
             {inProgress.length > 1 ? <GamesInProgress games={inProgress} /> : null}
