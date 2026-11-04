@@ -51,9 +51,8 @@ In landscape every iPad is at least 1133px wide, so it gets the desktop layout, 
 
 ### Touch targets
 
-- [ ] **Bigger targets under `@media (pointer: coarse)`.**
-  - Menu bar items, menu rows, inventory rows and dialog buttons are about 24 to 26px tall.
-  - Pad them to Apple's 44pt minimum for touch only, so desktop keeps its density.
+- [x] **Buttons and menu rows are at least 44px tall on a touch screen** (`@media (pointer: coarse)`), Apple's minimum, and desktop keeps its density.
+  - Left for later: the equipment slots stay 32px, though they can be tapped to pick an item, as making them bigger means laying out the top bar again.
 
 ### Check on a device
 
