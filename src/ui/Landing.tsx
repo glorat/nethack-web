@@ -13,7 +13,7 @@ import type { Profile } from "../online/account";
 import { AccountBar, HandlePrompt } from "../online/ui/Account";
 import { offlineGameUnder } from "../offline/progress";
 import { DeviceGames } from "../offline/ui/DeviceGames";
-import { listOnlineGames, loadProfile, signInWithGoogle } from "../online/server/api";
+import { listOnlineGames, loadProfile, signInWithGoogle, signOut } from "../online/server/api";
 import { updateWhenIdle } from "../sw/register";
 import { AboutDialog } from "./dialogs/AboutDialog";
 import { OptionsDialog } from "./dialogs/OptionsDialog";
@@ -35,6 +35,16 @@ export function Landing() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [signingIn, setSigningIn] = useState(false);
   const [signInFailed, setSignInFailed] = useState(false);
+  const [signedOut] = useState(() => new URLSearchParams(location.search).has("signedout"));
+  const [signOutFailed, setSignOutFailed] = useState(false);
+  useEffect(() => {
+    // the note is for coming here from signing out, not for a reload later
+    const params = new URLSearchParams(location.search);
+    if (!params.has("signedout")) return;
+    params.delete("signedout");
+    const search = params.toString();
+    history.replaceState(history.state, "", `${location.pathname}${search ? `?${search}` : ""}`);
+  }, []);
   useEffect(() => {
     // anyone else's visit doesn't touch the server
     // asking again would only be refused again, and send this page back to itself
@@ -59,6 +69,20 @@ export function Landing() {
         if ((e as { code?: string }).code === "auth/popup-closed-by-user") return;
         console.warn("couldn't sign in", e);
         setSignInFailed(true);
+      },
+    );
+  };
+  const signOutHere = () => {
+    setSignOutFailed(false);
+    signOut().then(
+      () => {
+        const params = new URLSearchParams(location.search);
+        params.set("signedout", "");
+        location.assign(`${import.meta.env.BASE_URL}?${params}`);
+      },
+      (e) => {
+        console.warn("couldn't sign out", e);
+        setSignOutFailed(true);
       },
     );
   };
@@ -102,13 +126,23 @@ export function Landing() {
       <header class="landing-bar">
         <span class="landing-title">NetHack</span>
         <span class="landing-bar-end">
-          {offered && !refused ? <AccountBar profile={profile} onSignIn={signIn} signingIn={signingIn} /> : null}
+          {offered && !refused ? <AccountBar profile={profile} onSignIn={signIn} signingIn={signingIn} onSignOut={signOutHere} /> : null}
           <button onClick={() => setAbout(true)}>About</button>
         </span>
       </header>
       {signInFailed && (
         <p class="server-waiting" role="alert">
           Couldn't sign in. Try again, or keep playing as you are.
+        </p>
+      )}
+      {signOutFailed && (
+        <p class="server-waiting" role="alert">
+          Couldn't sign out. Try again.
+        </p>
+      )}
+      {signedOut && (
+        <p class="server-waiting" role="status">
+          You're signed out. Your online games and handle are kept for when you sign in again.
         </p>
       )}
       {refused && (

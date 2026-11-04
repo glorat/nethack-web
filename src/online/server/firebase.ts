@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getToken, initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
-import { connectAuthEmulator, getAuth, GoogleAuthProvider, linkWithPopup, signInAnonymously, signInWithCredential } from "firebase/auth";
+import { connectAuthEmulator, getAuth, GoogleAuthProvider, linkWithPopup, signInAnonymously, signInWithCredential, signOut as authSignOut } from "firebase/auth";
 import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore/lite";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 import { appCheckRefused, type OnlineDeps, refusedAddress } from "../session";
@@ -105,7 +105,13 @@ export async function signInWithGoogle(): Promise<void> {
   await auth.currentUser?.getIdToken(true);
 }
 
-export const profile = () => userRequest<Profile>("profile", {});
+/** Forgets the account in this browser, in every tab. The next request makes a new anonymous player. */
+export const signOut = () => authSignOut(auth);
+
+export const profile = async (): Promise<Profile> => ({
+  ...(await userRequest<Omit<Profile, "email">>("profile", {})),
+  email: auth.currentUser?.email ?? null,
+});
 
 export const requestHandle = (input: { handle: string; sentAt: number }) => userRequest<{ status: "awaiting approval" }>("requestHandle", input);
 

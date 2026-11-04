@@ -64,6 +64,8 @@ export const loadProfile = async (): Promise<Profile> => (await server()).profil
 
 export const signInWithGoogle = async (): Promise<void> => (await server()).signInWithGoogle();
 
+export const signOut = async (): Promise<void> => (await server()).signOut();
+
 /** Asks for a handle, which the server grants or not in its own time; the profile says which. */
 export const askForHandle = async (handle: string): Promise<void> => {
   await (await server()).requestHandle({ handle, sentAt: Date.now() });

@@ -289,7 +289,17 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .landing-bar { display: flex; align-items: center; justify-content: space-between; padding: 4px 16px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
 .landing-title { font-weight: 600; }
 .landing-bar-end { display: flex; align-items: center; gap: 8px; }
-.landing-bar-end .account:not(button) { color: var(--muted); }
+.account-menu { position: relative; }
+.account-menu > .account::after { content: " ▾" / ""; }
+.account-popup {
+  position: absolute; top: 100%; right: 0; z-index: 12; margin-top: 4px; min-width: 220px; max-width: calc(100vw - 32px); padding: 4px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.account-who { display: flex; flex-direction: column; gap: 2px; padding: 4px 10px; }
+.account-who span { color: var(--muted); overflow-wrap: anywhere; }
+.account-popup hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+.account-popup [role="menuitem"] { width: 100%; background: none; border: none; padding: 4px 10px; border-radius: 4px; text-align: left; }
+.account-popup [role="menuitem"]:hover, .account-popup [role="menuitem"]:focus-visible { background: var(--accent); color: #fff; }
 .handle-prompt { display: flex; flex-direction: column; gap: 8px; max-width: 480px; }
 .handle-prompt small { color: var(--muted); }
 .handle-prompt button { align-self: flex-start; }
