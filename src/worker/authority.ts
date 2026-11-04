@@ -11,6 +11,11 @@ export interface Authority {
   utcOffset(): number;
   /** An unguessable 32-bit seed, asked for at the start and at each level change. */
   randomSeed(): number | Promise<number>;
+  /**
+   * A 32-bit seed to put in the core's main generator as the turn moves on, before the next command, or null to leave it.
+   * It's recorded, so a replay reseeds at the same point. No mode gives one yet.
+   */
+  injectedSeed?(turn: number): number | null | Promise<number | null>;
   /** A new game's id, kept in its save and in any bones it leaves. */
   uuid(): string;
   /** The bones the core may load for a level it's making, if any; `name` says which level. */

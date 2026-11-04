@@ -39,6 +39,8 @@ export interface NetHackModule {
   _nhweb_restoring(): number;
   _nhweb_game_name(): number;
   _nhweb_rng_fingerprint(): number;
+  /** 0 if no game is in play to take it. */
+  _nhweb_reseed(seed: number): number;
   _nhweb_hero_x(): number;
   _nhweb_hero_y(): number;
   _nhweb_moves(): number;

@@ -25,6 +25,7 @@ Each line is `<time> <tag> [args]`. `time` is the player's clock when it was wri
 | `rc` | JSON | The `.nethackrc`, likewise |
 | `alone` | `0` or `1` | No other tab was playing in the same mode |
 | `seed` | n | A random seed the core asked for |
+| `reseed` | n | A seed the authority put in the core's main random generator as the turn moved on, after that turn's checks and before its first command; a replay puts the same one in at the same point |
 | `now` | n | The time the core asked for, in seconds since 1970 |
 | `uuid` | uuid | The new game's id |
 | `bones` | name hash | What the host answered when the core looked for bones for a level: the SHA-256 of the file, or `-` for none |

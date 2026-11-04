@@ -193,7 +193,7 @@ export class Recorder implements GameHost {
 
   async nextInput(request: Extract<GameRequest, { kind: "poskey" }>): Promise<Input> {
     this.begin();
-    this.turn();
+    if (this.turn() && this.inner.injectedSeed) await this.inject(this.lastTurn);
     this.save();
     this.send(true);
     const input = await this.inner.nextInput(request);
@@ -365,11 +365,11 @@ export class Recorder implements GameHost {
     this.early = [];
   }
 
-  /** Before each command, when the turn has moved on: that turn and its checks. */
-  private turn(): void {
-    if (!this.dir) return;
+  /** Before each command, when the turn has moved on: that turn and its checks; true if it had moved on. */
+  private turn(): boolean {
+    if (!this.dir) return false;
     const turn = this.m._nhweb_moves();
-    if (turn === this.lastTurn) return;
+    if (turn === this.lastTurn) return false;
     this.lastTurn = turn;
     this.write(`T ${turn} ${turnSum(this.m)}`);
     if (turn - this.lastCheck >= CHECK_EVERY) {
@@ -380,6 +380,24 @@ export class Recorder implements GameHost {
       this.lastFiles = turn;
       this.write(`lv ${levelsHash(this.m)}`);
     }
+    return true;
+  }
+
+  /** Reseeds the core if the authority gives a seed now, after the turn's checks so they hold what came before it. */
+  private async inject(turn: number): Promise<void> {
+    let seed: number | null;
+    try {
+      seed = await this.inner.injectedSeed!(turn);
+    } catch (e) {
+      console.warn("no seed to inject, so the core keeps its own", e);
+      return;
+    }
+    if (seed === null) return;
+    if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) {
+      console.warn("not a 32-bit seed, so the core keeps its own", seed);
+      return;
+    }
+    if (this.m._nhweb_reseed(seed)) this.write(`reseed ${seed}`);
   }
 
   private write(line: string): void {

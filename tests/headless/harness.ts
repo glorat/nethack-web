@@ -54,6 +54,8 @@ export interface SessionOptions {
   resume?: boolean;
   /** Keep bones a debug-mode game leaves, which the page doesn't, as dying there is the easy way to get some. */
   keepWizardBones?: boolean;
+  /** The authority's seed to inject as each turn moves on, or null for none. */
+  injectSeed?: (turn: number) => number | null;
 }
 
 type Module = NetHackModule & {
@@ -405,6 +407,7 @@ export class Session {
       utcOffset: () => options.utcOffset ?? 0,
       randomSeed: () => (options.pageSeed ?? 0) + (options.seedsVary ? seeds++ : 0),
       uuid: () => PAGE_UUID,
+      injectedSeed: options.injectSeed,
       bonesWanted: async (name: string) => new BonesDb(this.m.FS).take(name),
       bonesLeft: (name: string, data: Uint8Array, wizard: boolean) => {
         if (!wizard || options.keepWizardBones) new BonesDb(this.m.FS).keep(name, data);
