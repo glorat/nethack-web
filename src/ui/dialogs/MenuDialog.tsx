@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { MenuHow, MenuItem, MenuSelection } from "../../protocol";
 import { isHeading, isQuestion, splitFields } from "../../port/question";
 import { sortedOrder } from "../../port/sort";
+import { listsStack } from "../../port/stack";
 import { tileStyle, type TileSheet } from "../../tiles";
 import { textStyle } from "../colors";
 
@@ -319,7 +320,11 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
               </label>
             ) : null}
           </div>
-          {count.current > 0 ? <span class="hint">Count: {count.current}</span> : null}
+          {count.current > 0 ? (
+            <span class="hint">Count: {count.current}</span>
+          ) : listsStack(how, items) ? (
+            <span class="hint">Type a number, then a letter, for only that many.</span>
+          ) : null}
           {how === "none" ? (
             <button class="primary" onClick={() => onDone(null)}>
               Close
