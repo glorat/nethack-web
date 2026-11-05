@@ -226,6 +226,10 @@ test("a watched game's chronicle gives chapters to jump to, and a link can open 
   await page.reload();
   await expect(page.getByText(/^Turn 150 of \d+$/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("button", { name: "Play", exact: true })).toBeVisible();
+  // going elsewhere by turn leaves no chapter in the address to come back to
+  await page.getByRole("slider", { name: "Turn" }).fill("60");
+  await expect(page.getByText(/^Turn 60 of \d+$/)).toBeVisible({ timeout: 30_000 });
+  expect(new URL(page.url()).searchParams.has("line")).toBe(false);
 });
 
 const exchange = (page: Page, answer: () => "token" | "brief" | "refuse" | "unreachable") =>

@@ -71,6 +71,8 @@ export function ReplayBar({ progress, lastTurn, turnsPerSecond, control, chapter
                 title={`Turn ${c.turn}: ${c.text}`}
                 aria-label={`Go to turn ${c.turn}: ${c.text}`}
                 tabIndex={-1}
+                // the chapter row below offers the same, for keyboards and screen readers
+                aria-hidden="true"
                 disabled={seeking}
                 onClick={() => go(c)}
               />
