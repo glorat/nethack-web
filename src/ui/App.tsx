@@ -36,6 +36,7 @@ import { TextDialog } from "./dialogs/TextDialog";
 import { YesNoDialog } from "./dialogs/YesNoDialog";
 import { EquipmentView } from "./EquipmentView";
 import { InventoryView } from "./InventoryView";
+import { QuickActions } from "./QuickActions";
 import { keyLike } from "./keyevent";
 import { type PageMode, SAVED_FAREWELL } from "./mode";
 import { MapView } from "./MapView";
@@ -71,6 +72,7 @@ const ZOOM_KEYS: Record<string, -1 | 0 | 1> = { "=": 1, "+": 1, "-": -1, "0": 0 
 const ASCII_KEY = "nethack.asciiMap";
 const ASCII_FONT_KEY = "nethack.asciiFont";
 const INVENTORY_KEY = "nethack.showInventory";
+const TOOLBAR_KEY = "nethack.showToolbar";
 const INVENTORY_WIDTH_KEY = "nethack.inventoryWidth";
 const TEXT_SIZE_KEY = "nethack.textSize";
 // only the game and watch pages load this, so anywhere else is taken as offline, which reaches nothing
@@ -121,6 +123,14 @@ function savedInventoryWidth(): number {
 function savedShowInventory(): boolean {
   try {
     return localStorage.getItem(INVENTORY_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+function savedShowToolbar(): boolean {
+  try {
+    return localStorage.getItem(TOOLBAR_KEY) !== "0";
   } catch {
     return true;
   }
@@ -302,6 +312,15 @@ export function App({ handedOver, onReplay }: Props) {
         localStorage.setItem(INVENTORY_WIDTH_KEY, String(next));
       } catch {}
   };
+  const [showToolbar, setShowToolbarState] = useState(savedShowToolbar);
+  const setShowToolbar = (show: boolean) => {
+    setShowToolbarState(show);
+    try {
+      localStorage.setItem(TOOLBAR_KEY, show ? "1" : "0");
+    } catch {}
+  };
+  // what the hero can do where they stand, as of the last command prompt
+  const [hereActions, setHereActions] = useState("");
   const setShowInventory = (show: boolean) => {
     shownInventory.current = show;
     setShowInventoryState(show);
@@ -347,6 +366,12 @@ export function App({ handedOver, onReplay }: Props) {
     if (name === "repeat" && repeatKey.current) return sendCode(repeatKey.current);
     pendingCommand.current = name;
     sendCode(commandKey.current);
+  };
+  // #hereaction, then the action's letter for the key it reads
+  const runHereAction = (letter: string) => {
+    if (!commandKey.current || pendingRef.current) return beep();
+    typeAhead.current.push({ key: letter, ctrlKey: false, altKey: false, metaKey: false });
+    runCommand("hereaction");
   };
 
   const sendCode = (code: number) => {
@@ -412,6 +437,7 @@ export function App({ handedOver, onReplay }: Props) {
             setInventoryKey(request.kind === "poskey" ? request.inventoryKey : 0);
             setCommandKey(request.kind === "poskey" ? request.commandKey : 0);
             repeatKey.current = request.kind === "poskey" ? request.repeatKey : 0;
+            if (request.kind === "poskey" && request.commandKey) setHereActions(request.hereActions);
             if (request.kind === "poskey") setWizard(request.wizard);
             return;
           }
@@ -772,6 +798,7 @@ export function App({ handedOver, onReplay }: Props) {
         { title: "Default Text Size", disabled: textSize === DEFAULT_TEXT_SIZE, run: () => setTextSize(DEFAULT_TEXT_SIZE, true) },
         null,
         { title: showInventory ? "Hide Inventory" : "Show Inventory", key: "⌃⌘S", run: () => setShowInventory(!showInventory) },
+        { title: showToolbar ? "Hide Toolbar" : "Show Toolbar", run: () => setShowToolbar(!showToolbar) },
       ],
     },
     // only in a debug-mode game, as Cocoa shows it
@@ -848,6 +875,9 @@ export function App({ handedOver, onReplay }: Props) {
             describe={(x, y) => client.describe(x, y)}
             onZoom={zoom}
             onShowInventory={showInventory ? undefined : () => setShowInventory(true)}
+            toolbar={
+              showToolbar && !replay && state.gameOver === null ? <QuickActions letters={hereActions} onRun={runHereAction} /> : null
+            }
             onClick={(x, y, button) => {
               if (pending || state.gameOver !== null || replay) return;
               setInventoryKey(0);
