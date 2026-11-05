@@ -1,6 +1,9 @@
 // Share links for finished online games: /g/<id>, rendered by a Pages Function from the server's public data, with the
 // preview tags that chat apps read. Self-contained, as the Pages Function bundles it without Vite.
 
+import { ascended, characterName } from "../port/xlog";
+import { tombstone } from "../port/tombstone";
+import { shortId } from "./game-id";
 import type { GameResult } from "./results";
 
 /** A finished online game as the server publishes it. */
@@ -11,43 +14,8 @@ export interface PublicGame {
   result: GameResult;
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-/** A game's UUID as 22 base64url characters, for a shorter link. */
-export function shortId(game: string): string {
-  const hex = game.replace(/-/g, "");
-  let bytes = "";
-  for (let i = 0; i < 32; i += 2) bytes += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
-  return btoa(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-/** The game a link names, by its short form or its UUID; null if it names none. */
-export function gameOf(id: string): string | null {
-  if (UUID.test(id)) return id;
-  if (!/^[A-Za-z0-9_-]{22}$/.test(id)) return null;
-  const bytes = atob(id.replace(/-/g, "+").replace(/_/g, "/") + "==");
-  const hex = [...bytes].map((c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("");
-  const game = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-  return shortId(game) === id ? game : null;
-}
-
 export const shareAddress = (origin: string, game: string) => `${origin}/g/${shortId(game)}`;
 
-const ROLES: Record<string, [string, string?]> = {
-  Arc: ["Archeologist"], Bar: ["Barbarian"], Cav: ["Caveman", "Cavewoman"], Hea: ["Healer"], Kni: ["Knight"], Mon: ["Monk"],
-  Pri: ["Priest", "Priestess"], Rog: ["Rogue"], Ran: ["Ranger"], Sam: ["Samurai"], Tou: ["Tourist"], Val: ["Valkyrie"], Wiz: ["Wizard"],
-};
-const RACES: Record<string, string> = { Hum: "Human", Elf: "Elf", Dwa: "Dwarf", Gno: "Gnome", Orc: "Orc" };
-
-/** The character, as the xlogfile's abbreviations spell it out: "Human Valkyrie", "Elf Priestess". */
-export function character({ role, race, gender }: GameResult): string {
-  const names = role ? ROLES[role] : undefined;
-  const roleName = names ? ((gender === "Fem" && names[1]) || names[0]) : role;
-  return [race ? (RACES[race] ?? race) : undefined, roleName].filter(Boolean).join(" ");
-}
-
-
-const isAscension = (result: GameResult) => /^ascended\b/.test(result.death ?? "");
 const who = (g: PublicGame) => g.handle ?? "Anonymous";
 const n = (x: number) => x.toLocaleString("en-US");
 const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -55,57 +23,24 @@ const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** How the game ended, as a sentence. */
 export function ending({ result }: PublicGame): string {
   const death = capitalised(result.death ?? "ended");
-  const where = !isAscension(result) && result.deathlev !== undefined ? ` on dungeon level ${result.deathlev}` : "";
+  const where = !ascended(result) && result.deathlev !== undefined ? ` on dungeon level ${result.deathlev}` : "";
   const when = result.turns !== undefined ? ` after ${n(result.turns)} turns` : "";
   return `${death}${where}${when}.`;
 }
 
 export function title(g: PublicGame): string {
   const points = g.result.points !== undefined ? `${n(g.result.points)} points` : "";
-  const role = character({ role: g.result.role, gender: g.result.gender });
-  if (isAscension(g.result)) return `${who(g)} ascended! ${[role, points].filter(Boolean).join(", ")}`;
+  const role = characterName({ role: g.result.role, gender: g.result.gender });
+  if (ascended(g.result)) return `${who(g)} ascended! ${[role, points].filter(Boolean).join(", ")}`;
   return `${who(g)}'s ${role || "game"}${points ? `: ${points}` : ""}`;
 }
 
 const html = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-function wrap(text: string, width: number): string[] {
-  const lines: string[] = [];
-  let line = "";
-  for (const word of text.split(" ")) {
-    if (line && `${line} ${word}`.length > width) {
-      lines.push(line);
-      line = word;
-    } else line = line ? `${line} ${word}` : word;
-  }
-  if (line) lines.push(line);
-  return lines;
-}
-
-function centred(text: string, width: number): string {
-  const s = text.slice(0, width);
-  const left = Math.floor((width - s.length) / 2);
-  return " ".repeat(left) + s + " ".repeat(width - s.length - left);
-}
-
-/** The core's tombstone, from rip.c, engraved as the end of the game engraves it; as HTML. */
-export function tombstone(g: PublicGame): string {
-  const year = g.endedAt !== undefined ? String(new Date(g.endedAt).getUTCFullYear()) : "";
-  const engraving = [who(g), g.result.points !== undefined ? `${n(g.result.points)} points` : "", ...wrap(g.result.death ?? "", 16).slice(0, 3), year];
-  while (engraving.length < 6) engraving.push("");
-  return [
-    "      ----------",
-    "     /          \\",
-    "    /    REST    \\",
-    "   /      IN      \\",
-    "  /     PEACE      \\",
-    " /                  \\",
-    ...engraving.map((line) => ` |<b>${html(centred(line, 18))}</b>|`),
-    "*|     *  *  *      | *",
-    "_)/\\_//(\\/(/\\)/\\//\\/|_)_",
-  ]
-    .map((row) => (row.includes("<b>") ? row : html(row)))
-    .join("\n");
+/** The core's tombstone, engraved for the game, as HTML. */
+function stone(g: PublicGame): string {
+  const rows = tombstone({ who: who(g), points: g.result.points, death: g.result.death, year: g.endedAt !== undefined ? new Date(g.endedAt).getUTCFullYear() : undefined });
+  return rows.map(({ before, engraved, after }) => html(before) + (engraved === undefined ? "" : `<b>${html(engraved)}</b>${html(after ?? "")}`)).join("\n");
 }
 
 const STYLE = `
@@ -191,9 +126,9 @@ export function sharePage(origin: string, id: string, g: PublicGame | null): str
     );
   }
   const { result } = g;
-  const up = isAscension(result);
-  const role = character(result);
-  const art = up ? `<div class="hero-glyph" aria-hidden="true">@</div>` : `<pre aria-hidden="true">${tombstone(g)}</pre>`;
+  const up = ascended(result);
+  const role = characterName(result);
+  const art = up ? `<div class="hero-glyph" aria-hidden="true">@</div>` : `<pre aria-hidden="true">${stone(g)}</pre>`;
   const headline = up ? `${who(g)}'s ${role || "character"} ascended` : `${who(g)}'s ${role || "character"} was ${result.death ?? "lost"}`;
   const ended = g.endedAt !== undefined ? ` Finished ${new Date(g.endedAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}.` : "";
   const stat = (label: string, value: string | undefined) => (value === undefined ? "" : `<div><dt>${label}</dt><dd>${html(value)}</dd></div>`);
