@@ -4,7 +4,7 @@ import { meterLevel } from "../port/meter";
 import { heroText, levelText } from "../port/status-header";
 import type { StatusValue } from "../protocol";
 import { nhColor } from "./colors";
-import { Described, type TipProps, useTooltip } from "./tooltip";
+import { Described, type ToggletipProps, useToggletip } from "./tooltip";
 
 // the gold field is "<encoded gold glyph>:<amount>"; the glyph is "\G" plus 8 hex digits
 function clean(text: string | undefined): string {
@@ -15,7 +15,7 @@ function value(fields: Record<string, StatusValue>, name: string): string {
   return clean(fields[name]?.text);
 }
 
-function Meter({ label, cur, max, kind, tip, on }: { label: string; cur: string; max: string; kind: string; tip: string; on: TipProps }) {
+function Meter({ label, cur, max, kind, tip, on }: { label: string; cur: string; max: string; kind: string; tip: string; on: ToggletipProps }) {
   const c = Number(cur);
   const m = Number(max);
   const pct = m > 0 ? Math.max(0, Math.min(100, (c / m) * 100)) : 0;
@@ -32,14 +32,14 @@ function Meter({ label, cur, max, kind, tip, on }: { label: string; cur: string;
 }
 
 export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
-  const tooltip = useTooltip();
-  // what was under the pointer may have changed or gone
-  useEffect(tooltip.sync, [fields]);
+  const toggletip = useToggletip();
+  // what was clicked may have changed or gone
+  useEffect(toggletip.sync, [fields]);
   if (!fields.BL_TITLE) return <div class="stats" />;
   const stat = (label: string, name: StatName) => {
     const change = fields[name]?.change;
     return (
-      <div key={name} class="stat" {...tooltip.on(STAT_TIPS[name], STAT_WIKI[name])}>
+      <div key={name} class="stat" {...toggletip.on(STAT_TIPS[name], STAT_WIKI[name])}>
         <span class="stat-label">{label}</span>
         <span class="stat-value" style={{ color: nhColor(fields[name]?.color ?? 8) }}>
           {value(fields, name)}
@@ -67,8 +67,8 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
       <div class="stats-title">{value(fields, "BL_TITLE")}</div>
       <div class="stats-sub">{heroText(value(fields, "BL_ALIGN"), value(fields, "hero_kind"))}</div>
       <div class="stats-sub">{levelText(value(fields, "BL_LEVELDESC"), value(fields, "dungeon_name"), Number(value(fields, "dungeon_level")))}</div>
-      <Meter label="HP" cur={value(fields, "BL_HP")} max={value(fields, "BL_HPMAX")} kind="hp" tip={STAT_TIPS.BL_HP} on={tooltip.on(STAT_TIPS.BL_HP, STAT_WIKI.BL_HP)} />
-      <Meter label="Pw" cur={value(fields, "BL_ENE")} max={value(fields, "BL_ENEMAX")} kind="pw" tip={STAT_TIPS.BL_ENE} on={tooltip.on(STAT_TIPS.BL_ENE, STAT_WIKI.BL_ENE)} />
+      <Meter label="HP" cur={value(fields, "BL_HP")} max={value(fields, "BL_HPMAX")} kind="hp" tip={STAT_TIPS.BL_HP} on={toggletip.on(STAT_TIPS.BL_HP, STAT_WIKI.BL_HP)} />
+      <Meter label="Pw" cur={value(fields, "BL_ENE")} max={value(fields, "BL_ENEMAX")} kind="pw" tip={STAT_TIPS.BL_ENE} on={toggletip.on(STAT_TIPS.BL_ENE, STAT_WIKI.BL_ENE)} />
       <div class="stat-grid">
         {stat("St", "BL_STR")}
         {stat("Dx", "BL_DX")}
@@ -86,14 +86,14 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
       {badges.length ? (
         <div class="badges">
           {badges.map(({ label, severity, tip, wiki }) => (
-            <span key={label} class={`badge ${severity}`} {...tooltip.on(tip, wiki)}>
+            <span key={label} class={`badge ${severity}`} {...toggletip.on(tip, wiki)}>
               {label}
               <Described tip={tip} />
             </span>
           ))}
         </div>
       ) : null}
-      {tooltip.element}
+      {toggletip.element}
     </div>
   );
 }

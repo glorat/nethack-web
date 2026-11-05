@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { sortKey } from "../../src/port/sort";
 import { clipAround } from "../../src/ui/scroll";
+import { TOOLTIP_DELAY } from "../../src/ui/tooltip";
 import { Session } from "../headless/harness";
 
 /** Answers the character-creation prompts until the map is showing. */
@@ -411,19 +412,14 @@ test("hovering over the map describes the square", async ({ page }) => {
   await expect(page.getByRole("tooltip")).toBeHidden();
 });
 
-test("hovering over AC says what it means", async ({ page }) => {
+test("a stat explains itself to screen readers, and to everyone else only when clicked", async ({ page }) => {
   await startGame(page, `Tip${Date.now() % 100000}`);
   const ac = stat(page, "AC");
   await expect(ac.locator(".screen-reader-only")).toHaveText(/Lower is better/);
   await ac.hover();
-  await expect(page.getByRole("tooltip")).toHaveText(/Lower is better/);
-  // a turn passing doesn't take it away
-  const turn = await stat(page, "T").innerText();
-  await page.keyboard.press("s");
-  await expect(stat(page, "T")).not.toHaveText(turn);
-  await expect(page.getByRole("tooltip")).toHaveText(/Lower is better/);
-  await page.locator(".map").hover();
-  await expect(page.getByRole("tooltip")).not.toHaveText(/Lower is better/);
+  await page.waitForTimeout(TOOLTIP_DELAY * 2);
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "What this means" })).toHaveCount(0);
 });
 
 test("clicking a stat explains it, with a link to the wiki, until a click elsewhere or a key", async ({ page }) => {
