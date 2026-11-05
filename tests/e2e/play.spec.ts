@@ -407,6 +407,21 @@ test("hovering over the map describes the square", async ({ page }) => {
   await expect(page.getByRole("tooltip")).toBeHidden();
 });
 
+test("hovering over AC says what it means", async ({ page }) => {
+  await startGame(page, `Tip${Date.now() % 100000}`);
+  const ac = page.locator(".stat", { hasText: "AC" });
+  await expect(ac).toHaveAttribute("aria-description", /Lower is better/);
+  await ac.hover();
+  await expect(page.getByRole("tooltip")).toHaveText(/Lower is better/);
+  // a turn passing doesn't take it away
+  const turn = await page.locator(".stat", { hasText: /^T/ }).innerText();
+  await page.keyboard.press("s");
+  await expect(page.locator(".stat", { hasText: /^T/ })).not.toHaveText(turn);
+  await expect(page.getByRole("tooltip")).toHaveText(/Lower is better/);
+  await page.locator(".map").hover();
+  await expect(page.getByRole("tooltip")).not.toHaveText(/Lower is better/);
+});
+
 test("zooming the map is kept across a reload", async ({ page }) => {
   const name = `Zoom${Date.now() % 100000}`;
   await startGame(page, name);

@@ -1,8 +1,10 @@
+import { useEffect } from "preact/hooks";
 import { AC_TIP, statusBadges } from "../port/badges";
 import { meterLevel } from "../port/meter";
 import { heroText, levelText } from "../port/status-header";
 import type { StatusValue } from "../protocol";
 import { nhColor } from "./colors";
+import { useTooltip } from "./tooltip";
 
 // the gold field is "<encoded gold glyph>:<amount>"; the glyph is "\G" plus 8 hex digits
 function clean(text: string | undefined): string {
@@ -29,11 +31,14 @@ function Meter({ label, cur, max, kind }: { label: string; cur: string; max: str
 }
 
 export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
+  const tooltip = useTooltip();
+  // what was under the pointer may have changed or gone
+  useEffect(tooltip.sync, [fields]);
   if (!fields.BL_TITLE) return <div class="stats" />;
   const stat = (label: string, name: string, tip?: string) => {
     const change = fields[name]?.change;
     return (
-      <div class="stat" title={tip}>
+      <div class="stat" {...tooltip.on(tip)}>
         <span class="stat-label">{label}</span>
         <span class="stat-value" style={{ color: nhColor(fields[name]?.color ?? 8) }}>
           {value(fields, name)}
@@ -79,12 +84,13 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
       {badges.length ? (
         <div class="badges">
           {badges.map(({ label, severity, tip }) => (
-            <span class={`badge ${severity}`} title={tip}>
+            <span class={`badge ${severity}`} {...tooltip.on(tip)}>
               {label}
             </span>
           ))}
         </div>
       ) : null}
+      {tooltip.element}
     </div>
   );
 }
