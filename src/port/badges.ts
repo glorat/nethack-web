@@ -156,3 +156,11 @@ export function statusBadges(conditions: string[], hunger: string, encumbrance: 
   if (hu) badges.unshift({ label: hu, severity: hungerSeverity(hu), tip: HUNGER_TIPS[hu], wiki: "Nutrition" });
   return badges;
 }
+
+/**
+ * The badges that mustn't pulse: those already up when the status arrives, as on resuming a game or seeking a replay,
+ * for as long as they stay. `quiet` is the last answer, or null while there was no status.
+ */
+export function quietBadges(quiet: Set<string> | null, labels: string[]): Set<string> {
+  return new Set(quiet ? labels.filter((l) => quiet.has(l)) : labels);
+}

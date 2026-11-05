@@ -160,6 +160,24 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .badge.caution { background: #f5c518; color: #000; }
 .badge.warning { background: #c2410c; color: #fff; }
 .badge.danger { background: #c0392b; color: #fff; }
+/* a badge pulses as it appears, more for worse ones; the element is new each time, as badges are keyed by label */
+.badge { --pulse: rgba(255, 255, 255, 0.7); animation: badge-appear 0.6s ease-out 1; }
+.badge.caution { animation-iteration-count: 2; --pulse: rgba(245, 197, 24, 0.8); }
+.badge.warning { animation-iteration-count: 3; --pulse: rgba(234, 88, 12, 0.9); }
+.badge.danger { animation-iteration-count: 3; animation-duration: 0.8s; --pulse: rgba(231, 76, 60, 1); }
+@keyframes badge-appear {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 var(--pulse); }
+  40% { transform: scale(1.1); }
+  100% { transform: scale(1); box-shadow: 0 0 0 8px transparent; }
+}
+.badge.quiet { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .badge:not(.quiet) { animation-name: badge-appear-still; }
+  @keyframes badge-appear-still {
+    0%, 100% { outline: 2px solid transparent; }
+    50% { outline: 2px solid var(--pulse); }
+  }
+}
 
 /* equipment */
 .equipment {
