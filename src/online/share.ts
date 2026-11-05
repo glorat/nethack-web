@@ -72,7 +72,7 @@ dd { margin: 0; font: 600 18px ui-monospace, "SF Mono", Menlo, Consolas, monospa
 .actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .button { font-weight: 600; font-size: 15px; border-radius: 6px; padding: 9px 18px; background: var(--accent); color: #fff; text-decoration: none; }
 .obit { display: grid; gap: 8px; min-width: 0; }
-.kicker { font: 600 13px ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.18em; text-transform: uppercase; color: #e5534b; }
+.kicker { font: 600 13px ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.18em; text-transform: uppercase; color: #f0726b; }
 .kicker.up { color: var(--gold); }
 .obit h1 { font-size: clamp(32px, 6vw, 52px); line-height: 1.05; margin: 0; overflow-wrap: anywhere; }
 .character { color: #b8b4ab; }
@@ -88,7 +88,7 @@ h2 { font: 600 12px ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-
 .journey li.kind-feat::before { border-color: var(--gold); }
 .journey li.kind-end::before { border-color: #e5534b; background: #e5534b; }
 .journey .turn { font: 13px ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--muted); padding-top: 2px; font-variant-numeric: tabular-nums; }
-.journey .what { font-size: 15px; line-height: 1.4; min-width: 0; }
+.journey .what { font-size: 15px; line-height: 1.4; min-width: 0; overflow-wrap: anywhere; }
 .journey a { font-size: 12px; color: #8fb3ff; margin-left: 4px; }
 .earned { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .earned li { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
@@ -160,15 +160,16 @@ function journey(game: string, chapters: Chapter[]): string {
   if (!chapters.length) return "";
   const rows = chapters.map(
     (c) =>
-      `<li class="kind-${c.kind}"><span class="turn">T${c.turn}</span><span class="what">${html(c.text)} <a href="${html(watchAddress(game, `&line=${c.line}`))}" aria-label="Watch ${html(c.text)}, on turn ${c.turn}">watch</a></span></li>`,
+      `<li class="kind-${c.kind}"><span class="turn">T${html(String(c.turn))}</span><span class="what">${html(c.text)} <a href="${html(watchAddress(game, `&line=${c.line}`))}" aria-label="Watch ${html(c.text)}, on turn ${html(String(c.turn))}">watch</a></span></li>`,
   );
-  return `<section><h2>The journey</h2><ol class="journey">${rows.join("")}</ol></section>`;
+  // list-style none would otherwise lose the list for Safari's screen reader
+  return `<section><h2>The journey</h2><ol class="journey" role="list">${rows.join("")}</ol></section>`;
 }
 
 function earned(achievements: PublicStory["achievements"]): string {
   if (!achievements.length) return "";
-  const badges = achievements.map((a) => `<li><b>${html(a.name)}</b><span>${html(a.description)} · turn ${n(a.turn)}</span></li>`);
-  return `<section><h2>Earned in this game</h2><ul class="earned">${badges.join("")}</ul></section>`;
+  const badges = achievements.map((a) => `<li><b>${html(a.name)}</b><span>${html(a.description)} · turn ${html(n(Number(a.turn)))}</span></li>`);
+  return `<section><h2>Earned in this game</h2><ul class="earned" role="list">${badges.join("")}</ul></section>`;
 }
 
 /** The share page for a game, or for a link that names none the server can show. */
