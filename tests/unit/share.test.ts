@@ -36,6 +36,8 @@ describe("the share page", () => {
     expect(meta(html, "theme-color")).toBe("#e5534b");
     expect(meta(html, "twitter:card")).toBe("summary_large_image");
     expect(meta(sharePage("https://nethack.app", id, ascended), "theme-color")).toBe("#e3b341");
+    expect(html).toContain(`href="/online/watch/?game=${GAME}"`);
+    expect(sharePage("https://nethack.app", id, null)).not.toContain("/online/watch/");
   });
 
   test("never shows the character's name", () => {
