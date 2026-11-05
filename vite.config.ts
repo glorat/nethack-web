@@ -68,6 +68,8 @@ export default defineConfig({
   define: { __NETHACK_VERSION__: JSON.stringify(nethackVersion()), __CORE_COMMIT__: JSON.stringify(coreCommit()) },
   plugins: [preact(), serviceWorker()],
   worker: { format: "es" },
+  // in production the site's Pages Functions put the server's public data here; in development, the emulator's
+  server: { proxy: { "/v1/": { target: "http://127.0.0.1:5299", rewrite: (path) => `/demo-nethack/europe-west1/publicData${path}` } } },
   build: {
     rollupOptions: {
       input: Object.fromEntries(PAGES.map((page) => [page.replaceAll("/", "-") || "root", new URL(`./${page}index.html`, import.meta.url).pathname])),

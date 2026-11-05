@@ -42,7 +42,7 @@ const withBells = postingThrough((post, events) => post([{ type: "bell" }, ...ev
 
 async function runner(turnsPerSecond: number, onEvents: (events: GameEvent[]) => void = () => {}, through: (boots: Boots) => Boots = (boots) => boots) {
   const seen: { progress: ReplayProgress; prompt: GameRequest | null } = {
-    progress: { turn: 0, playing: true, seeking: false, ended: null },
+    progress: { turn: 0, line: 0, playing: true, seeking: false, ended: null },
     prompt: null,
   };
   const r = new ReplayRunner(TEXT, through(await headlessBoot()), {
@@ -64,6 +64,20 @@ test("at full speed, a pause takes hold at once, not at the session's end", asyn
   await until(() => r.idle);
   expect(seen.progress.ended).toBeNull();
   expect(seen.progress.turn).toBeLessThan(FIRST_SESSION_END);
+}, 30000);
+
+test("a seek to a recording line stops just past it, so what it did has happened, at that point's turn", async () => {
+  const lines = TEXT.split("\n");
+  // a key well into the first session, as a chronicle entry would name
+  const target = lines.findIndex((l, i) => i > 200 && / k /.test(l)) + 1;
+  const { r, seen } = await runner(2);
+  r.control({ action: "seek", line: target });
+  await until(() => !seen.progress.seeking && seen.progress.line > target);
+  await until(() => r.idle);
+  expect(seen.progress.playing).toBe(false);
+  expect(seen.progress.line - target).toBeLessThan(10);
+  const turnsBefore = [...lines.slice(0, seen.progress.line - 1).join("\n").matchAll(/^\d+ T (\d+)\b/gm)];
+  expect(seen.progress.turn).toBe(Number(turnsBefore.at(-1)![1]));
 }, 30000);
 
 test("a speed change and a seek straight after it leave the replay playing on", async () => {

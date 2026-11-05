@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
 
 const PROD = "http://127.0.0.1:5198/";
@@ -184,6 +185,47 @@ test("a scored online game's link can be copied from the home, and one without a
   await panel.getByRole("button", { name: /^Share Agnes's game/ }).click();
   await expect(panel.getByRole("status")).toHaveText(/^Copied the link to Agnes's game of /);
   expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toBe(`${new URL(PROD).origin}/g/P5wqflsdTI6aYn0OS4HD9Q`);
+});
+
+test("a watched game's chronicle gives chapters to jump to, and a link can open at one", async ({ page }) => {
+  await fakeServer(page);
+  await page.route(RECAPTCHA, (route) => route.fulfill({ contentType: "text/javascript", body: FAKE_RECAPTCHA }));
+  await page.route("https://content-firebaseappcheck.googleapis.com/**", (route) =>
+    route.request().method() === "OPTIONS" ? route.fulfill({ status: 204, headers: cors }) : route.fulfill({ json: { token: "app-check-token", ttl: "3600s" }, headers: cors }),
+  );
+  const recording = readFileSync(new URL("../headless/golden/valkyrie.txt", import.meta.url), "utf8");
+  const lines = recording.split("\n");
+  const lineOfTurn = (turn: number) => lines.findIndex((l) => new RegExp(`^\\d+ T ${turn}\\b`).test(l)) + 1;
+  const game = "3f9c2a7e-5b1d-4c8e-9a62-7d0e4b81c3f5";
+  await page.route("https://europe-west1-nethack-web-server.cloudfunctions.net/{user,publicApi}", (route) => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") return route.fallback();
+    const { method, input } = request.postDataJSON().data;
+    if (method === "watchGame" && input.game === game) return route.fulfill({ json: { result: { recording } }, headers: cors });
+    return route.fallback();
+  });
+  await page.route(`**/v1/games/${game}/story.json`, (route) =>
+    route.fulfill({
+      json: {
+        chronicle: [
+          { turn: 50, line: lineOfTurn(50), flags: 0x8000, text: "entered level 2, the Dungeons of Doom" },
+          { turn: 150, line: lineOfTurn(150), flags: 0x20, text: "hit with a wielded weapon for the first time" },
+        ],
+        achievements: [],
+      },
+    }),
+  );
+  await page.goto(`${PROD}online/watch/?game=${game}`);
+  const chapters = page.getByRole("group", { name: "Chapters" });
+  await expect(chapters.getByRole("button")).toHaveText(["T50 Entered level 2, the Dungeons of Doom", "T150 Hit with a wielded weapon for the first time"], { timeout: 30_000 });
+  await chapters.getByRole("button", { name: /Hit with a wielded weapon/ }).click();
+  await expect(page.getByText(/^Turn 150 of \d+$/)).toBeVisible({ timeout: 30_000 });
+  await expect(chapters.getByRole("button", { name: /Hit with a wielded weapon/ })).toHaveAttribute("aria-current", "step");
+  expect(new URL(page.url()).searchParams.get("line")).toBe(String(lineOfTurn(150)));
+  // the address now opens there
+  await page.reload();
+  await expect(page.getByText(/^Turn 150 of \d+$/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "Play", exact: true })).toBeVisible();
 });
 
 const exchange = (page: Page, answer: () => "token" | "brief" | "refuse" | "unreachable") =>

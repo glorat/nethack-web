@@ -173,6 +173,8 @@ export type ReplayMessage =
 
 export interface ReplayProgress {
   turn: number;
+  /** The recording line the replay is waiting to answer, counting from 1; 0 before the first. */
+  line: number;
   playing: boolean;
   /** Going ahead to a turn without showing the way. */
   seeking: boolean;
@@ -188,7 +190,9 @@ export type ReplayControl =
   /** Turns a second; Infinity as fast as the core goes. */
   | { action: "speed"; turnsPerSecond: number }
   /** Plays again from the start, without showing it, up to this turn, then pauses there. */
-  | { action: "seek"; turn: number };
+  | { action: "seek"; turn: number }
+  /** Likewise, up to just after this recording line, so whatever it did has happened. */
+  | { action: "seek"; line: number };
 
 /** The values a game would otherwise take from the machine, as a replay has them from its recording. */
 export interface FixedInputs {

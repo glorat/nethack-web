@@ -426,7 +426,18 @@ a.landing-title { color: inherit; text-decoration: none; }
 }
 
 .replay-bar { display: flex; flex: none; align-items: center; gap: 8px; flex-wrap: wrap; padding: 4px 8px; background: var(--panel-2); border-top: 1px solid var(--border); }
-.replay-bar input[type="range"] { flex: 1 1 160px; min-width: 120px; }
+.replay-track { position: relative; display: flex; flex: 1 1 160px; min-width: 120px; }
+.replay-track input[type="range"] { flex: 1; min-width: 0; }
+/* the range's thumb leaves this much at each end, so a mark sits over its turn */
+.replay-mark { position: absolute; top: -6px; width: 9px; height: 9px; margin-left: -4.5px; padding: 0; border: 0; border-radius: 1px; transform: rotate(45deg); background: var(--muted); cursor: pointer; left: 0; }
+.replay-mark.descent { background: var(--accent); }
+.replay-mark.feat { background: #d6a83a; }
+.replay-mark.end { background: var(--danger); }
+.replay-mark:disabled { cursor: default; opacity: 0.6; }
+.replay-chapters { display: flex; gap: 6px; overflow-x: auto; flex: 1 0 100%; padding: 2px 0; }
+.replay-chapter { flex: none; padding: 2px 10px; border-radius: 999px; font-size: 12px; }
+.replay-chapter small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.replay-chapter[aria-current] { border-color: var(--accent); background: #23324d; }
 .replay-turn { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .replay-error { color: #f28b82; }
 .replay-spacer { flex: 1 1 0; }

@@ -23,8 +23,9 @@ export class ReplayRunner {
   private run = 0;
   private playing = true;
   private stepping = false;
-  private seekTo: number | null = null;
+  private seekTo: { turn: number } | { line: number } | null = null;
   private turn = 0;
+  private line = 0;
   private state = initialState();
   private ended: ReplayProgress["ended"] = null;
   /** Paces waiting for play to go on, woken by any control, each checking whether it's still wanted. */
@@ -87,7 +88,7 @@ export class ReplayRunner {
         this.turnsPerSecond = control.turnsPerSecond;
         break;
       case "seek":
-        this.seekTo = control.turn;
+        this.seekTo = "line" in control ? { line: control.line } : { turn: control.turn };
         this.playing = false;
         this.begin();
         break;
@@ -101,6 +102,7 @@ export class ReplayRunner {
   private begin(): void {
     const run = ++this.run;
     this.turn = 0;
+    this.line = 0;
     this.stepping = false;
     // the page has the game's frame up already; the cores' own start-up comes as events
     this.state = { ...initialState(), started: true };
@@ -134,11 +136,16 @@ export class ReplayRunner {
     if (run !== this.run) return never();
   }
 
-  private async pace(run: number, at: { turn?: number; request?: GameRequest }): Promise<void> {
+  private async pace(run: number, at: { turn?: number; request?: GameRequest; line?: number }): Promise<void> {
     if (run !== this.run) return never();
-    if (at.turn !== undefined) {
+    if (at.line !== undefined) this.line = at.line;
+    if (this.seekTo !== null && "line" in this.seekTo && this.line > this.seekTo.line) {
+      this.turn = at.turn ?? this.turn;
+      this.arrive();
+      this.progress();
+    } else if (at.turn !== undefined) {
       this.turn = at.turn;
-      if (this.seekTo !== null && at.turn >= this.seekTo) this.arrive();
+      if (this.seekTo !== null && "turn" in this.seekTo && at.turn >= this.seekTo.turn) this.arrive();
       else if (this.stepping) {
         this.stepping = false;
         this.playing = false;
@@ -223,7 +230,7 @@ export class ReplayRunner {
   private sendProgress(): void {
     this.page.replay({
       type: "replay_progress",
-      progress: { turn: this.turn, playing: this.playing, seeking: this.seekTo !== null, ended: this.ended },
+      progress: { turn: this.turn, line: this.line, playing: this.playing, seeking: this.seekTo !== null, ended: this.ended },
     });
   }
 }
