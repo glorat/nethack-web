@@ -48,7 +48,7 @@ export interface LeaderboardEntry {
 
 export const standing = ({ handle, result }: LeaderboardEntry): string => ending(handle ?? "Anonymous", result);
 
-export const ascended = (result: GameResult | undefined): boolean => /^ascended\b/.test(result?.death ?? "");
+export { ascended } from "../port/xlog";
 
 /** An address for the page that watches a finished online game. */
 export function gameWatchAddress(game: string): string {
