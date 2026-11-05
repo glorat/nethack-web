@@ -422,6 +422,40 @@ test("hovering over AC says what it means", async ({ page }) => {
   await expect(page.getByRole("tooltip")).not.toHaveText(/Lower is better/);
 });
 
+test("clicking a stat explains it, with a link to the wiki, until a click elsewhere or a key", async ({ page }) => {
+  await startGame(page, `Pop${Date.now() % 100000}`);
+  const popover = page.getByRole("dialog", { name: "What this means" });
+  await page.locator(".stat", { hasText: "AC" }).click();
+  await expect(popover).toContainText("Lower is better");
+  await expect(popover.getByRole("link")).toHaveAttribute("href", /search=Armor%20class/);
+  // the click that closes it doesn't reach the map
+  const cursor = await page.locator("canvas").getAttribute("data-cursor");
+  const map = (await page.locator(".map").boundingBox())!;
+  await page.mouse.click(map.x + map.width / 2 + 40, map.y + map.height / 2);
+  await expect(popover).toBeHidden();
+  await expect(page.locator("canvas")).toHaveAttribute("data-cursor", cursor!);
+  await page.locator(".stat", { hasText: "AC" }).click();
+  await expect(popover).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(popover).toBeHidden();
+  // a game key closes it and still plays
+  await page.locator(".stat", { hasText: "AC" }).click();
+  const turn = await page.locator(".stat", { hasText: /^T/ }).innerText();
+  await page.keyboard.press("s");
+  await expect(popover).toBeHidden();
+  await expect(page.locator(".stat", { hasText: /^T/ })).not.toHaveText(turn);
+});
+
+test("tapping a stat explains it", async ({ browser }) => {
+  const context = await browser.newContext({ hasTouch: true });
+  const page = await context.newPage();
+  await startGame(page, `Tap${Date.now() % 100000}`);
+  await page.locator(".stat", { hasText: "Dx" }).tap();
+  await expect(page.getByRole("dialog", { name: "What this means" })).toContainText("Dexterity");
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  await context.close();
+});
+
 test("zooming the map is kept across a reload", async ({ page }) => {
   const name = `Zoom${Date.now() % 100000}`;
   await startGame(page, name);

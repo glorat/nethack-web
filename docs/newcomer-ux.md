@@ -9,6 +9,9 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
 - [x] **Explain status badges and AC.** A tooltip on each badge saying what the condition means and how urgent it is, and on AC that lower is better. Effort S, benefit high. Decided: do it.
   - The labels and severities are already in `src/ui/StatsView.tsx` and `src/port/badges.ts`; this adds a short explanation each.
   - Wording answers the player's question ("You're turning to stone. Fix it now or you die."), not how the game works.
+- [x] **Click or tap a stat or badge for a popover** with its explanation and a NetHack Wiki link, closed by clicking or tapping elsewhere. Effort S, benefit high. Decided: do it.
+  - Stats and badges do nothing when clicked, so nothing conflicts, and it works by touch, where the hover tooltips don't.
+  - Chosen over a one-shot help mode (press ?, then click anything), which is kept for later in case players can't find this; it would open the same popover.
 - [ ] **An on-screen Esc button** for dialogs and prompts waiting for a key. Effort S, benefit medium.
   - Also an open item in `docs/tablet-support.md`. Map position prompts wait on the item below.
 - [ ] **Quick-action toolbar:** search, rest, pick up, up and down stairs, travel to the stairs. Effort M, benefit high.
