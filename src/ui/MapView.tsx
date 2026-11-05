@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { cursorColor } from "../port/cursor";
 import { tooltipText, wikiTerm, wikiUrl } from "../port/describe";
+import { useTooltip } from "./tooltip";
 import { COLNO, ROWNO, type GameState } from "../port/state";
 import { drawTile, type TileSheet } from "../tiles";
 import { asciiCell, type AsciiFont, drawSymbol } from "./ascii";
@@ -27,12 +28,6 @@ interface Props {
   onShowInventory?(): void;
 }
 
-interface Tooltip {
-  text: string;
-  left: number;
-  top: number;
-}
-
 interface ContextMenu {
   x: number;
   y: number;
@@ -42,7 +37,6 @@ interface ContextMenu {
   term: string | null;
 }
 
-const TOOLTIP_DELAY = 500;
 // how far a pinch goes for one zoom step, near Cocoa's 0.15 magnification (Safari's scale is times 100)
 const PINCH_STEP = 15;
 
@@ -54,8 +48,8 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
   const canvas = useRef<HTMLCanvasElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const pane = useRef<HTMLDivElement>(null);
-  const [tooltip, setTooltip] = useState<Tooltip | null>(null);
-  const hover = useRef<{ x: number; y: number; timer: number } | null>(null);
+  const tooltip = useTooltip();
+  const hover = useRef<{ x: number; y: number } | null>(null);
   const [petMark, setPetMark] = useState<HTMLImageElement | null>(null);
   const [menu, setMenu] = useState<ContextMenu | null>(null);
   const menuEl = useRef<HTMLDivElement>(null);
@@ -67,9 +61,8 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
   }, []);
 
   const cancelTooltip = () => {
-    if (hover.current) clearTimeout(hover.current.timer);
     hover.current = null;
-    setTooltip(null);
+    tooltip.hide();
   };
 
   // what was under the mouse may have moved or gone
@@ -249,12 +242,11 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
     if (at && hover.current?.x === at.x && hover.current.y === at.y) return;
     cancelTooltip();
     if (!at) return;
-    const { clientX, clientY } = e;
-    const timer = window.setTimeout(async () => {
+    tooltip.show(async () => {
       const text = await describe(at.x, at.y);
-      if (text && hover.current?.timer === timer) setTooltip({ text: tooltipText(text), left: clientX + 12, top: clientY + 16 });
-    }, TOOLTIP_DELAY);
-    hover.current = { ...at, timer };
+      return text && tooltipText(text);
+    }, e.clientX + 12, e.clientY + 16);
+    hover.current = at;
   };
 
   return (
@@ -317,11 +309,7 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
           </div>
         </div>
       ) : null}
-      {tooltip ? (
-        <div class="map-tooltip" role="tooltip" style={{ left: `${tooltip.left}px`, top: `${tooltip.top}px` }}>
-          {tooltip.text}
-        </div>
-      ) : null}
+      {tooltip.element}
     </div>
   );
 }

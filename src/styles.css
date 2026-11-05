@@ -97,7 +97,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .map-zoom button { width: 28px; padding: 2px 0; opacity: 0.8; }
 .map-zoom .ascii-toggle { width: auto; padding: 2px 8px; }
 .map-zoom .ascii-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-.map-tooltip {
+.tooltip {
   position: fixed; z-index: 5; pointer-events: none; max-width: 320px;
   background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
   padding: 3px 8px; font-size: 12px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
