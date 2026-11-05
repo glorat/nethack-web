@@ -1,5 +1,6 @@
 // A finished online game's share page: what chat apps read for the link's preview, and what a visitor sees.
-import { gameOf, sharePage } from "../../src/online/share";
+import { gameOf } from "../../src/online/game-id";
+import { sharePage } from "../../src/online/share";
 import { cached, onlyGet, upstream } from "../../edge/public-data.js";
 
 const unavailable = () =>
