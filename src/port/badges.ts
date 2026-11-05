@@ -77,7 +77,26 @@ const CONDITION_TIPS: Record<string, string> = {
   WOUNDEDL: "Your legs are hurt: you can't kick, and you can carry less until they heal.",
 };
 
-export const AC_TIP = "Armor Class: how hard you are to hit. Lower is better.";
+/** What each stat in the status panel means, by the core's field name. */
+export const STAT_TIPS = {
+  BL_HP: "Hit points: your health. It comes back over time, and if it reaches 0, you die.",
+  BL_ENE: "Power: what casting spells uses up. It comes back over time.",
+  BL_STR: "Strength: how hard and how often you hit, and how much you can carry.",
+  BL_DX: "Dexterity: how often you hit, up close or when throwing.",
+  BL_CO: "Constitution: how fast your health comes back, how much you gain as you level up, and how much you can carry.",
+  BL_IN: "Intelligence: whether you can learn spells from books safely, and for some roles how well you cast them.",
+  BL_WI: "Wisdom: how much power you gain as you level up, how fast it comes back, and for some roles how well you cast.",
+  BL_CH: "Charisma: what shopkeepers charge you.",
+  BL_AC: "Armor Class: how hard you are to hit. Lower is better.",
+  BL_XP: "Experience level: it goes up as you defeat monsters, bringing more health and power.",
+  BL_HD: "Your level in the form you've taken. Your own level comes back when you change back.",
+  BL_GOLD: "The gold you're carrying.",
+  BL_EXP: "Experience points: earn enough and your experience level goes up.",
+  BL_TIME: "Turns played so far.",
+  BL_SCORE: "Your score so far.",
+} as const satisfies Record<string, string>;
+
+export type StatName = keyof typeof STAT_TIPS;
 
 /** Fainting, Fainted and Starved are dangerous. */
 export function hungerSeverity(text: string): Severity {

@@ -9,6 +9,8 @@ interface Shown {
   top: number;
 }
 
+export type TipProps = ReturnType<ReturnType<typeof useTooltip>["on"]>;
+
 /**
  * A tooltip drawn by the page rather than the browser, so its delay is ours.
  * `show` waits TOOLTIP_DELAY, then shows the text at the point given; a later `show` or `hide` cancels it.
