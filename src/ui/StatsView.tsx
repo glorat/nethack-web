@@ -1,5 +1,5 @@
 import { useEffect } from "preact/hooks";
-import { STAT_TIPS, type StatName, statusBadges } from "../port/badges";
+import { STAT_TIPS, STAT_WIKI, type StatName, statusBadges } from "../port/badges";
 import { meterLevel } from "../port/meter";
 import { heroText, levelText } from "../port/status-header";
 import type { StatusValue } from "../protocol";
@@ -38,7 +38,7 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
   const stat = (label: string, name: StatName) => {
     const change = fields[name]?.change;
     return (
-      <div class="stat" {...tooltip.on(STAT_TIPS[name])}>
+      <div key={name} class="stat" {...tooltip.on(STAT_TIPS[name], STAT_WIKI[name])}>
         <span class="stat-label">{label}</span>
         <span class="stat-value" style={{ color: nhColor(fields[name]?.color ?? 8) }}>
           {value(fields, name)}
@@ -65,8 +65,8 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
       <div class="stats-title">{value(fields, "BL_TITLE")}</div>
       <div class="stats-sub">{heroText(value(fields, "BL_ALIGN"), value(fields, "hero_kind"))}</div>
       <div class="stats-sub">{levelText(value(fields, "BL_LEVELDESC"), value(fields, "dungeon_name"), Number(value(fields, "dungeon_level")))}</div>
-      <Meter label="HP" cur={value(fields, "BL_HP")} max={value(fields, "BL_HPMAX")} kind="hp" tip={tooltip.on(STAT_TIPS.BL_HP)} />
-      <Meter label="Pw" cur={value(fields, "BL_ENE")} max={value(fields, "BL_ENEMAX")} kind="pw" tip={tooltip.on(STAT_TIPS.BL_ENE)} />
+      <Meter label="HP" cur={value(fields, "BL_HP")} max={value(fields, "BL_HPMAX")} kind="hp" tip={tooltip.on(STAT_TIPS.BL_HP, STAT_WIKI.BL_HP)} />
+      <Meter label="Pw" cur={value(fields, "BL_ENE")} max={value(fields, "BL_ENEMAX")} kind="pw" tip={tooltip.on(STAT_TIPS.BL_ENE, STAT_WIKI.BL_ENE)} />
       <div class="stat-grid">
         {stat("St", "BL_STR")}
         {stat("Dx", "BL_DX")}
@@ -83,8 +83,8 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
       </div>
       {badges.length ? (
         <div class="badges">
-          {badges.map(({ label, severity, tip }) => (
-            <span class={`badge ${severity}`} {...tooltip.on(tip)}>
+          {badges.map(({ label, severity, tip, wiki }) => (
+            <span key={label} class={`badge ${severity}`} {...tooltip.on(tip, wiki)}>
               {label}
             </span>
           ))}

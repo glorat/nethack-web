@@ -112,6 +112,16 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 }
 .context-menu button { text-align: left; background: none; border: none; padding: 4px 10px; border-radius: 4px; }
 .context-menu button:hover { background: var(--border); }
+/* under dialogs, so a prompt that comes while it is open is seen */
+.tip-backdrop { position: fixed; inset: 0; z-index: 9; }
+.tip-popover {
+  position: fixed; max-width: 320px; padding: 6px 10px; font-size: calc(12px * var(--text-scale));
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+.tip-popover p { margin: 0 0 6px; }
+.tip-popover p:last-child { margin: 0; }
+.stats [aria-description] { cursor: pointer; }
 
 /* stats */
 /* what Cocoa's text size scales: stats, messages, inventory, menus and text windows */

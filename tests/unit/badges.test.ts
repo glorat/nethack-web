@@ -34,13 +34,14 @@ test("badges come hunger first, then encumbrance, then conditions, each with its
   expect(badges[2].tip).toMatch(/turning to stone/);
 });
 
-test("every condition, hunger and encumbrance the core can show has a meaning", () => {
+test("every condition, hunger and encumbrance the core can show has a meaning and a wiki search", () => {
   const conditions = [...botl.matchAll(/\{\s*\d+, BL_MASK_(\w+),\s+bl_\w+,/g)].map((m) => m[1]);
   expect(conditions.length).toBeGreaterThan(25);
   const hunger = ["Satiated", "Hungry", "Weak", "Fainting", "Fainted", "Starved"].map((h) => statusBadges([], h, "")[0]);
   const encumbrance = ["Burdened", "Stressed", "Strained", "Overtaxed", "Overloaded"].map((e) => statusBadges([], "", e)[0]);
   for (const badge of [...statusBadges(conditions, "", ""), ...hunger, ...encumbrance]) {
     expect(badge.tip, badge.label).toBeTruthy();
+    expect(badge.wiki, badge.label).toBeTruthy();
   }
   expect(statusBadges(conditions, "", "").filter((b, i) => b.label === conditions[i])).toEqual([]);
 });

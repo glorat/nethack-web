@@ -98,6 +98,22 @@ export const STAT_TIPS = {
 
 export type StatName = keyof typeof STAT_TIPS;
 
+/** What to search the NetHack Wiki for, for each stat. */
+export const STAT_WIKI: Record<StatName, string> = {
+  BL_HP: "Hit points", BL_ENE: "Energy", BL_STR: "Strength", BL_DX: "Dexterity", BL_CO: "Constitution",
+  BL_IN: "Intelligence", BL_WI: "Wisdom", BL_CH: "Charisma", BL_AC: "Armor class", BL_XP: "Experience level",
+  BL_HD: "Hit dice", BL_GOLD: "Gold", BL_EXP: "Experience points", BL_TIME: "Turn", BL_SCORE: "Score",
+};
+
+const CONDITION_WIKI: Record<string, string> = {
+  BAREH: "Bare-handed combat", BLIND: "Blindness", BUSY: "Occupation", CONF: "Confusion", DEAF: "Deafness",
+  ELF_IRON: "Iron", FLY: "Flying", FOODPOIS: "Food poisoning", GLOWHANDS: "Scroll of confuse monster",
+  GRAB: "Drowning", HALLU: "Hallucination", HELD: "Sticky", HOLDING: "Sticky", ICY: "Ice", INLAVA: "Lava",
+  LEV: "Levitation", PARLYZ: "Paralysis", RIDE: "Riding", SLEEPING: "Sleep", SLIME: "Sliming",
+  SLIPPERY: "Slippery fingers", STONE: "Stoning", STRNGL: "Strangulation", STUN: "Stun", SUBMERGED: "Underwater",
+  TERMILL: "Illness", TETHERED: "Heavy iron ball", TRAPPED: "Trap", UNCONSC: "Fainting", WOUNDEDL: "Wounded legs",
+};
+
 /** Fainting, Fainted and Starved are dangerous. */
 export function hungerSeverity(text: string): Severity {
   return HUNGER[text.trim()] ?? "danger";
@@ -120,16 +136,23 @@ export interface Badge {
   label: string;
   severity: Severity;
   tip?: string;
+  /** What to search the NetHack Wiki for. */
+  wiki?: string;
 }
 
 /** Hunger first, then encumbrance, then the conditions in the core's order. */
 export function statusBadges(conditions: string[], hunger: string, encumbrance: string): Badge[] {
   const badges = conditions.map(
-    (c): Badge => ({ label: CONDITION_LABELS[c] ?? c, severity: conditionSeverity(c), tip: CONDITION_TIPS[c] }),
+    (c): Badge => ({
+      label: CONDITION_LABELS[c] ?? c,
+      severity: conditionSeverity(c),
+      tip: CONDITION_TIPS[c],
+      wiki: CONDITION_WIKI[c],
+    }),
   );
   const cap = encumbrance.trim();
-  if (cap) badges.unshift({ label: cap, severity: encumbranceSeverity(cap), tip: ENCUMBRANCE_TIPS[cap] });
+  if (cap) badges.unshift({ label: cap, severity: encumbranceSeverity(cap), tip: ENCUMBRANCE_TIPS[cap], wiki: "Encumbrance" });
   const hu = hunger.trim();
-  if (hu) badges.unshift({ label: hu, severity: hungerSeverity(hu), tip: HUNGER_TIPS[hu] });
+  if (hu) badges.unshift({ label: hu, severity: hungerSeverity(hu), tip: HUNGER_TIPS[hu], wiki: "Nutrition" });
   return badges;
 }
