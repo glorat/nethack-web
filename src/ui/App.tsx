@@ -16,6 +16,7 @@ import { downloadRecording, downloadText, lastTurnIn, replayable } from "../port
 import { shadowWanted } from "../port/shadow";
 import { onlineMode } from "../online/ui/mode";
 import { watchedGame } from "../online/results";
+import { type Chapter, loadChapters, startingLine } from "../online/story";
 import { finishedGameRecording } from "../online/server/api";
 import { DEFAULT_TILE_SET, importedTileSet, TILE_SETS, type TileSet, tileSetFileName, tileSetNamed } from "../port/tilesets";
 import { loadImportedSheet, loadTileSheet, type TileSheet } from "../tiles";
@@ -197,6 +198,11 @@ export function App({ handedOver, onReplay }: Props) {
           ? { text: null, loading: !!watched }
           : { text: lastGame() },
   );
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  useEffect(() => {
+    if (!watched) return;
+    loadChapters(watched).then(setChapters, (e) => console.warn("couldn't load the game's chapters", e));
+  }, []);
   useEffect(() => {
     if (!watched || handedOver !== undefined) return;
     finishedGameRecording(watched).then(
@@ -207,7 +213,7 @@ export function App({ handedOver, onReplay }: Props) {
       },
     );
   }, []);
-  const [replayProgress, setReplayProgress] = useState<ReplayProgress>({ turn: 0, playing: true, seeking: false, ended: null });
+  const [replayProgress, setReplayProgress] = useState<ReplayProgress>({ turn: 0, line: 0, playing: true, seeking: false, ended: null });
   const [replaySpeed, setReplaySpeed] = useState(REPLAY_SPEEDS[0].turnsPerSecond);
   const replayLastTurn = useMemo(() => ((replay?.text && lastTurnIn(replay.text)) || 0), [replay]);
   /** The game's recording, once it has ended. */
@@ -661,6 +667,9 @@ export function App({ handedOver, onReplay }: Props) {
       } else if (sheet && !playing) {
         setPlaying(true);
         client.replay(new URL(import.meta.env.BASE_URL, location.href).href, replay.text, replaySpeed);
+        // a link to a moment in the game
+        const line = watched ? startingLine(location.search) : null;
+        if (line !== null) client.replayControl({ action: "seek", line });
       }
       return;
     }
@@ -895,6 +904,12 @@ export function App({ handedOver, onReplay }: Props) {
           control={(control) => {
             if (control.action === "speed") setReplaySpeed(control.turnsPerSecond);
             client.replayControl(control);
+          }}
+          chapters={chapters}
+          onChapter={({ line }) => {
+            const address = new URL(location.href);
+            address.searchParams.set("line", String(line));
+            history.replaceState(null, "", address);
           }}
           onDownload={() => downloadRecording(replay.text!)}
           onExit={() => location.replace(LANDING_PATH)}

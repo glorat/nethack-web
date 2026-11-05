@@ -234,9 +234,10 @@ export interface ReplayHooks {
   /**
    * Waited for before each answer, to set the pace; resolves at once to go as
    * fast as the core can. `turn` if a turn has begun since the last answer,
-   * `request` if this answer is to a prompt rather than a key for a command.
+   * `request` if this answer is to a prompt rather than a key for a command,
+   * and `line`, the recording line the answer is on, counting from 1.
    */
-  pace(at: { turn?: number; request?: GameRequest }): Promise<void>;
+  pace(at: { turn?: number; request?: GameRequest; line?: number }): Promise<void>;
   /** The core's pause in an animation, such as a zap; it plays at its own pace without this. */
   delay?(): Promise<void>;
   /** The bones with this hash, which a recording names rather than holds. */
@@ -400,7 +401,7 @@ export class ReplayHost implements GameHost {
       await this.hooks.more();
     }
     try {
-      await this.hooks.pace({ turn, request });
+      await this.hooks.pace({ turn, request, line: this.session.recorded.get(this.at)?.at });
     } catch (e) {
       this.stopped(e instanceof Error ? e.message : String(e));
     }

@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import type { Answer, GameEvent, GameRequest, StartOptions, UiMessage, WorkerMessage } from "../protocol";
+import type { Answer, GameEvent, GameRequest, ReplayControl, StartOptions, UiMessage, WorkerMessage } from "../protocol";
 import type { AuthorityChoice } from "../protocol";
 import { offlineWorker } from "../offline/worker";
 import { onlineWorker } from "../online/worker";
@@ -26,6 +26,7 @@ let module: NetHackModule | null = null;
 let game: Game | null = null;
 let recorder: Recorder | null = null;
 let runner: ReplayRunner | null = null;
+const early: ReplayControl[] = [];
 let shadow: Shadow | null = null;
 
 function send(message: WorkerMessage): void {
@@ -323,6 +324,7 @@ async function startReplay(assetBase: string, text: string, turnsPerSecond: numb
     (hash) => db.get(hash),
   );
   runner.start();
+  for (const control of early.splice(0)) runner.control(control);
 }
 
 /** A core of its own, reading this browser's bones, that follows the game by its recording. */
@@ -370,7 +372,9 @@ self.onmessage = (ev: MessageEvent<UiMessage>) => {
       );
       break;
     case "replay_control":
-      runner?.control(msg.control);
+      // one sent with the replay, such as a seek to where a link points, comes before the core has loaded
+      if (runner) runner.control(msg.control);
+      else early.push(msg.control);
       break;
     case "shadow":
       startShadow(msg.assetBase).catch((e) =>

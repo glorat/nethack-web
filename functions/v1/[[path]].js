@@ -2,7 +2,7 @@
 // it serves, without query strings, so nothing can be asked that the cache doesn't hold.
 import { cached, onlyGet, upstream } from "../../edge/public-data.js";
 
-const KNOWN = /^\/v1\/(leaderboard\.json|games\/[A-Za-z0-9_-]{22}(\.json|\/card\.png)|games\/[0-9a-f-]{36}(\.json|\/card\.png))$/;
+const KNOWN = /^\/v1\/(leaderboard\.json|games\/([A-Za-z0-9_-]{22}|[0-9a-f-]{36})(\.json|\/card\.png|\/story\.json))$/;
 
 export const onRequest = (context) => {
   const refused = onlyGet(context.request);
