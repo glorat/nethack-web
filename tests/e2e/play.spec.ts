@@ -52,6 +52,10 @@ async function untilPlaying(page: Page) {
   }
 }
 
+/** The stat in the status panel with this label. */
+const stat = (page: Page, label: string) =>
+  page.locator(".stat").filter({ has: page.locator(".stat-label").getByText(label, { exact: true }) });
+
 /** Every key so far has been dealt with: keys typed ahead go to the core before it asks for another command. */
 const untilCommand = (page: Page) => page.locator(".app[data-commanding]").waitFor({ state: "attached" });
 
@@ -409,14 +413,14 @@ test("hovering over the map describes the square", async ({ page }) => {
 
 test("hovering over AC says what it means", async ({ page }) => {
   await startGame(page, `Tip${Date.now() % 100000}`);
-  const ac = page.locator(".stat", { hasText: "AC" });
-  await expect(ac).toHaveAttribute("aria-description", /Lower is better/);
+  const ac = stat(page, "AC");
+  await expect(ac.locator(".screen-reader-only")).toHaveText(/Lower is better/);
   await ac.hover();
   await expect(page.getByRole("tooltip")).toHaveText(/Lower is better/);
   // a turn passing doesn't take it away
-  const turn = await page.locator(".stat", { hasText: /^T/ }).innerText();
+  const turn = await stat(page, "T").innerText();
   await page.keyboard.press("s");
-  await expect(page.locator(".stat", { hasText: /^T/ })).not.toHaveText(turn);
+  await expect(stat(page, "T")).not.toHaveText(turn);
   await expect(page.getByRole("tooltip")).toHaveText(/Lower is better/);
   await page.locator(".map").hover();
   await expect(page.getByRole("tooltip")).not.toHaveText(/Lower is better/);
@@ -425,7 +429,7 @@ test("hovering over AC says what it means", async ({ page }) => {
 test("clicking a stat explains it, with a link to the wiki, until a click elsewhere or a key", async ({ page }) => {
   await startGame(page, `Pop${Date.now() % 100000}`);
   const popover = page.getByRole("dialog", { name: "What this means" });
-  await page.locator(".stat", { hasText: "AC" }).click();
+  await stat(page, "AC").click();
   await expect(popover).toContainText("Lower is better");
   await expect(popover.getByRole("link")).toHaveAttribute("href", /search=Armor%20class/);
   // the click that closes it doesn't reach the map
@@ -434,23 +438,23 @@ test("clicking a stat explains it, with a link to the wiki, until a click elsewh
   await page.mouse.click(map.x + map.width / 2 + 40, map.y + map.height / 2);
   await expect(popover).toBeHidden();
   await expect(page.locator("canvas")).toHaveAttribute("data-cursor", cursor!);
-  await page.locator(".stat", { hasText: "AC" }).click();
+  await stat(page, "AC").click();
   await expect(popover).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(popover).toBeHidden();
   // a game key closes it and still plays
-  await page.locator(".stat", { hasText: "AC" }).click();
-  const turn = await page.locator(".stat", { hasText: /^T/ }).innerText();
+  await stat(page, "AC").click();
+  const turn = await stat(page, "T").innerText();
   await page.keyboard.press("s");
   await expect(popover).toBeHidden();
-  await expect(page.locator(".stat", { hasText: /^T/ })).not.toHaveText(turn);
+  await expect(stat(page, "T")).not.toHaveText(turn);
 });
 
 test("tapping a stat explains it", async ({ browser }) => {
   const context = await browser.newContext({ hasTouch: true });
   const page = await context.newPage();
   await startGame(page, `Tap${Date.now() % 100000}`);
-  await page.locator(".stat", { hasText: "Dx" }).tap();
+  await stat(page, "Dx").tap();
   await expect(page.getByRole("dialog", { name: "What this means" })).toContainText("Dexterity");
   await expect(page.getByRole("tooltip")).toHaveCount(0);
   await context.close();
@@ -472,7 +476,7 @@ test("zooming the map is kept across a reload", async ({ page }) => {
 
 test("keys typed into an open window stay there", async ({ page }) => {
   await startGame(page, `Keys${Date.now() % 100000}`);
-  const turn = async () => page.locator(".stat", { hasText: "T" }).last().innerText();
+  const turn = async () => stat(page, "T").innerText();
   const before = await turn();
   const dialog = page.getByRole("dialog");
 
@@ -699,7 +703,7 @@ test("a stat that changes shows an arrow beside it", async ({ page }) => {
 
   // her shield is all she can take off, and without it her AC goes up, which is worse
   await page.keyboard.press("Shift+T");
-  const ac = page.locator(".stat", { hasText: "AC" });
+  const ac = stat(page, "AC");
   await expect(ac.locator(".stat-change.worse")).toHaveText("↑");
   await page.locator(".stats").screenshot({ path: "test-results/stat-change.png" });
 });
@@ -1093,7 +1097,7 @@ test("a key pressed at a text window, other than one to close it, closes it and 
 
 test("a key typed before a text window opened doesn't close it unseen", async ({ page }) => {
   await startGame(page, `Ahead${Date.now() % 100000}`);
-  const turn = () => page.locator(".stat", { hasText: "T" }).last().innerText();
+  const turn = () => stat(page, "T").innerText();
   const before = await turn();
   // all typed at once, so s is typed ahead of the history window it lands in
   await page.evaluate(() => {
@@ -1228,7 +1232,7 @@ test("Cmd-period cancels as Escape does, for keyboards without Esc", async ({ pa
 
 test("the Act menu repeats the last command and opens the extended command list", async ({ page }) => {
   await startGame(page, `Again${Date.now() % 100000}`);
-  const turn = async () => Number((await page.locator(".stat", { hasText: "T" }).last().innerText()).replace(/\D/g, ""));
+  const turn = async () => Number((await stat(page, "T").innerText()).replace(/\D/g, ""));
   const act = async (name: RegExp) => {
     await page.getByRole("menubar").getByRole("menuitem", { name: "Act" }).click();
     await page.getByRole("menu", { name: "Act" }).getByRole("menuitem", { name }).click();

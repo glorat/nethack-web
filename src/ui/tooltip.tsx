@@ -54,19 +54,19 @@ export function useTooltip() {
 
   /**
    * Props that show `tip` under the element they're on: on hover for a mouse only, as a tap has nothing to end it,
-   * and as a popover on a click or tap. The tip is also the element's description for screen readers.
+   * and as a popover on a click or tap. Screen readers need the tip as hidden text in the element too: see `Described`.
    */
   const on = (tip: string | undefined, wiki?: string) =>
     tip
       ? {
-          "aria-description": tip,
+          "data-tip": tip,
           "data-wiki": wiki,
           onPointerEnter: (e: PointerEvent) => {
             if (e.pointerType !== "mouse") return;
             const el = e.currentTarget as HTMLElement;
             hovered.current = el;
             const r = el.getBoundingClientRect();
-            show(() => el.getAttribute("aria-description"), r.left, r.bottom + 4);
+            show(() => el.getAttribute("data-tip"), r.left, r.bottom + 4);
           },
           onPointerLeave: () => {
             hovered.current = null;
@@ -85,7 +85,7 @@ export function useTooltip() {
   const sync = () => {
     const el = hovered.current;
     if (el) {
-      const tip = el.isConnected ? el.getAttribute("aria-description") : null;
+      const tip = el.isConnected ? el.getAttribute("data-tip") : null;
       if (!tip) {
         hovered.current = null;
         hide();
@@ -93,7 +93,7 @@ export function useTooltip() {
     }
     setPinned((p) => {
       if (!p) return p;
-      const tip = p.el.isConnected ? p.el.getAttribute("aria-description") : null;
+      const tip = p.el.isConnected ? p.el.getAttribute("data-tip") : null;
       if (!tip) return null;
       const wiki = p.el.getAttribute("data-wiki");
       return tip === p.text && wiki === p.wiki ? p : { ...p, text: tip, wiki };
@@ -153,4 +153,9 @@ export function useTooltip() {
   ) : null;
 
   return { show, hide, on, sync, element };
+}
+
+/** A tip as text for screen readers only; `aria-description` would do, but some browsers show it as a tooltip too. */
+export function Described({ tip }: { tip: string | undefined }) {
+  return tip ? <span class="screen-reader-only">{tip}</span> : null;
 }
