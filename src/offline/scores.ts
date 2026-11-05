@@ -22,7 +22,7 @@ export function parseScores(record: string): Score[] {
   });
 }
 
-export const ascended = (score: Score): boolean => /^ascended\b/.test(score.death);
+export { ascended } from "../port/xlog";
 
 /** The core's date as the browser's way of writing one. */
 export function scoreDate({ date }: Score): string {

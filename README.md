@@ -17,6 +17,7 @@ NetHack and this web port are under the NetHack General Public License ([LICENSE
   window port (`win/shim/winshim.c`) on top of it.
 - `src/protocol.ts`: the messages between the worker and the UI.
 - `src/port/`: UI-side game state, without DOM code.
+- `src/port/xlog.ts`, `src/port/tombstone.ts`, `src/online/game-id.ts`: what the core's xlogfile entries say spelt out, its tombstone, and share links' game IDs. nethack-server builds these into its functions from its `vendor/nethack-web/` submodule, so each imports nothing, and a change reaches the server when it moves that submodule.
 - `src/online/`, `src/offline/`: what belongs to one mode only, from the worker's
   side to the page's. Everything else is shared by both.
 - Each mode has its own pages, `/online/` and `/offline/`, with its game at `play/` and replays at `watch/` under it. The address is the mode, and nothing under `/offline/` reaches the network. `src/port/modes.ts` builds and reads these addresses.
