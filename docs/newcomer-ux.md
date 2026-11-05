@@ -15,8 +15,12 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
   - Click only, with no hover tooltip: a toggletip, as accessibility guidance has it for tips that hold a link. A hover tooltip showing the same text before the popover read as a duplicate. A hover card that can be moved into, like Wikipedia's link previews, is the alternative if testers want hover back.
 - [ ] **An on-screen Esc button** for dialogs and prompts waiting for a key. Effort S, benefit medium.
   - Also an open item in `docs/tablet-support.md`. Map position prompts wait on the item below.
-- [ ] **Quick-action toolbar:** search, rest, pick up, up and down stairs, travel to the stairs. Effort M, benefit high.
-  - The commands are already in the menu bar; the work is the layout and the choice of buttons.
+- [ ] **Quick-action toolbar** of what you can do where you stand. Effort M, benefit high. Decided, as designed below.
+  - **Where:** a floating group at the map's bottom-left, mirroring the zoom buttons at the bottom-right, so on a tablet actions are under the left thumb and zoom under the right.
+  - **What:** the actions the core's here-menu (`there_cmd_menu_self`, clicking your own square) finds for your square, such as go up or down, drink, sit, sacrifice, pick up, loot, tip, eat, dismount and disarm, plus Search, Rest and Cast (when you know a spell) always. Not the here-menu's Inventory, Drop and Look Here, which the sidebar and right-click already cover, nor actions on the squares next to you, which need a direction.
+  - **From the core:** a fork change that lists those actions each turn without opening a menu, and runs one by its ID as picking it from the here-menu does, so it's recorded as an ordinary command. The list carries IDs and fixed labels, not the menu's item names: naming an object can mark it seen, which would change the game and break replays.
+  - **Labels:** short verbs with the key in small type, as "Go down >", like the menu bar's keys. An action just appears when it applies, without a pulse.
+  - **Showing it:** View > Show Toolbar, on by default and remembered. Toolbar modes showing more or fewer buttons, icons or text may come later; for now there's this one.
   - Also listed under Later in `docs/tablet-support.md`.
 - [ ] **Alerts for dangerous messages,** such as stoning, sliming, illness and lycanthropy ("You feel feverish"): coloured, and kept in view until dealt with. Effort M, benefit high.
   - Most of the work is a curated list of message patterns. Hallucination changes some wording.
