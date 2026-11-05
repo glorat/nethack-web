@@ -26,6 +26,7 @@ NetHack and this web port are under the NetHack General Public License ([LICENSE
 - `*/play/index.html`, `*/watch/index.html`, `src/main.tsx`: the game, and watching a finished one.
 - `src/ui/`: map, stats, equipment, messages, inventory, and dialogs.
 - `src/sw/sw.js`: service worker; the build adds the precache list.
+- `functions/`: Cloudflare Pages Functions, which run only on the paths in `public/_routes.json`. `/__/` passes Firebase Auth's sign-in pages through. `/v1/` passes the server's public data through, only for the addresses it serves and without query strings, and `/g/<id>` is a finished online game's share page, rendered from that data by `src/online/share.ts` with the preview tags chat apps read. Both cache with the Cache API (`edge/public-data.js`). The server's address is `PUBLIC_DATA`, or production's: `pnpm --allow-build=esbuild --allow-build=workerd dlx wrangler@4.155.0 pages dev dist --binding PUBLIC_DATA=http://127.0.0.1:5299/demo-nethack/europe-west1/publicData` runs them against the emulators.
 
 ## Building
 

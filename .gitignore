@@ -6,3 +6,4 @@ public/tiles/tiles16.bmp
 test-results/
 playwright-report/
 .DS_Store
+.wrangler/
