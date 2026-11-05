@@ -1,18 +1,8 @@
-import { conditionSeverity, encumbranceSeverity, hungerSeverity, type Severity } from "../port/badges";
+import { AC_TIP, statusBadges } from "../port/badges";
 import { meterLevel } from "../port/meter";
 import { heroText, levelText } from "../port/status-header";
 import type { StatusValue } from "../protocol";
 import { nhColor } from "./colors";
-
-const CONDITION_LABELS: Record<string, string> = {
-  BAREH: "Bare-handed", BLIND: "Blind", BUSY: "Busy", CONF: "Confused", DEAF: "Deaf",
-  ELF_IRON: "Iron", FLY: "Flying", FOODPOIS: "Food poisoned", GLOWHANDS: "Glowing hands",
-  GRAB: "Grabbed", HALLU: "Hallucinating", HELD: "Held", ICY: "Icy", INLAVA: "In lava",
-  LEV: "Levitating", PARLYZ: "Paralyzed", RIDE: "Riding", SLEEPING: "Asleep", SLIME: "Slimed",
-  SLIPPERY: "Slippery", STONE: "Stoning", STRNGL: "Strangled", STUN: "Stunned",
-  SUBMERGED: "Underwater", TERMILL: "Ill", TETHERED: "Tethered", TRAPPED: "Trapped",
-  UNCONSC: "Unconscious", WOUNDEDL: "Wounded legs", HOLDING: "Holding",
-};
 
 // the gold field is "<encoded gold glyph>:<amount>"; the glyph is "\G" plus 8 hex digits
 function clean(text: string | undefined): string {
@@ -40,10 +30,10 @@ function Meter({ label, cur, max, kind }: { label: string; cur: string; max: str
 
 export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
   if (!fields.BL_TITLE) return <div class="stats" />;
-  const stat = (label: string, name: string) => {
+  const stat = (label: string, name: string, tip?: string) => {
     const change = fields[name]?.change;
     return (
-      <div class="stat">
+      <div class="stat" title={tip}>
         <span class="stat-label">{label}</span>
         <span class="stat-value" style={{ color: nhColor(fields[name]?.color ?? 8) }}>
           {value(fields, name)}
@@ -63,9 +53,7 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
   const conditions = (fields.BL_CONDITION?.text ?? "").split(" ").filter(Boolean);
   const hunger = value(fields, "BL_HUNGER");
   const encumbrance = value(fields, "BL_CAP");
-  const badges = conditions.map((c): [string, Severity] => [CONDITION_LABELS[c] ?? c, conditionSeverity(c)]);
-  if (encumbrance) badges.unshift([encumbrance, encumbranceSeverity(encumbrance)]);
-  if (hunger) badges.unshift([hunger, hungerSeverity(hunger)]);
+  const badges = statusBadges(conditions, hunger, encumbrance);
   const exp = value(fields, "BL_EXP");
   return (
     <div class="stats">
@@ -81,7 +69,7 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
         {stat("In", "BL_IN")}
         {stat("Wi", "BL_WI")}
         {stat("Ch", "BL_CH")}
-        {stat("AC", "BL_AC")}
+        {stat("AC", "BL_AC", AC_TIP)}
         {stat(fields.BL_HD?.text ? "HD" : "XL", fields.BL_HD?.text ? "BL_HD" : "BL_XP")}
         {stat("$", "BL_GOLD")}
         {exp ? stat("Exp", "BL_EXP") : null}
@@ -90,8 +78,10 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
       </div>
       {badges.length ? (
         <div class="badges">
-          {badges.map(([text, severity]) => (
-            <span class={`badge ${severity}`}>{text}</span>
+          {badges.map(({ label, severity, tip }) => (
+            <span class={`badge ${severity}`} title={tip}>
+              {label}
+            </span>
           ))}
         </div>
       ) : null}
