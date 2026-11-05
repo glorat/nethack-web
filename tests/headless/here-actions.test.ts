@@ -3,13 +3,13 @@ import { toolbarActions } from "../../src/port/here-actions";
 import { replayRecording, Session } from "./harness";
 
 const labels = (g: Session) => toolbarActions(g.hereActions).map((a) => a.label);
-const letterOf = (g: Session, label: string) => toolbarActions(g.hereActions).find((a) => a.label === label)?.letter;
+const nameOf = (g: Session, label: string) => toolbarActions(g.hereActions).find((a) => a.label === label)?.name;
 
-async function hereAction(g: Session, letter: string) {
+async function hereAction(g: Session, name: string) {
   await g.send("#");
   if (g.prompt?.kind !== "ext_cmd") throw new Error("no extended command prompt");
   await g.answer({ kind: "ext_cmd", index: g.prompt.commands.find((c) => c.name === "hereaction")!.index });
-  await g.send(letter);
+  await g.getlin(name);
 }
 
 test("on the stairs the game starts on, the toolbar offers going up, then Search and Rest", async () => {
@@ -41,17 +41,17 @@ test("an action runs as picking it from the here-menu does, and is replayed", as
   ]);
   await g.dismiss();
 
-  await hereAction(g, letterOf(g, "Eat")!);
+  await hereAction(g, nameOf(g, "Eat")!);
   expect(g.messages.join(" ")).toMatch(/apple/i);
   expect(labels(g)).not.toContain("Eat");
 
   const turn = Number(g.state.status.BL_TIME?.text);
-  await hereAction(g, letterOf(g, "Search")!);
+  await hereAction(g, nameOf(g, "Search")!);
   expect(Number(g.state.status.BL_TIME?.text)).toBeGreaterThan(turn);
 
   // an action this square doesn't allow does nothing
   const before = Number(g.state.status.BL_TIME?.text);
-  await hereAction(g, "k");
+  await hereAction(g, "eat");
   expect(Number(g.state.status.BL_TIME?.text)).toBe(before);
 
   await g.send("#");
@@ -60,4 +60,6 @@ test("an action runs as picking it from the here-menu does, and is replayed", as
   const replayed = await replayRecording(g.recording!);
   expect(replayed.error).toBeNull();
   expect(replayed.state.status).toEqual(g.state.status);
+  // recorded by name, as extended commands are
+  expect(g.recording).toMatch(/^\d+ l "eat"$/m);
 });

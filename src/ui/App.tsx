@@ -367,10 +367,11 @@ export function App({ handedOver, onReplay }: Props) {
     pendingCommand.current = name;
     sendCode(commandKey.current);
   };
-  // #hereaction, then the action's letter for the key it reads
-  const runHereAction = (letter: string) => {
+  // #hereaction, then the action's name for the line it asks for
+  const runHereAction = (name: string) => {
     if (!commandKey.current || pendingRef.current) return beep();
-    typeAhead.current.push({ key: letter, ctrlKey: false, altKey: false, metaKey: false });
+    const key = (k: string) => ({ key: k, ctrlKey: false, altKey: false, metaKey: false });
+    typeAhead.current.push(...[...name].map(key), key("Enter"));
     runCommand("hereaction");
   };
 
@@ -876,7 +877,7 @@ export function App({ handedOver, onReplay }: Props) {
             onZoom={zoom}
             onShowInventory={showInventory ? undefined : () => setShowInventory(true)}
             toolbar={
-              showToolbar && !replay && state.gameOver === null ? <QuickActions letters={hereActions} onRun={runHereAction} /> : null
+              showToolbar && !replay && state.gameOver === null ? <QuickActions names={hereActions} onRun={runHereAction} /> : null
             }
             onClick={(x, y, button) => {
               if (pending || state.gameOver !== null || replay) return;

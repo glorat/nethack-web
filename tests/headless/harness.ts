@@ -101,7 +101,7 @@ export class Session {
   inventoryKey = 0;
   /** While the core waits for a key: whether the game is in debug mode, for the Wizard Mode menu. */
   wizard = false;
-  /** While the core waits for a command: what the hero can do where they stand, as letters for #hereaction. */
+  /** While the core waits for a command: what the hero can do where they stand, as names for #hereaction. */
   hereActions = "";
   /** What the core printed outside its windows, such as errors before the game starts. */
   output: string[] = [];
