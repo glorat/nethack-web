@@ -13,11 +13,14 @@ export const onRequest = (context) => {
   const { origin } = new URL(context.request.url);
   return cached(context, async () => {
     const game = gameOf(id);
-    const found = game ? await fetch(`${upstream(context.env)}/v1/games/${game}.json`).catch(() => null) : null;
+    const ask = (path) => (game ? fetch(`${upstream(context.env)}/v1/games/${game}${path}`).catch(() => null) : null);
+    const [found, told] = await Promise.all([ask(".json"), ask("/story.json")]);
     // only the server's own "no such game" makes the page say so; a passing failure isn't cached
     if (game && !found?.ok && found?.status !== 404) return unavailable();
+    if (found?.ok && !told?.ok) return unavailable();
     const data = found?.ok ? await found.json() : null;
-    return new Response(sharePage(origin, id, data), {
+    const story = data ? await told.json() : null;
+    return new Response(sharePage(origin, id, data, story), {
       status: data ? 200 : 404,
       headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": `public, max-age=60, s-maxage=${data ? 3600 : 300}` },
     });

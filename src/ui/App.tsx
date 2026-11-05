@@ -16,7 +16,7 @@ import { downloadRecording, downloadText, lastTurnIn, replayable } from "../port
 import { shadowWanted } from "../port/shadow";
 import { onlineMode } from "../online/ui/mode";
 import { watchedGame } from "../online/results";
-import { type Chapter, loadChapters, startingLine } from "../online/story";
+import { type Chapter, loadChapters, startingPoint } from "../online/story";
 import { finishedGameRecording } from "../online/server/api";
 import { DEFAULT_TILE_SET, importedTileSet, TILE_SETS, type TileSet, tileSetFileName, tileSetNamed } from "../port/tilesets";
 import { loadImportedSheet, loadTileSheet, type TileSheet } from "../tiles";
@@ -184,6 +184,14 @@ interface Props {
   handedOver?: string;
   /** Replays the game this page just played: this App goes, and another comes with `handedOver`. */
   onReplay(text: string): void;
+}
+
+/** Keeps the address naming the chapter the replay was sent to, or nothing once it's sent elsewhere. */
+function movedTo(line: number | null): void {
+  const address = new URL(location.href);
+  for (const name of ["line", "turn", "play"]) address.searchParams.delete(name);
+  if (line !== null) address.searchParams.set("line", String(line));
+  if (address.href !== location.href) history.replaceState(null, "", address);
 }
 
 export function App({ handedOver, onReplay }: Props) {
@@ -668,8 +676,8 @@ export function App({ handedOver, onReplay }: Props) {
         setPlaying(true);
         client.replay(new URL(import.meta.env.BASE_URL, location.href).href, replay.text, replaySpeed);
         // a link to a moment in the game
-        const line = watched ? startingLine(location.search) : null;
-        if (line !== null) client.replayControl({ action: "seek", line });
+        const start = watched ? startingPoint(location.search) : null;
+        if (start) client.replayControl({ action: "seek", ...start });
       }
       return;
     }
@@ -903,20 +911,12 @@ export function App({ handedOver, onReplay }: Props) {
           turnsPerSecond={replaySpeed}
           control={(control) => {
             if (control.action === "speed") setReplaySpeed(control.turnsPerSecond);
-            // the address names a chapter only while the replay went there by it
-            if (control.action === "seek" && "turn" in control && new URLSearchParams(location.search).has("line")) {
-              const address = new URL(location.href);
-              address.searchParams.delete("line");
-              history.replaceState(null, "", address);
-            }
+            // the address names where the replay was sent only while it's there
+            if (control.action === "seek" && "turn" in control) movedTo(null);
             client.replayControl(control);
           }}
           chapters={chapters}
-          onChapter={({ line }) => {
-            const address = new URL(location.href);
-            address.searchParams.set("line", String(line));
-            history.replaceState(null, "", address);
-          }}
+          onChapter={({ line }) => movedTo(line)}
           onDownload={() => downloadRecording(replay.text!)}
           onExit={() => location.replace(LANDING_PATH)}
         />

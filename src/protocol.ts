@@ -189,10 +189,10 @@ export type ReplayControl =
   | { action: "step" }
   /** Turns a second; Infinity as fast as the core goes. */
   | { action: "speed"; turnsPerSecond: number }
-  /** Plays again from the start, without showing it, up to this turn, then pauses there. */
-  | { action: "seek"; turn: number }
+  /** Plays again from the start, without showing it, up to this turn, then pauses there, or plays on if `play`. */
+  | { action: "seek"; turn: number; play?: boolean }
   /** Likewise, up to just after this recording line, so whatever it did has happened. */
-  | { action: "seek"; line: number };
+  | { action: "seek"; line: number; play?: boolean };
 
 /** The values a game would otherwise take from the machine, as a replay has them from its recording. */
 export interface FixedInputs {

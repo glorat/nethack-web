@@ -1,10 +1,18 @@
 // Share links for finished online games: /g/<id>, rendered by a Pages Function from the server's public data, with the
 // preview tags that chat apps read. Self-contained, as the Pages Function bundles it without Vite.
 
-import { ascended, characterName } from "../port/xlog";
+import { alignmentName, ascended, characterName } from "../port/xlog";
 import { tombstone } from "../port/tombstone";
 import { shortId } from "./game-id";
+import { type Chapter, chaptersOf } from "./story";
 import type { GameResult } from "./results";
+
+/** A scored game's story as the server publishes it. */
+export interface PublicStory {
+  chronicle: { turn: number; line: number; flags: number; text: string }[];
+  achievements: { id: string; name: string; description: string; turn: number }[];
+  standing?: { place: number; of: number };
+}
 
 /** A finished online game as the server publishes it. */
 export interface PublicGame {
@@ -63,9 +71,35 @@ dt { font-size: 12px; color: var(--muted); }
 dd { margin: 0; font: 600 18px ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .button { font-weight: 600; font-size: 15px; border-radius: 6px; padding: 9px 18px; background: var(--accent); color: #fff; text-decoration: none; }
+.obit { display: grid; gap: 8px; min-width: 0; }
+.kicker { font: 600 13px ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.18em; text-transform: uppercase; color: #e5534b; }
+.kicker.up { color: var(--gold); }
+.obit h1 { font-size: clamp(32px, 6vw, 52px); line-height: 1.05; margin: 0; overflow-wrap: anywhere; }
+.character { color: #b8b4ab; }
+.end { font-size: clamp(18px, 2.4vw, 22px); color: var(--text); font-weight: 600; margin-top: 4px; }
+.obit .actions { margin-top: 12px; }
+.story { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.story > div { display: grid; gap: 24px; min-width: 0; }
+h2 { font: 600 12px ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+.journey { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--border); }
+.journey li { display: grid; grid-template-columns: 56px 1fr; gap: 12px; padding: 0 0 12px 16px; position: relative; }
+.journey li::before { content: ""; position: absolute; left: -7px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 2px solid var(--muted); }
+.journey li.kind-descent::before { border-color: var(--accent); }
+.journey li.kind-feat::before { border-color: var(--gold); }
+.journey li.kind-end::before { border-color: #e5534b; background: #e5534b; }
+.journey .turn { font: 13px ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--muted); padding-top: 2px; font-variant-numeric: tabular-nums; }
+.journey .what { font-size: 15px; line-height: 1.4; min-width: 0; }
+.journey a { font-size: 12px; color: #8fb3ff; margin-left: 4px; }
+.earned { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.earned li { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+.earned span { color: var(--muted); font-size: 13px; }
+.story dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.story dl div { border-right: 0; border-bottom: 1px solid var(--border); }
+.story dl div:nth-child(odd) { border-right: 1px solid var(--border); }
+.story dl div:last-child:nth-child(odd) { grid-column: span 2; border-right: 0; }
 .button.secondary { background: #2e2e2e; border: 1px solid var(--border); color: var(--text); }
 .button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
-@media (max-width: 640px) { .hero { grid-template-columns: 1fr; } pre { font-size: 12px; } dl div { border-right: 0; border-bottom: 1px solid var(--border); } }
+@media (max-width: 640px) { .hero, .story { grid-template-columns: 1fr; } pre { font-size: 12px; } dl div { border-right: 0; border-bottom: 1px solid var(--border); } }
 `;
 
 const SITE_DESCRIPTION = "The classic dungeon crawl in your browser: online with high scores, or offline on your device.";
@@ -116,11 +150,29 @@ ${body}
 }
 
 const play = `<div class="actions"><a class="button" href="/online/">Play NetHack</a></div>`;
-const watchAndPlay = (game: string) =>
-  `<div class="actions"><a class="button" href="/online/watch/?game=${html(game)}">Watch the game</a><a class="button secondary" href="/online/">Play NetHack</a></div>`;
+
+/** How many turns before the end "the last moments" start. */
+const LAST_MOMENTS = 30;
+
+const watchAddress = (game: string, at = "") => `/online/watch/?game=${encodeURIComponent(game)}${at}`;
+
+function journey(game: string, chapters: Chapter[]): string {
+  if (!chapters.length) return "";
+  const rows = chapters.map(
+    (c) =>
+      `<li class="kind-${c.kind}"><span class="turn">T${c.turn}</span><span class="what">${html(c.text)} <a href="${html(watchAddress(game, `&line=${c.line}`))}" aria-label="Watch ${html(c.text)}, on turn ${c.turn}">watch</a></span></li>`,
+  );
+  return `<section><h2>The journey</h2><ol class="journey">${rows.join("")}</ol></section>`;
+}
+
+function earned(achievements: PublicStory["achievements"]): string {
+  if (!achievements.length) return "";
+  const badges = achievements.map((a) => `<li><b>${html(a.name)}</b><span>${html(a.description)} · turn ${n(a.turn)}</span></li>`);
+  return `<section><h2>Earned in this game</h2><ul class="earned">${badges.join("")}</ul></section>`;
+}
 
 /** The share page for a game, or for a link that names none the server can show. */
-export function sharePage(origin: string, id: string, g: PublicGame | null): string {
+export function sharePage(origin: string, id: string, g: PublicGame | null, story: PublicStory | null = null): string {
   const url = `${origin}/g/${id}`;
   if (!g) {
     return page(
@@ -132,7 +184,7 @@ export function sharePage(origin: string, id: string, g: PublicGame | null): str
   const up = ascended(result);
   const role = characterName(result);
   const art = up ? `<div class="hero-glyph" aria-hidden="true">@</div>` : `<pre aria-hidden="true">${stone(g)}</pre>`;
-  const headline = up ? `${who(g)}'s ${role || "character"} ascended` : `${who(g)}'s ${role || "character"} was ${result.death ?? "lost"}`;
+  const character = [characterName(result), alignmentName(result)].filter(Boolean).join(" · ");
   const ended = g.endedAt !== undefined ? ` Finished ${new Date(g.endedAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}.` : "";
   const stat = (label: string, value: string | undefined) => (value === undefined ? "" : `<div><dt>${label}</dt><dd>${html(value)}</dd></div>`);
   const stats = [
@@ -140,6 +192,13 @@ export function sharePage(origin: string, id: string, g: PublicGame | null): str
     stat("Turns", result.turns !== undefined ? n(result.turns) : undefined),
     up ? "" : stat("Died on", result.deathlev !== undefined ? `Level ${result.deathlev}` : undefined),
     stat("Deepest", result.maxlvl !== undefined ? `Level ${result.maxlvl}` : undefined),
+    stat("High scores", story?.standing ? `#${n(story.standing.place)} of ${n(story.standing.of)}` : undefined),
+  ].join("");
+  const lastMoments = result.turns !== undefined && result.turns > LAST_MOMENTS ? watchAddress(g.game, `&turn=${result.turns - LAST_MOMENTS}&play=1`) : null;
+  const actions = [
+    lastMoments ? `<a class="button" href="${html(lastMoments)}">Watch the last moments</a>` : "",
+    `<a class="button ${lastMoments ? "secondary" : ""}" href="${html(watchAddress(g.game))}">${lastMoments ? "Watch from the start" : "Watch the game"}</a>`,
+    `<a class="button secondary" href="/online/">Play NetHack</a>`,
   ].join("");
   return page(
     {
@@ -150,8 +209,16 @@ export function sharePage(origin: string, id: string, g: PublicGame | null): str
       imageAlt: up ? `${who(g)}'s ${role} ascended` : `Tombstone for ${who(g)}'s ${role}: ${result.death ?? ""}`,
       themeColor: up ? "#e3b341" : "#e5534b",
     },
-    `<div class="hero">${art}<div><h1>${html(headline)}</h1><p>${html(ending(g))}${html(ended)}</p></div></div>
-<dl>${stats}</dl>
-${watchAndPlay(g.game)}`,
+    `<div class="hero">${art}<div class="obit">
+<div class="kicker ${up ? "up" : ""}">${up ? "Ascended" : "Rest in peace"}</div>
+<h1>${html(who(g))}</h1>
+${character ? `<div class="character">${html(character)}</div>` : ""}
+<p class="end">${html(ending(g))}${html(ended)}</p>
+<div class="actions">${actions}</div>
+</div></div>
+<div class="story">
+<div>${journey(g.game, chaptersOf(story?.chronicle ?? []))}</div>
+<div>${earned(story?.achievements ?? [])}<dl>${stats}</dl></div>
+</div>`,
   );
 }

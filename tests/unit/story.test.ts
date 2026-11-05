@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { chaptersOf, startingLine } from "../../src/online/story";
+import { chaptersOf, startingPoint } from "../../src/online/story";
 
 test("each chronicle entry is a chapter, its kind from what the core says of it", () => {
   const chapters = chaptersOf([
@@ -15,7 +15,10 @@ test("each chronicle entry is a chapter, its kind from what the core says of it"
   expect(chaptersOf([{ turn: 1, line: 1, flags: 0x4000, text: "x" }, { turn: 2, line: 2, flags: 0x20, text: "y" }]).map((c) => c.kind)).toEqual(["event", "event"]);
 });
 
-test("a link names the recording line to start at, or none", () => {
-  expect(startingLine("?game=g&line=914")).toBe(914);
-  for (const search of ["?game=g", "?line=0", "?line=-3", "?line=2.5", "?line=x"]) expect(startingLine(search), search).toBeNull();
+test("a link names where to start, by recording line or by turn, and whether to play on", () => {
+  expect(startingPoint("?game=g&line=914")).toEqual({ line: 914, play: false });
+  expect(startingPoint("?game=g&turn=497&play=1")).toEqual({ turn: 497, play: true });
+  // a line is the more exact
+  expect(startingPoint("?line=914&turn=497")).toEqual({ line: 914, play: false });
+  for (const search of ["?game=g", "?line=0", "?line=-3", "?line=2.5", "?line=x", "?turn=0"]) expect(startingPoint(search), search).toBeNull();
 });

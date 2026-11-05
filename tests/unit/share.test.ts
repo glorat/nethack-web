@@ -40,6 +40,36 @@ describe("the share page", () => {
     expect(sharePage("https://nethack.app", id, null)).not.toContain("/online/watch/");
   });
 
+  test("is the game's obituary: its journey, each moment linked to its replay, what it earned, and where it stands", () => {
+    const story = {
+      chronicle: [
+        { turn: 1, line: 17, flags: 0x2, text: "glorat the lawful human Valkyrie entered the dungeon" },
+        { turn: 242, line: 305, flags: 0x8000, text: "entered level 3, the Gnomish Mines" },
+        { turn: 527, line: 914, flags: 0x4000, text: "killed by a <dwarf>" },
+      ],
+      achievements: [{ id: "entered-mines", name: "Into the Mines", description: "Entered the Gnomish Mines", turn: 242 }],
+      standing: { place: 1, of: 5 },
+    };
+    const html = sharePage("https://nethack.app", shortId(GAME), died, story);
+    expect(html).toContain(`<li class="kind-descent"><span class="turn">T242</span>`);
+    expect(html).toContain(`href="/online/watch/?game=${GAME}&#38;line=914"`);
+    expect(html).toContain("Killed by a &#60;dwarf&#62;");
+    expect(html).not.toContain("<dwarf>");
+    expect(html).toContain("<b>Into the Mines</b>");
+    expect(html).toContain("<dd>#1 of 5</dd>");
+    // the last moments start 30 turns before the end, and play on
+    expect(html).toContain(`href="/online/watch/?game=${GAME}&#38;turn=${8412 - 30}&#38;play=1">Watch the last moments`);
+    expect(html).toContain(`href="/online/watch/?game=${GAME}">Watch from the start`);
+  });
+
+  test("without a story, or for a short game, shows what it can", () => {
+    const html = sharePage("https://nethack.app", GAME, { ...died, result: { ...died.result, turns: 12 } });
+    expect(html).not.toContain("The journey");
+    expect(html).not.toContain("Earned in this game");
+    expect(html).not.toContain("Watch the last moments");
+    expect(html).toContain(">Watch the game</a>");
+  });
+
   test("never shows the character's name", () => {
     const html = sharePage("https://nethack.app", GAME, died);
     expect(html).toContain("glorat");
