@@ -1,10 +1,10 @@
 import { useEffect } from "preact/hooks";
-import { AC_TIP, statusBadges } from "../port/badges";
+import { STAT_TIPS, type StatName, statusBadges } from "../port/badges";
 import { meterLevel } from "../port/meter";
 import { heroText, levelText } from "../port/status-header";
 import type { StatusValue } from "../protocol";
 import { nhColor } from "./colors";
-import { useTooltip } from "./tooltip";
+import { type TipProps, useTooltip } from "./tooltip";
 
 // the gold field is "<encoded gold glyph>:<amount>"; the glyph is "\G" plus 8 hex digits
 function clean(text: string | undefined): string {
@@ -15,12 +15,12 @@ function value(fields: Record<string, StatusValue>, name: string): string {
   return clean(fields[name]?.text);
 }
 
-function Meter({ label, cur, max, kind }: { label: string; cur: string; max: string; kind: string }) {
+function Meter({ label, cur, max, kind, tip }: { label: string; cur: string; max: string; kind: string; tip: TipProps }) {
   const c = Number(cur);
   const m = Number(max);
   const pct = m > 0 ? Math.max(0, Math.min(100, (c / m) * 100)) : 0;
   return (
-    <div class={`meter ${kind} ${meterLevel(c, m)}`}>
+    <div class={`meter ${kind} ${meterLevel(c, m)}`} {...tip}>
       <span class="meter-label">{label}</span>
       <div class="meter-bar">
         <div class="meter-fill" style={{ width: `${pct}%` }} />
@@ -35,10 +35,10 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
   // what was under the pointer may have changed or gone
   useEffect(tooltip.sync, [fields]);
   if (!fields.BL_TITLE) return <div class="stats" />;
-  const stat = (label: string, name: string, tip?: string) => {
+  const stat = (label: string, name: StatName) => {
     const change = fields[name]?.change;
     return (
-      <div class="stat" {...tooltip.on(tip)}>
+      <div class="stat" {...tooltip.on(STAT_TIPS[name])}>
         <span class="stat-label">{label}</span>
         <span class="stat-value" style={{ color: nhColor(fields[name]?.color ?? 8) }}>
           {value(fields, name)}
@@ -65,8 +65,8 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
       <div class="stats-title">{value(fields, "BL_TITLE")}</div>
       <div class="stats-sub">{heroText(value(fields, "BL_ALIGN"), value(fields, "hero_kind"))}</div>
       <div class="stats-sub">{levelText(value(fields, "BL_LEVELDESC"), value(fields, "dungeon_name"), Number(value(fields, "dungeon_level")))}</div>
-      <Meter label="HP" cur={value(fields, "BL_HP")} max={value(fields, "BL_HPMAX")} kind="hp" />
-      <Meter label="Pw" cur={value(fields, "BL_ENE")} max={value(fields, "BL_ENEMAX")} kind="pw" />
+      <Meter label="HP" cur={value(fields, "BL_HP")} max={value(fields, "BL_HPMAX")} kind="hp" tip={tooltip.on(STAT_TIPS.BL_HP)} />
+      <Meter label="Pw" cur={value(fields, "BL_ENE")} max={value(fields, "BL_ENEMAX")} kind="pw" tip={tooltip.on(STAT_TIPS.BL_ENE)} />
       <div class="stat-grid">
         {stat("St", "BL_STR")}
         {stat("Dx", "BL_DX")}
@@ -74,7 +74,7 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
         {stat("In", "BL_IN")}
         {stat("Wi", "BL_WI")}
         {stat("Ch", "BL_CH")}
-        {stat("AC", "BL_AC", AC_TIP)}
+        {stat("AC", "BL_AC")}
         {stat(fields.BL_HD?.text ? "HD" : "XL", fields.BL_HD?.text ? "BL_HD" : "BL_XP")}
         {stat("$", "BL_GOLD")}
         {exp ? stat("Exp", "BL_EXP") : null}
