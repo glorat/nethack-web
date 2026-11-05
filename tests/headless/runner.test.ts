@@ -80,6 +80,20 @@ test("a seek to a recording line stops just past it, so what it did has happened
   expect(seen.progress.turn).toBe(Number(turnsBefore.at(-1)![1]));
 }, 30000);
 
+test("a seek to a line after a save and restore arrives in the later session, at that point's turn", async () => {
+  const lines = TEXT.split("\n");
+  const restored = lines.findIndex((l) => / session restore /.test(l));
+  const target = lines.findIndex((l, i) => i > restored + 20 && / k /.test(l)) + 1;
+  const { r, seen } = await runner(2);
+  r.control({ action: "seek", line: target });
+  await until(() => !seen.progress.seeking && seen.progress.line > target);
+  await until(() => r.idle);
+  expect(seen.progress.line).toBeGreaterThan(restored + 1);
+  expect(seen.progress.turn).toBeGreaterThanOrEqual(FIRST_SESSION_END);
+  const turnsBefore = [...lines.slice(0, seen.progress.line - 1).join("\n").matchAll(/^\d+ T (\d+)\b/gm)];
+  expect(seen.progress.turn).toBe(Number(turnsBefore.at(-1)![1]));
+}, 30000);
+
 test("a speed change and a seek straight after it leave the replay playing on", async () => {
   const { r, seen } = await runner(2);
   await until(() => seen.progress.turn >= 1);

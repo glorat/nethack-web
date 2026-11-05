@@ -903,6 +903,12 @@ export function App({ handedOver, onReplay }: Props) {
           turnsPerSecond={replaySpeed}
           control={(control) => {
             if (control.action === "speed") setReplaySpeed(control.turnsPerSecond);
+            // the address names a chapter only while the replay went there by it
+            if (control.action === "seek" && "turn" in control && new URLSearchParams(location.search).has("line")) {
+              const address = new URL(location.href);
+              address.searchParams.delete("line");
+              history.replaceState(null, "", address);
+            }
             client.replayControl(control);
           }}
           chapters={chapters}
