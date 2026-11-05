@@ -121,7 +121,10 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 }
 .tip-popover p { margin: 0 0 6px; }
 .tip-popover p:last-child { margin: 0; }
-.stats [aria-description] { cursor: pointer; }
+.stats [data-tip] { cursor: pointer; }
+.screen-reader-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
 
 /* stats */
 /* what Cocoa's text size scales: stats, messages, inventory, menus and text windows */
