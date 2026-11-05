@@ -11,6 +11,7 @@ export interface Row {
 /** The face is this wide, and each engraved line is cut to it. */
 const FACE = 18;
 const DEATH_WIDTH = 16;
+const DEATH_LINES = 4;
 
 function wrap(text: string, width: number): string[] {
   const lines: string[] = [];
@@ -31,10 +32,12 @@ function centred(text: string, width: number): string {
   return " ".repeat(left) + s + " ".repeat(width - s.length - left);
 }
 
-/** The stone, engraved with who, the score, up to three lines of the death, and the year. */
+/** The stone, engraved with who, the score, up to four lines of the death, and the year on its bottom line. */
 export function tombstone({ who, points, death, year }: { who: string; points?: number | undefined; death?: string | undefined; year?: number | undefined }): Row[] {
-  const engraving = [who, points !== undefined ? `${points.toLocaleString("en-US")} points` : "", ...wrap(death ?? "", DEATH_WIDTH).slice(0, 3), year !== undefined ? String(year) : ""];
-  while (engraving.length < 6) engraving.push("");
+  const deathLines = wrap(death ?? "", DEATH_WIDTH).slice(0, DEATH_LINES);
+  while (deathLines.length < DEATH_LINES) deathLines.push("");
+  // as rip.c lays it out: the year always on the bottom line, under the death's four
+  const engraving = [who, points !== undefined ? `${points.toLocaleString("en-US")} points` : "", ...deathLines, year !== undefined ? String(year) : ""];
   return [
     { before: "         ----------" },
     { before: "        /          \\" },
