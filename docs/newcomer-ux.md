@@ -6,7 +6,7 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
 
 ## To do
 
-- [ ] **Explain status badges and AC.** A tooltip on each badge saying what the condition means and how urgent it is, and on AC that lower is better. Effort S, benefit high. Decided: do it.
+- [x] **Explain status badges and AC.** A tooltip on each badge saying what the condition means and how urgent it is, and on AC that lower is better. Effort S, benefit high. Decided: do it.
   - The labels and severities are already in `src/ui/StatsView.tsx` and `src/port/badges.ts`; this adds a short explanation each.
   - Wording answers the player's question ("You're turning to stone. Fix it now or you die."), not how the game works.
 - [ ] **An on-screen Esc button** for dialogs and prompts waiting for a key. Effort S, benefit medium.
