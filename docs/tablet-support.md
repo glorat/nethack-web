@@ -65,7 +65,7 @@ In landscape every iPad is at least 1133px wide, so it gets the desktop layout, 
 ## Later
 
 - **A count before a command** (`n20s`, search 20 turns) by touch. A gap, but not a priority.
-- **Quick actions:** a toolbar for search, rest, repeat, pick up and the stairs, instead of two taps through a menu.
+- **Quick actions:** done as the toolbar of what you can do where you stand; see `docs/newcomer-ux.md`.
 
 ## Not supported
 

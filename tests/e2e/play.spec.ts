@@ -446,6 +446,35 @@ test("clicking a stat explains it, with a link to the wiki, until a click elsewh
   await expect(stat(page, "T")).not.toHaveText(turn);
 });
 
+test("the toolbar offers what you can do where you stand, and runs it", async ({ page }) => {
+  await startGame(page, `Tool${Date.now() % 100000}`);
+  const toolbar = page.getByRole("group", { name: "What you can do here" });
+  // the game starts on the up stairs
+  await expect(toolbar.getByRole("button")).toHaveText(["Go up<", "Searchs", "Rest."]);
+  // the key is for the eye, not part of the button's name
+  await expect(toolbar.getByRole("button", { name: "Search", exact: true })).toBeVisible();
+  const turn = await stat(page, "T").innerText();
+  await toolbar.getByRole("button", { name: /^Search/ }).click();
+  await expect(stat(page, "T")).not.toHaveText(turn);
+  await untilCommand(page);
+  await expect(toolbar.getByRole("button")).toHaveCount(3);
+});
+
+test("the toolbar can be hidden from the View menu, and stays hidden", async ({ page }) => {
+  await startGame(page, `NoTool${Date.now() % 100000}`);
+  const toolbar = page.getByRole("group", { name: "What you can do here" });
+  await expect(toolbar).toBeVisible();
+  await page.getByRole("menubar").getByRole("menuitem", { name: "View" }).click();
+  await page.getByRole("menuitem", { name: "Hide Toolbar" }).click();
+  await expect(toolbar).toBeHidden();
+  await page.reload();
+  await untilPlaying(page);
+  await expect(toolbar).toBeHidden();
+  await page.getByRole("menubar").getByRole("menuitem", { name: "View" }).click();
+  await page.getByRole("menuitem", { name: "Show Toolbar" }).click();
+  await expect(toolbar).toBeVisible();
+});
+
 test("a status badge pulses as it appears", async ({ page }) => {
   test.setTimeout(60_000);
   await startGame(page, `Hunger${Date.now() % 100000}`);

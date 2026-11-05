@@ -116,9 +116,10 @@ export type GameRequest =
   | { kind: "key" }
   /**
    * inventoryKey, commandKey (the extended command key) and repeatKey are 0 unless the core is waiting for a command,
-   * or if nothing is bound to them.
+   * or if nothing is bound to them. hereActions: what the hero can do where they stand, by their names for
+   * #hereaction separated by spaces, or "" unless the core is waiting for a command.
    */
-  | { kind: "poskey"; inventoryKey: number; commandKey: number; repeatKey: number; wizard: boolean }
+  | { kind: "poskey"; inventoryKey: number; commandKey: number; repeatKey: number; hereActions: string; wizard: boolean }
   /** directions: for "In what direction?", the keys for W NW N NE E SE S SW down up. */
   | { kind: "yn"; query: string; choices: string; defaultChoice: string; directions?: string }
   | { kind: "getlin"; query: string }

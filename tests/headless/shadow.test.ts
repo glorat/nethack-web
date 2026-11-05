@@ -45,6 +45,19 @@ test("a shadow matches a game to its end", async () => {
   expect((await shadowOf(g)).at(-1)).toMatchObject({ state: "ended" });
 });
 
+test("a shadow matches a game that used the toolbar, cancelled taps and all", async () => {
+  const g = await (await Session.start(options)).skipText();
+  for (const line of ["search", null, "rest"]) {
+    await g.send("#");
+    if (g.prompt?.kind !== "ext_cmd") throw new Error("no extended command prompt");
+    await g.answer({ kind: "ext_cmd", index: g.prompt.commands.find((c) => c.name === "hereaction")!.index });
+    await g.answer({ kind: "getlin", text: line });
+  }
+  await g.send("s".repeat(5));
+  await quit(g);
+  expect((await shadowOf(g)).at(-1)).toMatchObject({ state: "ended" });
+});
+
 test("a shadow follows a game that came back, from what its recording held", async () => {
   const first = await (await Session.start(options)).skipText();
   await first.send("s".repeat(12));

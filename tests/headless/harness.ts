@@ -101,6 +101,8 @@ export class Session {
   inventoryKey = 0;
   /** While the core waits for a key: whether the game is in debug mode, for the Wizard Mode menu. */
   wizard = false;
+  /** While the core waits for a command: what the hero can do where they stand, as names for #hereaction. */
+  hereActions = "";
   /** What the core printed outside its windows, such as errors before the game starts. */
   output: string[] = [];
   /** The recording's lines, as the recorder streamed them out. */
@@ -389,12 +391,13 @@ export class Session {
           this.giveAnswer = give;
           this.settle();
         }),
-      nextInput: (request: { inventoryKey: number; wizard: boolean }) =>
+      nextInput: (request: { inventoryKey: number; hereActions: string; wizard: boolean }) =>
         new Promise<Input>((give) => {
           // as the worker persists while waiting for each key
           this.persisted = this.saves();
           this.inventoryKey = request.inventoryKey;
           this.wizard = request.wizard;
+          this.hereActions = request.hereActions;
           this.giveInput = give;
           if (this.queue.length) this.feed();
           else this.settle();

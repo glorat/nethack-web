@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { cursorColor } from "../port/cursor";
 import { tooltipText, wikiTerm, wikiUrl } from "../port/describe";
@@ -26,6 +27,8 @@ interface Props {
   onZoom(step: -1 | 0 | 1): void;
   /** Present while the inventory sidebar is hidden. */
   onShowInventory?(): void;
+  /** Buttons over the map's bottom-left corner. */
+  toolbar?: ComponentChildren;
 }
 
 interface ContextMenu {
@@ -44,7 +47,7 @@ const PINCH_STEP = 15;
 const CLICK_PRIMARY = 1;
 const CLICK_SECONDARY = 2;
 
-export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, onClick, describe, onZoom, onShowInventory }: Props) {
+export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, onClick, describe, onZoom, onShowInventory, toolbar }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const pane = useRef<HTMLDivElement>(null);
@@ -276,6 +279,7 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
           Show Inventory
         </button>
       ) : null}
+      {toolbar}
       <div class="map-zoom">
         <button class="ascii-toggle" aria-pressed={ascii} disabled={!onAscii} onClick={() => onAscii?.(!ascii)}>
           ASCII

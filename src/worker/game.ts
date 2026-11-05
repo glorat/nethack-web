@@ -184,6 +184,7 @@ export class Game {
       inventoryKey: this.m._nhweb_inventory_key(),
       commandKey: this.m._nhweb_command_key(),
       repeatKey: this.m._nhweb_repeat_key(),
+      hereActions: this.m.UTF8ToString(this.m._nhweb_here_actions()),
       wizard: !!this.m._nhweb_wizard(),
     });
   }
