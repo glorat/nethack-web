@@ -156,6 +156,36 @@ test("a finished online game can be deleted from the home, after saying what tha
   await expect.poll(() => boards).toBeGreaterThan(before);
 });
 
+test("a scored online game's link can be copied from the home, and one without a score has none", async ({ page }) => {
+  await fakeServer(page);
+  await page.route(RECAPTCHA, (route) => route.fulfill({ contentType: "text/javascript", body: FAKE_RECAPTCHA }));
+  await page.route("https://content-firebaseappcheck.googleapis.com/**", (route) =>
+    route.request().method() === "OPTIONS" ? route.fulfill({ status: 204, headers: cors }) : route.fulfill({ json: { token: "app-check-token", ttl: "3600s" }, headers: cors }),
+  );
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "share", { value: undefined });
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: async (text: string) => void ((window as unknown as { copied: string }).copied = text) } });
+  });
+  const at = Date.parse("2026-11-01T12:00:00Z");
+  const games = [
+    { game: "3f9c2a7e-5b1d-4c8e-9a62-7d0e4b81c3f5", name: "Agnes", startedAt: at, endedAt: at, checked: true, result: { points: 50, death: "killed by a newt", turns: 9 } },
+    { game: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Bert", startedAt: at, endedAt: at, checked: false },
+  ];
+  await page.route("https://europe-west1-nethack-web-server.cloudfunctions.net/{user,publicApi}", (route) => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") return route.fallback();
+    if (request.postDataJSON().data.method === "finishedGames") return route.fulfill({ json: { result: { games } }, headers: cors });
+    return route.fallback();
+  });
+  await page.goto(`${PROD}online/`);
+  const panel = page.locator("section", { has: page.getByRole("heading", { name: "Your finished online games" }) });
+  await expect(panel.getByRole("listitem")).toHaveCount(2);
+  await expect(panel.getByRole("button", { name: /^Share Bert's game/ })).toHaveCount(0);
+  await panel.getByRole("button", { name: /^Share Agnes's game/ }).click();
+  await expect(panel.getByRole("status")).toHaveText(/^Copied the link to Agnes's game of /);
+  expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toBe(`${new URL(PROD).origin}/g/P5wqflsdTI6aYn0OS4HD9Q`);
+});
+
 const exchange = (page: Page, answer: () => "token" | "brief" | "refuse" | "unreachable") =>
   page.route("https://content-firebaseappcheck.googleapis.com/**", (route) => {
     if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });

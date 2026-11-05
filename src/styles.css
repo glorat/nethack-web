@@ -348,6 +348,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .online-actions { display: flex; gap: 12px; align-items: baseline; }
 .row-delete { padding: 0; background: none; border: none; color: var(--muted); font: inherit; text-decoration: underline; cursor: pointer; }
 .row-delete:hover:not(:disabled) { color: var(--danger); }
+.row-share { padding: 0; background: none; border: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 .row-confirm { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
 .row-confirm p { flex-basis: 100%; margin: 0; }
 button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }

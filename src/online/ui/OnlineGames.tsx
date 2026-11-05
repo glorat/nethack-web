@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { ascended, type FinishedGame, outcome, gameWatchAddress } from "../results";
 import { deleteFinishedGame, listFinishedGames } from "../server/api";
+import { shareAddress } from "../share";
 
 const SHOWN = 10;
 
@@ -40,7 +41,7 @@ export function OnlineGames({ onDeleted }: { onDeleted: () => void }) {
       {games?.length ? (
         <ol class="device-scores online-scores">
           {games.slice(0, SHOWN).map((g) => (
-            <Row key={g.game} game={g} onDeleted={() => gone(g)} />
+            <Row key={g.game} game={g} onDeleted={() => gone(g)} onShared={setNote} />
           ))}
         </ol>
       ) : null}
@@ -55,7 +56,7 @@ const PROBLEMS: Partial<Record<Asking, string>> = {
   failed: "Couldn't delete this game. Try again.",
 };
 
-function Row({ game: g, onDeleted }: { game: FinishedGame; onDeleted: () => void }) {
+function Row({ game: g, onDeleted, onShared }: { game: FinishedGame; onDeleted: () => void; onShared: (note: string) => void }) {
   const { game, endedAt, result } = g;
   const [asking, setAsking] = useState<Asking>("no");
   const keep = useRef<HTMLButtonElement>(null);
@@ -88,6 +89,7 @@ function Row({ game: g, onDeleted }: { game: FinishedGame; onDeleted: () => void
         <a href={gameWatchAddress(game)} aria-label={`Watch ${label}`}>
           Watch
         </a>
+        {result ? <ShareButton game={game} label={label} onShared={onShared} /> : null}
         <button type="button" ref={del} class="row-delete" aria-label={`Delete ${label}`} aria-expanded={asking !== "no"} onClick={() => setAsking("sure?")} disabled={asking !== "no"}>
           Delete
         </button>
@@ -108,5 +110,27 @@ function Row({ game: g, onDeleted }: { game: FinishedGame; onDeleted: () => void
         </div>
       )}
     </li>
+  );
+}
+
+/** Shares a scored game's link: the device's share sheet where there is one, or else a copy of the link. */
+function ShareButton({ game, label, onShared }: { game: string; label: string; onShared: (note: string) => void }) {
+  const share = async () => {
+    const url = shareAddress(location.origin, game);
+    try {
+      if (navigator.share) await navigator.share({ url });
+      else {
+        await navigator.clipboard.writeText(url);
+        onShared(`Copied the link to ${label}.`);
+      }
+    } catch (e) {
+      // closing the share sheet is a choice, not a failure
+      if ((e as Error).name !== "AbortError") onShared(`Couldn't share ${label}. Try again.`);
+    }
+  };
+  return (
+    <button type="button" class="row-share" aria-label={`Share ${label}`} onClick={() => void share()}>
+      Share
+    </button>
   );
 }
