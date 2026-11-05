@@ -13,6 +13,7 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
   - Stats and badges do nothing else when clicked, so nothing conflicts, and it works by touch.
   - Chosen over a one-shot help mode (press ?, then click anything), which is kept for later in case players can't find this; it would open the same popover.
   - Click only, with no hover tooltip: a toggletip, as accessibility guidance has it for tips that hold a link. A hover tooltip showing the same text before the popover read as a duplicate. A hover card that can be moved into, like Wikipedia's link previews, is the alternative if testers want hover back.
+- [x] **A badge pulses as it appears,** each time its status starts, to draw the eye and invite a click. Stronger for worse badges; a still highlight with reduced motion. Effort S, benefit medium. Decided: do it, in place of opening the popover the first time a badge appears, which would interrupt.
 - [ ] **An on-screen Esc button** for dialogs and prompts waiting for a key. Effort S, benefit medium.
   - Also an open item in `docs/tablet-support.md`. Map position prompts wait on the item below.
 - [ ] **Quick-action toolbar:** search, rest, pick up, up and down stairs, travel to the stairs. Effort M, benefit high.

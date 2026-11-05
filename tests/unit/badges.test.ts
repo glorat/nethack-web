@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import botl from "../../nethack/src/botl.c?raw";
-import { conditionSeverity, encumbranceSeverity, hungerSeverity, statusBadges } from "../../src/port/badges";
+import { conditionSeverity, encumbranceSeverity, hungerSeverity, quietBadges, statusBadges } from "../../src/port/badges";
 
 test("hunger is graded as Cocoa grades it", () => {
   expect(["Satiated", "Hungry", "Weak", "Fainting", "Fainted", "Starved"].map(hungerSeverity)).toEqual([
@@ -49,4 +49,12 @@ test("every condition, hunger and encumbrance the core can show has a meaning an
 test("no hunger or encumbrance gives no badge for them", () => {
   expect(statusBadges([], "", "")).toEqual([]);
   expect(statusBadges([], "        ", "")).toEqual([]);
+});
+
+test("badges already up when the status arrives stay quiet while they last, and pulse when they come back", () => {
+  const arrived = quietBadges(null, ["Hungry", "Burdened"]);
+  expect([...arrived]).toEqual(["Hungry", "Burdened"]);
+  const next = quietBadges(arrived, ["Hungry", "Stunned"]);
+  expect([...next]).toEqual(["Hungry"]);
+  expect([...quietBadges(next, ["Burdened", "Hungry"])]).toEqual(["Hungry"]);
 });

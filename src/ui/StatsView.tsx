@@ -1,5 +1,5 @@
-import { useEffect } from "preact/hooks";
-import { STAT_TIPS, STAT_WIKI, type StatName, statusBadges } from "../port/badges";
+import { useEffect, useRef } from "preact/hooks";
+import { quietBadges, STAT_TIPS, STAT_WIKI, type StatName, statusBadges } from "../port/badges";
 import { meterLevel } from "../port/meter";
 import { heroText, levelText } from "../port/status-header";
 import type { StatusValue } from "../protocol";
@@ -35,7 +35,11 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
   const toggletip = useToggletip();
   // what was clicked may have changed or gone
   useEffect(toggletip.sync, [fields]);
-  if (!fields.BL_TITLE) return <div class="stats" />;
+  const quiet = useRef<Set<string> | null>(null);
+  if (!fields.BL_TITLE) {
+    quiet.current = null;
+    return <div class="stats" />;
+  }
   const stat = (label: string, name: StatName) => {
     const change = fields[name]?.change;
     return (
@@ -61,6 +65,8 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
   const hunger = value(fields, "BL_HUNGER");
   const encumbrance = value(fields, "BL_CAP");
   const badges = statusBadges(conditions, hunger, encumbrance);
+  const quieted = quietBadges(quiet.current, badges.map((b) => b.label));
+  quiet.current = quieted;
   const exp = value(fields, "BL_EXP");
   return (
     <div class="stats">
@@ -86,7 +92,7 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
       {badges.length ? (
         <div class="badges">
           {badges.map(({ label, severity, tip, wiki }) => (
-            <span key={label} class={`badge ${severity}`} {...toggletip.on(tip, wiki)}>
+            <span key={label} class={`badge ${severity}${quieted.has(label) ? " quiet" : ""}`} {...toggletip.on(tip, wiki)}>
               {label}
               <Described tip={tip} />
             </span>
