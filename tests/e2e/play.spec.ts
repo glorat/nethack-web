@@ -446,6 +446,47 @@ test("clicking a stat explains it, with a link to the wiki, until a click elsewh
   await expect(stat(page, "T")).not.toHaveText(turn);
 });
 
+test("a status badge pulses as it appears", async ({ page }) => {
+  test.setTimeout(60_000);
+  await startGame(page, `Hunger${Date.now() % 100000}`);
+  // note each badge's animations as it's added, as they're over in a second or two
+  await page.evaluate(() => {
+    (window as any).appeared = [];
+    new MutationObserver((records) => {
+      for (const r of records)
+        for (const n of r.addedNodes)
+          if (n instanceof HTMLElement)
+            for (const b of n.matches(".badge") ? [n] : n.querySelectorAll(".badge"))
+              (window as any).appeared.push([b.textContent, b.getAnimations().map((a) => (a as CSSAnimation).animationName)]);
+    }).observe(document.querySelector(".stats")!, { childList: true, subtree: true });
+  });
+  // searching until hungry, answering whatever interrupts
+  const hungry = page.locator(".badge", { hasText: "Hungry" });
+  for (let i = 0; i < 100 && !(await hungry.count()); i++) {
+    await page.keyboard.type("20s");
+    await untilCommand(page);
+    while (await page.getByRole("dialog").count()) {
+      await page.keyboard.press("Escape");
+      await untilCommand(page);
+    }
+  }
+  await expect(hungry).toBeVisible();
+  const appeared: [string, string[]][] = await page.evaluate(() => (window as any).appeared);
+  expect(appeared).toContainEqual([expect.stringContaining("Hungry"), ["badge-appear"]]);
+  // and not again while it stays
+  const pulses = async () => (await page.evaluate(() => (window as any).appeared as [string][])).filter(([t]) => t.includes("Hungry")).length;
+  const count = await pulses();
+  await page.keyboard.type("5s");
+  await untilCommand(page);
+  await expect(hungry).toBeVisible();
+  expect(await pulses()).toBe(count);
+  // nor when the game comes back after a reload, as it was already up
+  await page.reload();
+  await untilPlaying(page);
+  await expect(hungry).toBeVisible();
+  expect(await hungry.evaluate((b) => b.getAnimations().length)).toBe(0);
+});
+
 test("tapping a stat explains it", async ({ browser }) => {
   const context = await browser.newContext({ hasTouch: true });
   const page = await context.newPage();
