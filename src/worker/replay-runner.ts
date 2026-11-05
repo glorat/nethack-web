@@ -80,9 +80,12 @@ export class ReplayRunner {
         break;
       case "pause":
         this.playing = false;
+        // a pause during a seek holds when it arrives
+        this.playOnArrival = false;
         break;
       case "step":
         if (this.ended) return;
+        this.playOnArrival = false;
         this.stepping = true;
         this.playing = true;
         break;

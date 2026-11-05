@@ -103,6 +103,15 @@ test("a seek asked to play on does, from where it arrives", async () => {
   expect(seen.progress).toMatchObject({ playing: true, ended: null });
 }, 30000);
 
+test("a pause during a seek asked to play on holds once it arrives", async () => {
+  const { r, seen } = await runner(32, () => {}, slowCore);
+  r.control({ action: "seek", turn: 80, play: true });
+  r.control({ action: "pause" });
+  await until(() => !seen.progress.seeking && seen.progress.turn >= 80);
+  await until(() => r.idle);
+  expect(seen.progress.playing).toBe(false);
+}, 30000);
+
 test("a speed change and a seek straight after it leave the replay playing on", async () => {
   const { r, seen } = await runner(2);
   await until(() => seen.progress.turn >= 1);

@@ -17,9 +17,9 @@ export const onRequest = (context) => {
     const [found, told] = await Promise.all([ask(".json"), ask("/story.json")]);
     // only the server's own "no such game" makes the page say so; a passing failure isn't cached
     if (game && !found?.ok && found?.status !== 404) return unavailable();
-    if (found?.ok && !told?.ok) return unavailable();
     const data = found?.ok ? await found.json() : null;
-    const story = data ? await told.json() : null;
+    // the story is extra: without it the page still says how the game went
+    const story = data && told?.ok ? await told.json().then((s) => (Array.isArray(s?.chronicle) && Array.isArray(s?.achievements) ? s : null), () => null) : null;
     return new Response(sharePage(origin, id, data, story), {
       status: data ? 200 : 404,
       headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": `public, max-age=60, s-maxage=${data ? 3600 : 300}` },
