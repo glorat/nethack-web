@@ -63,3 +63,41 @@ test("an action runs as picking it from the here-menu does, and is replayed", as
   // recorded by name, as extended commands are
   expect(g.recording).toMatch(/^\d+ l "eat"$/m);
 });
+
+/** Wishes for an apple, drops it, eats it and searches from the toolbar's actions, then taps one and cancels it. */
+async function useToolbar(g: Session) {
+  await g.send("\x17");
+  await g.getlin("apple");
+  const apple = g.state.inventory.find((i) => /apple/.test(i.text))!;
+  await g.send("d");
+  await g.yn(apple.accelerator);
+  await hereAction(g, "eat");
+  await hereAction(g, "search");
+  await g.send("#");
+  if (g.prompt?.kind !== "ext_cmd") throw new Error("no extended command prompt");
+  await g.answer({ kind: "ext_cmd", index: g.prompt.commands.find((c) => c.name === "hereaction")!.index });
+  await g.answer({ kind: "getlin", text: null });
+  await g.send("s");
+}
+
+test("a cancelled action is recorded as cancelled, and does nothing", async () => {
+  const g = await (await Session.start({ options: "time" })).skipText();
+  const turn = g.state.status.BL_TIME?.text;
+  await g.send("#");
+  if (g.prompt?.kind !== "ext_cmd") throw new Error("no extended command prompt");
+  await g.answer({ kind: "ext_cmd", index: g.prompt.commands.find((c) => c.name === "hereaction")!.index });
+  await g.answer({ kind: "getlin", text: null });
+  expect(g.state.status.BL_TIME?.text).toBe(turn);
+  expect(g.recorded.slice(-2)).toEqual([expect.stringMatching(/ x "hereaction"$/), expect.stringMatching(/ l -$/)]);
+});
+
+test("a game left unfinished after using the toolbar comes back as it was", async () => {
+  const left = await (await Session.start({ wizard: true, pageSeed: 3, options: "time" })).skipText();
+  await useToolbar(left);
+
+  const next = await (await Session.start({ wizard: true, pageSeed: 3, options: "time", saves: left.persisted })).skipText();
+  expect(next.recorded.some((l) => / back /.test(l))).toBe(true);
+  expect(next.state.status).toEqual(left.state.status);
+  expect(next.hero).toEqual(left.hero);
+  expect(next.state.inventory.map((i) => i.text)).toEqual(left.state.inventory.map((i) => i.text));
+});
