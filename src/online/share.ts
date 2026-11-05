@@ -63,6 +63,7 @@ dt { font-size: 12px; color: var(--muted); }
 dd { margin: 0; font: 600 18px ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .button { font-weight: 600; font-size: 15px; border-radius: 6px; padding: 9px 18px; background: var(--accent); color: #fff; text-decoration: none; }
+.button.secondary { background: #2e2e2e; border: 1px solid var(--border); color: var(--text); }
 .button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 @media (max-width: 640px) { .hero { grid-template-columns: 1fr; } pre { font-size: 12px; } dl div { border-right: 0; border-bottom: 1px solid var(--border); } }
 `;
@@ -115,6 +116,8 @@ ${body}
 }
 
 const play = `<div class="actions"><a class="button" href="/online/">Play NetHack</a></div>`;
+const watchAndPlay = (game: string) =>
+  `<div class="actions"><a class="button" href="/online/watch/?game=${html(game)}">Watch the game</a><a class="button secondary" href="/online/">Play NetHack</a></div>`;
 
 /** The share page for a game, or for a link that names none the server can show. */
 export function sharePage(origin: string, id: string, g: PublicGame | null): string {
@@ -149,6 +152,6 @@ export function sharePage(origin: string, id: string, g: PublicGame | null): str
     },
     `<div class="hero">${art}<div><h1>${html(headline)}</h1><p>${html(ending(g))}${html(ended)}</p></div></div>
 <dl>${stats}</dl>
-${play}`,
+${watchAndPlay(g.game)}`,
   );
 }

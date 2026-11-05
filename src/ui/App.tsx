@@ -776,7 +776,7 @@ export function App({ handedOver, onReplay }: Props) {
   if (watched && replay && !replay.loading && !replay.text) {
     return (
       <div class="fatal">
-        This game can't be watched. <a href={LANDING_PATH}>Back to the home page</a>
+        This game can't be watched. If it ended just now, try again in a few minutes. <a href={LANDING_PATH}>Back to the home page</a>
       </div>
     );
   }

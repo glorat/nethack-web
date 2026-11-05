@@ -834,7 +834,7 @@ test("the leaderboard ranks a game under its player's handle, never the characte
       data: { fields },
     });
   const text = (value: string) => ({ stringValue: value });
-  await result({ projection: { mapValue: { fields: { result: { mapValue: { fields: { points: { integerValue: String(points) }, role: text("Val"), race: text("Hum"), death: text("ascended"), name: text(name), endedAt: text(new Date().toISOString()) } } } } } } });
+  await result({ projection: { mapValue: { fields: { result: { mapValue: { fields: { points: { integerValue: String(points) }, role: text("Val"), race: text("Hum"), death: text("ascended"), name: text(name), game: text(game), endedAt: text(new Date().toISOString()) } } } } } } });
   try {
     await page.reload();
     const first = page.locator(".leaderboard li").first();
@@ -842,6 +842,8 @@ test("the leaderboard ranks a game under its player's handle, never the characte
     await expect(first).toContainText(`${handle} (Val-Hum): ascended`);
     await expect(first).toContainText("(yours)");
     await expect(first).not.toContainText(name);
+    // each row opens its game's share page
+    await expect(first.getByRole("link", { name: new RegExp(handle) })).toHaveAttribute("href", `/g/${Buffer.from(game.replaceAll("-", ""), "hex").toString("base64url")}`);
   } finally {
     await result({});
   }

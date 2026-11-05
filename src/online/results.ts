@@ -39,6 +39,8 @@ function ending(who: string, result: GameResult): string {
 
 /** A game on the leaderboard, under its player's handle rather than the character's name. */
 export interface LeaderboardEntry {
+  /** For a link to the game; missing for one scored before the server kept it there. */
+  game?: string;
   /** Null for a player who hasn't chosen one. */
   handle: string | null;
   yours: boolean;

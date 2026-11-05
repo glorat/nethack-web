@@ -1,6 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { ascended, type LeaderboardEntry, standing } from "../results";
 import { loadLeaderboard } from "../server/api";
+import { shareAddress } from "../share";
 
 const endedOn = (at: number) => new Date(at).toLocaleDateString(undefined, { dateStyle: "medium" });
 
@@ -21,7 +22,7 @@ export function Leaderboard({ reload }: { reload: number }) {
               <small>{i + 1}</small>
               <strong>{entry.result.points?.toLocaleString() ?? "–"}</strong>
               <span>
-                {standing(entry)}
+                {entry.game ? <a href={shareAddress("", entry.game)}>{standing(entry)}</a> : standing(entry)}
                 {entry.yours ? <em> (yours)</em> : null}
               </span>
               <small>{entry.endedAt !== undefined ? endedOn(entry.endedAt) : null}</small>

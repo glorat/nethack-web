@@ -139,7 +139,8 @@ export const leaderboard = (input: { sentAt: number }) => publicRequest<{ entrie
 
 export const achievements = () => userRequest<{ achievements: Achievement[] }>("achievements", {});
 
-export const gameRecording = (input: { game: string; sentAt: number }) => userRequest<{ recording: string } | null>("gameRecording", input);
+/** Anyone may ask; the player gets their own game as soon as it ends, and others once it has been scored. */
+export const watchGame = (input: { game: string; sentAt: number }) => publicRequest<{ recording: string } | null>("watchGame", input);
 
 export const seed = (input: { game: string; turn: number; sentAt: number }) =>
   userRequest<{ seed: number; now: number; validTurns: number }>("seed", input);

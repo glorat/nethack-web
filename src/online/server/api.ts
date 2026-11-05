@@ -68,9 +68,9 @@ export const loadLeaderboard = async (): Promise<LeaderboardEntry[]> => (await (
 /** The server's achievements, with when the player earned each. */
 export const loadAchievements = async (): Promise<Achievement[]> => (await (await server()).achievements()).achievements;
 
-/** A finished game's recording, or null if the server won't give one. */
+/** A finished game's recording, or null if the server won't give one yet. */
 export const finishedGameRecording = async (game: string): Promise<string | null> =>
-  (await (await server()).gameRecording({ game, sentAt: Date.now() }))?.recording ?? null;
+  (await (await server()).watchGame({ game, sentAt: Date.now() }))?.recording ?? null;
 
 /** Whether the player is signed in, their handle, and their latest request for one. */
 export const loadProfile = async (): Promise<Profile> => (await server()).profile();
