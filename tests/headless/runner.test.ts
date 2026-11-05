@@ -94,6 +94,15 @@ test("a seek to a line after a save and restore arrives in the later session, at
   expect(seen.progress.turn).toBe(Number(turnsBefore.at(-1)![1]));
 }, 30000);
 
+test("a seek asked to play on does, from where it arrives", async () => {
+  // fast enough to see it go on, slow enough not to reach the end first
+  const { r, seen } = await runner(32);
+  r.control({ action: "seek", turn: 50, play: true });
+  await until(() => !seen.progress.seeking && seen.progress.turn >= 50);
+  await until(() => seen.progress.turn > 60);
+  expect(seen.progress).toMatchObject({ playing: true, ended: null });
+}, 30000);
+
 test("a speed change and a seek straight after it leave the replay playing on", async () => {
   const { r, seen } = await runner(2);
   await until(() => seen.progress.turn >= 1);

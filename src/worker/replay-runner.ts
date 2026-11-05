@@ -24,6 +24,8 @@ export class ReplayRunner {
   private playing = true;
   private stepping = false;
   private seekTo: { turn: number } | { line: number } | null = null;
+  /** Play on once the seek arrives, rather than pause there. */
+  private playOnArrival = false;
   private turn = 0;
   private line = 0;
   private state = initialState();
@@ -89,6 +91,7 @@ export class ReplayRunner {
         break;
       case "seek":
         this.seekTo = "line" in control ? { line: control.line } : { turn: control.turn };
+        this.playOnArrival = control.play === true;
         this.playing = false;
         this.begin();
         break;
@@ -197,7 +200,8 @@ export class ReplayRunner {
   /** A seek has reached its turn: show all it skipped, and wait there. */
   private arrive(): void {
     this.seekTo = null;
-    this.playing = false;
+    this.playing = this.playOnArrival && !this.ended;
+    this.playOnArrival = false;
     this.page.replay({ type: "replay_state", state: this.state });
   }
 

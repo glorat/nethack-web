@@ -226,10 +226,15 @@ test("a watched game's chronicle gives chapters to jump to, and a link can open 
   await page.reload();
   await expect(page.getByText(/^Turn 150 of \d+$/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("button", { name: "Play", exact: true })).toBeVisible();
-  // going elsewhere by turn leaves no chapter in the address to come back to
+  // the share page's last moments: a turn, playing on from there
+  await page.goto(`${PROD}online/watch/?game=${game}&turn=200&play=1`);
+  await expect(page.getByRole("button", { name: "Pause" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/^Turn 20\d of \d+$/)).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: "Pause" }).click();
+  // going elsewhere by turn leaves nothing in the address to come back to
   await page.getByRole("slider", { name: "Turn" }).fill("60");
   await expect(page.getByText(/^Turn 60 of \d+$/)).toBeVisible({ timeout: 30_000 });
-  expect(new URL(page.url()).searchParams.has("line")).toBe(false);
+  for (const name of ["line", "turn", "play"]) expect(new URL(page.url()).searchParams.has(name)).toBe(false);
 });
 
 const exchange = (page: Page, answer: () => "token" | "brief" | "refuse" | "unreachable") =>

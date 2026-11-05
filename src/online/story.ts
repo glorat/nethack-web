@@ -45,8 +45,16 @@ export async function loadChapters(game: string): Promise<Chapter[]> {
   return chaptersOf(chronicle);
 }
 
-/** The line an address asks the replay to start at, if any. */
-export function startingLine(search: string): number | null {
-  const line = Number(new URLSearchParams(search).get("line"));
-  return Number.isInteger(line) && line > 0 ? line : null;
+/** Where an address asks the replay to start, by recording line or by turn, and whether to play on from there. */
+export function startingPoint(search: string): ({ line: number } | { turn: number }) & { play: boolean } | null {
+  const params = new URLSearchParams(search);
+  const play = params.get("play") === "1";
+  const count = (name: string) => {
+    const value = Number(params.get(name));
+    return Number.isInteger(value) && value > 0 ? value : null;
+  };
+  const line = count("line");
+  if (line !== null) return { line, play };
+  const turn = count("turn");
+  return turn !== null ? { turn, play } : null;
 }
