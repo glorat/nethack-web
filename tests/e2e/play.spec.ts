@@ -397,6 +397,27 @@ test.describe("on a touch screen", () => {
   });
 });
 
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("a long message log scrolls rather than pushing the map off the screen", async ({ page }) => {
+    await startGame(page, `Phone${Date.now() % 100000}`);
+    const mapHeight = async () => (await page.locator(".map-pane").boundingBox())!.height;
+    const look = async (times: number) => {
+      for (let i = 0; i < times; i++) await page.keyboard.press(":");
+      await untilCommand(page);
+    };
+    await look(20);
+    const before = await mapHeight();
+    expect(before).toBeGreaterThan(844 / 2);
+    await look(20);
+    expect(await page.locator(".message").count()).toBeGreaterThan(40);
+    expect(await mapHeight()).toBe(before);
+    const messages = page.locator(".messages");
+    expect(await messages.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop)).toBeLessThanOrEqual(1);
+  });
+});
+
 test("with a mouse, buttons and menu rows keep their size", async ({ page }) => {
   await startGame(page, `Mouse${Date.now() % 100000}`);
   expect((await page.getByRole("menubar").getByRole("menuitem", { name: "Act" }).boundingBox())!.height).toBeLessThan(44);
