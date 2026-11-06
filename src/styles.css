@@ -89,11 +89,17 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
 .map-pane { position: relative; flex: 1; min-height: 0; display: flex; }
 .map {
-  flex: 1; overflow: auto; background: #000;
+  position: relative; flex: 1; overflow: auto; background: #000;
   /* Safari's double-tap zoom, long-press callout and scroll bounce would fight the game's taps; a pinch is the map's own */
   touch-action: manipulation; overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .map-zoom { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 4px; }
+.tap-mark {
+  position: absolute; box-sizing: border-box; pointer-events: none;
+  border: 2px solid rgba(255, 255, 255, 0.9); border-radius: 3px; background: rgba(255, 255, 255, 0.25);
+}
+.tap-mark[hidden] { display: none; }
+.tap-mark.released { opacity: 0; transition: opacity 250ms ease-out; }
 /* left of the zoom buttons, which take about 160px */
 .quick-actions { position: absolute; left: 12px; bottom: 12px; right: 180px; display: flex; flex-wrap: wrap-reverse; gap: 4px; pointer-events: none; }
 .quick-actions button { pointer-events: auto; opacity: 0.9; padding: 2px 8px; }

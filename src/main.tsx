@@ -2,6 +2,7 @@ import { render } from "preact";
 import { useState } from "preact/hooks";
 import { holdOffUpdates, registerServiceWorker } from "./sw/register";
 import { App } from "./ui/App";
+import { startDiagnostics } from "./ui/diagnostics";
 import "./styles.css";
 
 function Root() {
@@ -10,5 +11,6 @@ function Root() {
 }
 
 render(<Root />, document.getElementById("app")!);
+startDiagnostics();
 holdOffUpdates();
 registerServiceWorker();
