@@ -1424,15 +1424,17 @@ test("Game Settings' choices and the options file show each other's changes, and
   const saved = await page.evaluate(() => localStorage.getItem("nethack.options"));
   expect(saved).toMatch(/\nOPTIONS=!tutorial\n\n?$/);
 
-  // cancelled while the core checks it, the file isn't kept when the check comes back
+  // while the core checks it, the file can't be changed or the dialog closed, so what's kept is what was checked
   await page.getByRole("button", { name: "Game Settings..." }).click();
   await tutorial.selectOption({ label: "Always play it first" });
   await settings.getByRole("button", { name: "OK" }).click();
   await expect(settings.getByRole("button", { name: "Checking…" })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "Cancel" })).toBeDisabled();
+  await expect(tutorial).toBeDisabled();
+  await expect(text).not.toBeEditable();
   await page.keyboard.press("Escape");
   await expect(settings).toBeHidden();
-  await page.waitForTimeout(2000);
-  expect(await page.evaluate(() => localStorage.getItem("nethack.options"))).toBe(saved);
+  expect(await page.evaluate(() => localStorage.getItem("nethack.options"))).toMatch(/\nOPTIONS=tutorial\n/);
 });
 
 test("the View menu switches between the painted and classic tiles, and the choice is kept", async ({ page }) => {

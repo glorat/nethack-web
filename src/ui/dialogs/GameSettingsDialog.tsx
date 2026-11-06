@@ -22,38 +22,28 @@ export function GameSettingsDialog({ text, onDone }: Props) {
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       e.stopPropagation();
-      if (e.key === "Escape" && !e.isComposing) close();
+      if (e.key === "Escape" && !e.isComposing && !checking) onDone(null);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   });
-  // the text now and whether the dialog is still open, which a check's answer may come after a change to
-  const latest = useRef(text);
-  const open = useRef(true);
-  const close = () => {
-    open.current = false;
-    onDone(null);
-  };
   const edit = (next: string) => {
-    latest.current = next;
     setValue(next);
     setProblems([]);
   };
   const problemList = useRef<HTMLDivElement>(null);
+  // nothing can change or close the dialog while the core checks the file, so its answer is about what's shown
   const save = async () => {
-    const checked = value;
     setChecking(true);
-    const found = await checkConfig(new URL(import.meta.env.BASE_URL, location.href).href, configFile(BASE_OPTIONS, checked));
-    if (!open.current) return;
+    const found = await checkConfig(new URL(import.meta.env.BASE_URL, location.href).href, configFile(BASE_OPTIONS, value));
     setChecking(false);
-    if (latest.current !== checked) return;
     // a file the core couldn't be asked about is kept, as the core will say what's wrong at the start of the next game
     if (found?.length) {
       setProblems(found);
       requestAnimationFrame(() => problemList.current?.querySelector("button")?.focus());
       return;
     }
-    setFailed(!onDone(checked));
+    setFailed(!onDone(value));
   };
   const showLine = (line: number) => {
     const el = area.current;
@@ -75,6 +65,7 @@ export function GameSettingsDialog({ text, onDone }: Props) {
                 <label class="setting" key={setting.name}>
                   <span class="setting-label">{setting.label}</span>
                   <select
+                    disabled={checking}
                     value={"choice" in now ? setting.choices.indexOf(now.choice) : -1}
                     onChange={(e) => edit(choose(value, setting, setting.choices[Number((e.target as HTMLSelectElement).value)]))}
                   >
@@ -95,7 +86,7 @@ export function GameSettingsDialog({ text, onDone }: Props) {
           </div>
           <label class="settings-file">
             <span class="setting-label">Options file</span>
-            <textarea ref={area} class="options-text" spellcheck={false} wrap="off" value={value} onInput={(e) => edit((e.target as HTMLTextAreaElement).value)} />
+            <textarea ref={area} class="options-text" spellcheck={false} wrap="off" readOnly={checking} value={value} onInput={(e) => edit((e.target as HTMLTextAreaElement).value)} />
           </label>
         </div>
         {problems.length ? (
@@ -124,7 +115,7 @@ export function GameSettingsDialog({ text, onDone }: Props) {
                 ? "Fix these lines to save."
                 : "Changes take effect when you start a new game."}
           </span>
-          <button onClick={close}>Cancel</button>
+          <button disabled={checking} onClick={() => onDone(null)}>Cancel</button>
           <button class="primary" disabled={checking} onClick={() => void save()}>
             {checking ? "Checking…" : "OK"}
           </button>
