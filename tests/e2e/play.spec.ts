@@ -397,6 +397,26 @@ test.describe("on a touch screen", () => {
   });
 });
 
+test("the map copies painted tiles at its square size, rather than shrinking each from the full sheet", async ({ page }) => {
+  await page.addInitScript(() => {
+    const draws = { fromSheet: 0, all: 0 };
+    (window as unknown as { mapDraws: typeof draws }).mapDraws = draws;
+    const drawImage = CanvasRenderingContext2D.prototype.drawImage;
+    CanvasRenderingContext2D.prototype.drawImage = function (this: CanvasRenderingContext2D, ...args: unknown[]) {
+      if (this.canvas.closest(".map")) {
+        draws.all++;
+        if (args[0] instanceof HTMLImageElement && args[0].src.includes("tiles64")) draws.fromSheet++;
+      }
+      return (drawImage as (...a: unknown[]) => void).apply(this, args);
+    } as typeof drawImage;
+  });
+  await startGame(page, `Sheet${Date.now() % 100000}`);
+  await page.evaluate(() => Object.assign((window as unknown as { mapDraws: object }).mapDraws, { fromSheet: 0, all: 0 }));
+  await page.getByRole("button", { name: "Zoom out" }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { mapDraws: { all: number } }).mapDraws.all)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => (window as unknown as { mapDraws: { fromSheet: number } }).mapDraws.fromSheet)).toBe(0);
+});
+
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
