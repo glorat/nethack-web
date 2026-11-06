@@ -6,7 +6,7 @@ export const upstream = (env) => env.PUBLIC_DATA ?? PRODUCTION;
 
 /**
  * The cached answer for this address without its query string, or else `answer()`, kept as its headers allow if it
- * was found. Anything else isn't kept: a game is missing only until it's scored.
+ * was found and may be kept. Anything else isn't kept: a game is missing only until it's scored.
  */
 export async function cached(context, answer) {
   const url = new URL(context.request.url);
@@ -16,7 +16,7 @@ export async function cached(context, answer) {
   const hit = await cache.match(key);
   if (hit) return hit;
   const response = await answer();
-  if (response.status === 200) context.waitUntil(cache.put(key, response.clone()));
+  if (response.status === 200 && !/no-store/.test(response.headers.get("Cache-Control") ?? "")) context.waitUntil(cache.put(key, response.clone()));
   return response;
 }
 
