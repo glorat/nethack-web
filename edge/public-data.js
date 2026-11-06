@@ -5,8 +5,8 @@ const PRODUCTION = "https://europe-west1-nethack-web-server.cloudfunctions.net/p
 export const upstream = (env) => env.PUBLIC_DATA ?? PRODUCTION;
 
 /**
- * The cached answer for this address without its query string, or else `answer()`, kept as its headers allow if it's
- * a page or a 404. Anything else, such as a server's passing failure, isn't kept.
+ * The cached answer for this address without its query string, or else `answer()`, kept as its headers allow if it
+ * was found. Anything else isn't kept: a game is missing only until it's scored.
  */
 export async function cached(context, answer) {
   const url = new URL(context.request.url);
@@ -16,7 +16,7 @@ export async function cached(context, answer) {
   const hit = await cache.match(key);
   if (hit) return hit;
   const response = await answer();
-  if (response.status === 200 || response.status === 404) context.waitUntil(cache.put(key, response.clone()));
+  if (response.status === 200) context.waitUntil(cache.put(key, response.clone()));
   return response;
 }
 
