@@ -44,9 +44,31 @@ export async function loadImportedSheet(name: string, file: Blob): Promise<TileS
   return sheetOf(image, size.width, size.height);
 }
 
+/** A sheet whose image may be a canvas: what the map draws from. */
+export type DrawableSheet = Omit<TileSheet, "image"> & { image: CanvasImageSource };
+
+/**
+ * The sheet redrawn once at `cell` a tile, when that shrinks it. Shrinking every tile from the full
+ * painted sheet on each redraw kept some phones' GPUs busy for a third of a second at a time.
+ */
+export function sheetForCell(sheet: TileSheet, cell: number): DrawableSheet {
+  if (cell >= Math.max(sheet.width, sheet.height)) return sheet;
+  const rows = Math.ceil(sheet.image.naturalHeight / sheet.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = sheet.columns * cell;
+  canvas.height = rows * cell;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return sheet;
+  ctx.imageSmoothingQuality = "high";
+  for (let row = 0; row < rows; row++)
+    for (let column = 0; column < sheet.columns; column++)
+      ctx.drawImage(sheet.image, column * sheet.width, row * sheet.height, sheet.width, sheet.height, column * cell, row * cell, cell, cell);
+  return { image: canvas, width: cell, height: cell, columns: sheet.columns };
+}
+
 export function drawTile(
   ctx: CanvasRenderingContext2D,
-  sheet: TileSheet,
+  sheet: DrawableSheet,
   tile: number,
   dx: number,
   dy: number,
