@@ -239,9 +239,17 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   display: flex; flex-direction: column; gap: 10px;
 }
 .input-dialog form { display: contents; }
-.options-dialog { width: min(640px, 92vw); }
-.options-text { font: 12px/1.4 var(--mono); height: 50vh; resize: vertical; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
-.options-dialog .hint { margin-right: auto; font-size: 12px; }
+.settings-dialog { width: min(900px, 94vw); max-width: none; }
+.settings-body { display: grid; grid-template-columns: minmax(220px, 1fr) 2fr; gap: 14px; min-height: 0; }
+@media (max-width: 640px) { .settings-body { grid-template-columns: 1fr; } }
+.settings-common { display: flex; flex-direction: column; gap: 12px; }
+.setting, .settings-file { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.setting-label { font-size: 12px; color: var(--muted); }
+.options-text { font: 12px/1.4 var(--mono); height: 50vh; resize: vertical; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; user-select: text; }
+.settings-problems ul { margin: 0; padding-left: 18px; }
+.settings-problems { color: var(--danger); font-size: 13px; max-height: 20vh; overflow: auto; }
+.link-inline { padding: 0; background: none; border: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+.settings-dialog .hint { margin-right: auto; font-size: 12px; }
 .about-dialog { width: min(480px, 92vw); }
 .about-dialog p { margin: 0; line-height: 1.45; }
 .about-dialog a { color: var(--accent); }

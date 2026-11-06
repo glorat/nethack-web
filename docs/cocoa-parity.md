@@ -6,7 +6,7 @@ Decided for the web:
 
 - Commands and wizard commands go in a slim menu bar along the top of the page, grouped as Cocoa's are.
 - Right-click opens a small context menu with the wiki search, and keeps the secondary click to the core as an item.
-- Options are a raw `.nethackrc` editor, as in Cocoa.
+- Options are the `.nethackrc`, edited raw as in Cocoa, beside choices for the most common settings that rewrite it (Game Settings; see `docs/newcomer-ux.md`).
 - Ship the 64px and classic 16px tile sheets; no 128px.
 - Speech, notes and sound are later phases, not dropped.
 

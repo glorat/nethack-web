@@ -1365,12 +1365,12 @@ test("a menu's lines of text read as text, its headings as headings", async ({ p
 
 test("the options file is edited in the browser and read when a game starts", async ({ page }) => {
   await page.goto("/offline/");
-  await page.getByRole("button", { name: "Edit Options File..." }).click();
-  const editor = page.getByRole("dialog", { name: "Options file" });
-  const text = editor.locator("textarea");
+  await page.getByRole("button", { name: "Game Settings..." }).click();
+  const editor = page.getByRole("dialog", { name: "Game Settings" });
+  const text = editor.getByLabel("Options file", { exact: true });
   await expect(text).toHaveValue(/#OPTIONS=autodig/);
   await text.fill(`${await text.inputValue()}OPTIONS=!time\n`);
-  await editor.getByRole("button", { name: "Save" }).click();
+  await editor.getByRole("button", { name: "OK" }).click();
   await expect(editor).toBeHidden();
 
   await page.getByLabel("Who are you?").fill(`Rc${Date.now() % 100000}`);
@@ -1383,7 +1383,7 @@ test("the options file is edited in the browser and read when a game starts", as
 
   // typing in the editor is text, not play
   await page.getByRole("menubar").getByRole("menuitem", { name: "Game" }).click();
-  await page.getByRole("menu", { name: "Game" }).getByRole("menuitem", { name: /Edit Options File/ }).click();
+  await page.getByRole("menu", { name: "Game" }).getByRole("menuitem", { name: /Game Settings/ }).click();
   await expect(text).toHaveValue(/OPTIONS=!time/);
   await text.press("End");
   await page.keyboard.type("i");
@@ -1391,6 +1391,48 @@ test("the options file is edited in the browser and read when a game starts", as
   await expect(page.locator(".menu-dialog")).toHaveCount(0);
   await editor.getByRole("button", { name: "Cancel" }).click();
   await expect(editor).toBeHidden();
+});
+
+test("Game Settings' choices and the options file show each other's changes, and a file the core finds wrong isn't kept", async ({ page }) => {
+  await page.goto("/offline/");
+  await page.getByRole("button", { name: "Game Settings..." }).click();
+  const settings = page.getByRole("dialog", { name: "Game Settings" });
+  const tutorial = settings.getByLabel("Tutorial");
+  const move = settings.getByLabel("Move with");
+  const text = settings.getByLabel("Options file", { exact: true });
+  await expect(tutorial).toHaveValue("0");
+  await expect(tutorial).toBeFocused();
+
+  await tutorial.selectOption({ label: "Never" });
+  await expect(text).toHaveValue(/\nOPTIONS=!tutorial\n$/);
+  await text.fill((await text.inputValue()).replace("#OPTIONS=number_pad:1", "OPTIONS=number_pad:1"));
+  await expect(move).toHaveValue("1");
+  await move.selectOption({ label: "Letters (h j k l y u b n)" });
+  await expect(text).not.toHaveValue(/^OPTIONS=number_pad/m);
+
+  await text.fill(`${await text.inputValue()}OPTIONS=bogus\n`);
+  await settings.getByRole("button", { name: "OK" }).click();
+  const problems = settings.getByRole("alert");
+  await expect(problems).toContainText("Unknown option 'bogus'");
+  await expect(problems.getByRole("button", { name: /^Line \d+$/ })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(text).toBeFocused();
+  await page.keyboard.press("Backspace");
+  await expect(problems).toBeHidden();
+  await settings.getByRole("button", { name: "OK" }).click();
+  await expect(settings).toBeHidden();
+  const saved = await page.evaluate(() => localStorage.getItem("nethack.options"));
+  expect(saved).toMatch(/\nOPTIONS=!tutorial\n\n?$/);
+
+  // cancelled while the core checks it, the file isn't kept when the check comes back
+  await page.getByRole("button", { name: "Game Settings..." }).click();
+  await tutorial.selectOption({ label: "Always play it first" });
+  await settings.getByRole("button", { name: "OK" }).click();
+  await expect(settings.getByRole("button", { name: "Checking…" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(settings).toBeHidden();
+  await page.waitForTimeout(2000);
+  expect(await page.evaluate(() => localStorage.getItem("nethack.options"))).toBe(saved);
 });
 
 test("the View menu switches between the painted and classic tiles, and the choice is kept", async ({ page }) => {
@@ -1529,9 +1571,9 @@ test("when the game ends, a dialog offers a new game under the same name, or the
   // the options editor's keys are its own, not the dialog's
   const bar = page.getByRole("menubar");
   await bar.getByRole("menuitem", { name: "Game" }).click();
-  await page.getByRole("menu", { name: "Game" }).getByRole("menuitem", { name: /Edit Options File/ }).click();
-  const editor = page.getByRole("dialog", { name: "Options file" });
-  await editor.locator("textarea").press("Enter");
+  await page.getByRole("menu", { name: "Game" }).getByRole("menuitem", { name: /Game Settings/ }).click();
+  const editor = page.getByRole("dialog", { name: "Game Settings" });
+  await editor.getByLabel("Options file", { exact: true }).press("Enter");
   await expect(editor).toBeVisible();
   await editor.getByRole("button", { name: "Cancel" }).click();
 
