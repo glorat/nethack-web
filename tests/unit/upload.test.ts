@@ -208,3 +208,18 @@ test("the last batch is the one holding the last line, once everything has reach
   await vi.advanceTimersByTimeAsync(5000);
   expect(up.lastBatch()).toBe(batchId(1, 3));
 });
+
+test("the last batch carries the generation of a recording cut back, and there's none once another tab has the game", async () => {
+  server.batches.set(batchId(1, 1), { lines: "1 k 1\n1 k 2\n1 k 3", sentAt: 0 });
+  const up = uploader({ generation: 1, sent: 3 });
+  up.before(text(numbered(2)));
+  up.finished(text([...numbered(2), "1 end over"]));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(up.lastBatch()).toBe(batchId(2, 3));
+
+  const other = uploader();
+  server.batches.set(batchId(1, 1), { lines: "1 x", sentAt: 0 });
+  other.finished(text(["1 end over"]));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(other.lastBatch()).toBeNull();
+});

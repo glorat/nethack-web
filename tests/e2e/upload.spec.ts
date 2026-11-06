@@ -487,7 +487,13 @@ test("a game just ended is scored at once, with a link to its page", async ({ pa
   const over = await endGame(page);
   await expect(over.getByRole("progressbar", { name: "Working out your score" }).or(over.getByText(/You scored/))).toBeVisible();
   await expect(over.getByText(/You scored \d+ points?\./)).toBeVisible({ timeout: 60_000 });
-  await expect(over.getByRole("link", { name: "See your game's page" })).toHaveAttribute("href", /\/g\/[A-Za-z0-9_-]{22}$/);
+  await expect(over.getByRole("status")).toContainText("You scored");
+  const link = over.getByRole("link", { name: "See your game's page" });
+  await expect(link).toHaveAttribute("href", /\/g\/[A-Za-z0-9_-]{22}$/);
+  // Enter on the link follows it, rather than starting a new game
+  await link.focus();
+  await page.keyboard.press("Enter");
+  await page.waitForURL(/\/g\/[A-Za-z0-9_-]{22}$/, { waitUntil: "commit" });
 });
 
 test("a real game that was cut back still validates, with the cut-back noted", async ({ page }) => {
