@@ -161,7 +161,41 @@ function observePerformance() {
       update();
     }).observe({ type: "longtask", buffered: true });
   } catch {}
+  try {
+    type Script = { invoker: string; invokerType: string; sourceURL: string; sourceFunctionName: string; sourceCharPosition: number; duration: number; forcedStyleAndLayoutDuration: number; pauseDuration: number };
+    type Frame = PerformanceEntry & { renderStart: number; styleAndLayoutStart: number; blockingDuration: number; scripts: Script[] };
+    new PerformanceObserver((list) => {
+      for (const f of list.getEntries() as Frame[]) {
+        if (f.duration < 150) continue;
+        const end = f.startTime + f.duration;
+        slowFrames.push({
+          at: r(f.startTime),
+          ms: r(f.duration),
+          blocking: r(f.blockingDuration),
+          scriptMs: r(f.scripts.reduce((s, x) => s + x.duration, 0)),
+          beforeRender: r((f.renderStart || end) - f.startTime),
+          rafAndObservers: f.renderStart ? r((f.styleAndLayoutStart || end) - f.renderStart) : 0,
+          styleLayoutPaint: f.styleAndLayoutStart ? r(end - f.styleAndLayoutStart) : 0,
+          scripts: f.scripts
+            .filter((s) => s.duration >= 10)
+            .map((s) => ({
+              ms: r(s.duration),
+              forcedLayout: r(s.forcedStyleAndLayoutDuration),
+              invoker: s.invoker,
+              type: s.invokerType,
+              fn: s.sourceFunctionName,
+              src: s.sourceURL.replace(location.origin, ""),
+              char: s.sourceCharPosition,
+            })),
+        });
+        if (slowFrames.length > 20) slowFrames.shift();
+      }
+      update();
+    }).observe({ type: "long-animation-frame", buffered: true });
+  } catch {}
 }
+
+const slowFrames: Record<string, unknown>[] = [];
 
 function environment() {
   const canvas = document.querySelector<HTMLCanvasElement>(".map canvas");
@@ -188,7 +222,7 @@ function median(values: number[]) {
 }
 
 function report() {
-  return JSON.stringify({ env: environment(), taps, longTasks: allLongTasks }, null, 0);
+  return JSON.stringify({ env: environment(), taps, longTasks: allLongTasks, slowFrames }, null, 0);
 }
 
 let summary: HTMLSpanElement;
@@ -265,6 +299,7 @@ export function startDiagnostics() {
     e.stopPropagation();
     taps.length = 0;
     allLongTasks.length = 0;
+    slowFrames.length = 0;
     current = null;
     update();
   };
