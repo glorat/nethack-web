@@ -98,13 +98,13 @@ export function GameSettingsDialog({ text, onDone }: Props) {
             <ul>
               {problems.map((p, i) =>
                 p.line === null ? (
-                  <li key={i}>{p.message}.</li>
+                  <li key={i}>{p.message}</li>
                 ) : (
                   <li key={i}>
                     <button type="button" class="link-inline" onClick={() => showLine(p.line!)}>
                       Line {p.line}
                     </button>
-                    : {p.message}.
+                    : {p.message}
                   </li>
                 ),
               )}

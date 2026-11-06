@@ -3,7 +3,7 @@
 import { CONFIG_FILE } from "./worker/game";
 import type { NetHackModule } from "./worker/memory";
 
-/** What the core says is wrong with a line of an options file; line is null if it doesn't say which. */
+/** What the core says is wrong with a line of an options file, as a sentence; line is null if it doesn't say which. */
 export interface ConfigProblem {
   line: number | null;
   message: string;
@@ -11,7 +11,7 @@ export interface ConfigProblem {
 
 export type CreateModule = (config: object) => Promise<NetHackModule>;
 
-/** The core's "line<TAB>message" lines, line 0 when it doesn't know. */
+/** The core's "line<TAB>message" lines, line 0 when it doesn't know, some messages with a full stop and some without. */
 export function configProblems(text: string): ConfigProblem[] {
   return text
     .split("\n")
@@ -19,7 +19,8 @@ export function configProblems(text: string): ConfigProblem[] {
     .map((row) => {
       const tab = row.indexOf("\t");
       const line = Number(row.slice(0, tab));
-      return { line: line > 0 ? line : null, message: row.slice(tab + 1) };
+      const message = row.slice(tab + 1);
+      return { line: line > 0 ? line : null, message: /[.!?]$/.test(message) ? message : `${message}.` };
     });
 }
 
