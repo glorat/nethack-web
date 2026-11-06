@@ -109,7 +109,7 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
       const expectedMs = expectedScoringMs(linesIn(ended));
       const giveUpMs = Math.max(SCORE_WAIT_MS, 3 * expectedMs);
       const score = (async () => {
-        await Promise.race([up.settled(), new Promise((r) => setTimeout(r, SAVE_SEND_MS))]);
+        await Promise.race([up.settled(), new Promise((r) => setTimeout(r, giveUpMs))]);
         const through = up.lastBatch();
         if (!through) return { kind: "later" as const };
         return scoreGame(id, location.origin, giveUpMs, {
