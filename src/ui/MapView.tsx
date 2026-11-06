@@ -1,10 +1,10 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { cursorColor } from "../port/cursor";
 import { tooltipText, wikiTerm, wikiUrl } from "../port/describe";
 import { useTooltip } from "./tooltip";
 import { COLNO, ROWNO, type GameState } from "../port/state";
-import { drawTile, type TileSheet } from "../tiles";
+import { drawTile, sheetForCell, type TileSheet } from "../tiles";
 import { asciiCell, type AsciiFont, drawSymbol } from "./ascii";
 import { drawMarks } from "./marks";
 import { clipAround } from "./scroll";
@@ -76,6 +76,7 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
   const height = text?.height ?? cell;
   // the Rogue level is drawn as text even with tiles on, in squares the size of the tiles, as Cocoa does
   const symbols = text ?? (state.status.rogue_level ? { ...asciiCell(cell, null, scale), width: cell } : null);
+  const tiles = useMemo(() => (text ? null : sheetForCell(sheet, cell)), [sheet, cell, !!text]);
   // BL_HP is the polymorphed form's while polymorphed, as Cocoa's u.mh
   const cursorStroke = cursorColor(Number(state.status.BL_HP?.text), Number(state.status.BL_HPMAX?.text));
 
@@ -92,9 +93,9 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
         if (!c) continue;
         if (symbols) {
           drawSymbol(ctx, symbols, c.symbol, c.color, x * width, y * height);
-        } else {
-          drawTile(ctx, sheet, c.bgTile, x * width, y * height, cell);
-          drawTile(ctx, sheet, c.tile, x * width, y * height, cell);
+        } else if (tiles) {
+          drawTile(ctx, tiles, c.bgTile, x * width, y * height, cell);
+          drawTile(ctx, tiles, c.tile, x * width, y * height, cell);
         }
         if (c.marks) drawMarks(ctx, c.marks, x * width, y * height, width, height, petMark);
       }
@@ -104,7 +105,7 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
       ctx.lineWidth = 1;
       ctx.strokeRect(state.cursor.x * width + 0.5, state.cursor.y * height + 0.5, width - 1, height - 1);
     }
-  }, [state.map, state.cursor, cursorStroke, sheet, cell, symbols?.font, symbols?.width, petMark]);
+  }, [state.map, state.cursor, cursorStroke, sheet, tiles, cell, symbols?.font, symbols?.width, petMark]);
 
   // the middle of the view in squares, kept as it scrolls: once the canvas has been resized, the browser
   // has already clamped the scroll position to it
