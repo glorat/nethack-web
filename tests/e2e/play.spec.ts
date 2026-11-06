@@ -1054,7 +1054,7 @@ test("Sort A–Z sorts a menu's items under each heading by name, and unticking 
   await page.keyboard.press("Escape");
 });
 
-test("a short question from the game shows a button for each answer", async ({ page }) => {
+test("a short question from the game shows a button for each answer, and not asking about the tutorial again is kept", async ({ page }) => {
   await enterGame(page, `Ask${Date.now() % 100000}`);
   await page.getByRole("dialog", { name: "Choose your character" }).getByRole("button", { name: "Play" }).click();
   // the tutorial offer, after the intro, is a menu of a few short answers
@@ -1062,11 +1062,20 @@ test("a short question from the game shows a button for each answer", async ({ p
   await expect(dialog).toContainText(/Go bravely/i, { timeout: 15_000 });
   await dialog.getByRole("button", { name: "OK" }).click();
   await expect(dialog).toContainText(/tutorial/i);
-  await expect(dialog.locator(".answers .answer")).toHaveCount(2);
+  await expect(dialog.locator(".answers .answer")).toHaveCount(3);
+  await expect(dialog).toContainText("You can change this in Game Settings.");
   await dialog.screenshot({ path: "test-results/question.png" });
-  await dialog.getByRole("button", { name: /just start play/i }).click();
+  await dialog.getByRole("button", { name: /don't ask again/i }).click();
   await untilPlaying(page);
   await expect(page.locator(".stats-title")).toBeVisible();
+
+  // kept in the options file, where Game Settings shows it
+  expect(await page.evaluate(() => localStorage.getItem("nethack.options"))).toMatch(/^OPTIONS=!tutorial$/m);
+  await page.getByRole("menubar").getByRole("menuitem", { name: "Game" }).click();
+  await page.getByRole("menu", { name: "Game" }).getByRole("menuitem", { name: /Game Settings/ }).click();
+  const settings = page.getByRole("dialog", { name: "Game Settings" });
+  await expect(settings.getByLabel("Tutorial")).toHaveValue("2");
+  await settings.getByRole("button", { name: "Cancel" }).click();
 });
 
 test("a read-only list's Close is its default button", async ({ page }) => {

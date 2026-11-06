@@ -38,6 +38,8 @@ export interface SessionOptions {
   utcOffset?: number;
   /** Debug mode, for ^W wishes, ^F maps and the like. */
   wizard?: boolean;
+  /** Leave the tutorial option unset, so the game asks about it. */
+  askTutorial?: boolean;
   /** Extra NETHACKOPTIONS, appended. */
   options?: string;
   /** A .nethackrc, for what only a config file sets, such as MENUCOLOR. */
@@ -103,6 +105,8 @@ export class Session {
   wizard = false;
   /** While the core waits for a command: what the hero can do where they stand, as names for #hereaction. */
   hereActions = "";
+  /** The options the game asked the page to keep in the options file. */
+  keptOptions: string[] = [];
   /** What the core printed outside its windows, such as errors before the game starts. */
   output: string[] = [];
   /** The recording's lines, as the recorder streamed them out. */
@@ -143,7 +147,7 @@ export class Session {
     return [
       `name:${options.name ?? "Tester"}`,
       options.character ?? "role:Valkyrie,race:human,gender:female,align:neutral",
-      "!autopickup,!tutorial,!tips,perm_invent",
+      options.askTutorial ? "!autopickup,!tips,perm_invent" : "!autopickup,!tutorial,!tips,perm_invent",
       options.wizard ? "playmode:debug" : "",
       options.options ?? "",
     ].filter(Boolean).join(",");
@@ -382,7 +386,10 @@ export class Session {
           throw new Error("failPost");
         }
         this.state = applyEvents(this.state, events);
-        for (const e of events) if (e.type === "map") this.drawn.push(...e.cells);
+        for (const e of events) {
+          if (e.type === "map") this.drawn.push(...e.cells);
+          if (e.type === "keep_option") this.keptOptions.push(e.option);
+        }
         if (events.some((e) => e.type === "game_over")) this.end();
       },
       request: (request: GameRequest) =>

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { configFile, OPTIONS_TEMPLATE, optionNames, optionSettings, savedOptionsFile, withOption } from "../../src/port/options";
+import { configFile, keptOption, OPTIONS_TEMPLATE, optionNames, optionSettings, savedOptionsFile, withOption } from "../../src/port/options";
 
 test("the game's options go after the player's, leaving out any the player sets, so theirs win without a duplicate", () => {
   expect(configFile("time,!autopickup,menucolors", "OPTIONS=autopickup,pickup_types:$\nOPTIONS=!time\n")).toBe(
@@ -54,4 +54,9 @@ test("an option set more than once is left set once, where it was first", () => 
   expect(withOption("OPTIONS=number_pad:1\nOPTIONS=autodig,number_pad:3\n", "number_pad", "number_pad:-1")).toBe(
     "OPTIONS=number_pad:-1\nOPTIONS=autodig\n",
   );
+});
+
+test("an option the game asks to keep is kept as written, in place of how the file set it", () => {
+  expect(keptOption("OPTIONS=time,tutorial\n", "!tutorial")).toBe("OPTIONS=time,!tutorial\n");
+  expect(keptOption(OPTIONS_TEMPLATE, "!tutorial")).toBe(`${OPTIONS_TEMPLATE}OPTIONS=!tutorial\n`);
 });

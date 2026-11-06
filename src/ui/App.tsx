@@ -4,7 +4,7 @@ import { WIKI_URL } from "../port/describe";
 import { commandToRun, listCommands } from "../port/extcmd";
 import { ArrowChords, keyCode, takeLine, type KeyLike } from "../port/keys";
 import { playerName, savedName } from "../port/name";
-import { BASE_OPTIONS, configFile, OPTIONS_KEY, savedOptions, savedOptionsFile, saveOptions as keepOptions } from "../port/options";
+import { BASE_OPTIONS, configFile, keptOption, OPTIONS_KEY, savedOptions, savedOptionsFile, saveOptions as keepOptions } from "../port/options";
 import { applyEvents, initialState, nextBatch } from "../port/state";
 import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, textSizeFromOptions } from "../port/textsize";
 import type { Answer, GameRequest, ReplayProgress, ShadowStatus } from "../protocol";
@@ -401,6 +401,7 @@ export function App({ handedOver, onReplay }: Props) {
               try {
                 localStorage.setItem(OPTIONS_KEY, savedOptionsFile(e.text, BASE_OPTIONS));
               } catch {}
+            if (e.type === "keep_option" && !replay) keepOptions(keptOption(savedOptions(), e.option));
             if (e.type === "recording") {
               mode?.finished(e.text);
               setRecorded(e.text);

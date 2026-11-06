@@ -109,6 +109,11 @@ export function withOption(file: string, name: string, option: string | null): s
   return placed ? text : `${text === "" ? "" : text.replace(/\n?$/, "\n")}OPTIONS=${option}\n`;
 }
 
+/** The file with an option as written, such as "!tutorial" or "number_pad:1", kept as withOption keeps it. */
+export function keptOption(file: string, option: string): string {
+  return withOption(file, option.split(/[:=]/)[0].trim().replace(/^!/, "").toLowerCase(), option);
+}
+
 /**
  * The player's file with the game's own options added after it, but only those the player doesn't set:
  * an option set twice in a file is an error, and the player's choice wins.

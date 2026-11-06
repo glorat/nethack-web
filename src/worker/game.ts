@@ -64,6 +64,7 @@ export type CoreEvent =
   | { kind: "end"; conduct: number; roleplay: number; turn: number };
 
 const CORE_EVENT_KINDS = [undefined, "achievement", "chronicle", "uevent", "end"] as const;
+const NHWEB_EVENT_OPTION = 5;
 
 /** Decodes the shim's `shim_game_event(kind, a, b, turn, format, text)`. */
 export function coreEvent(args: unknown[]): CoreEvent | null {
@@ -341,6 +342,11 @@ export class Game {
         return 0;
       }
       case "shim_game_event": {
+        // for the page, which keeps the options file, rather than an event of the game
+        if (args[0] === NHWEB_EVENT_OPTION) {
+          this.emit({ type: "keep_option", option: String(args[5]) });
+          return 0;
+        }
         const event = coreEvent(args);
         if (event) this.host.gameEvent?.(event);
         return 0;
