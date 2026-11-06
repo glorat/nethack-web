@@ -281,6 +281,8 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 .direction-arrow { font-size: 18px; }
 .direction-dialog .hint, .ext-dialog .hint { font-size: 12px; }
 .dialog-title { font-weight: 600; }
+.score-wait, .score-line { margin-top: 10px; }
+.score-wait .meter-bar { margin-top: 6px; }
 .dialog-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; align-items: center; }
 .hint { color: var(--muted); }
 .dialog-left { display: flex; align-items: center; gap: 8px; margin-right: auto; }

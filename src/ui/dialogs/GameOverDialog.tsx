@@ -1,4 +1,12 @@
-import { useLayoutEffect } from "preact/hooks";
+import { useEffect, useLayoutEffect, useState } from "preact/hooks";
+import type { FinishedScore } from "../mode";
+
+interface Scoring {
+  startedAt: number;
+  expectedMs: number;
+  /** Null until it comes. */
+  score: FinishedScore | null;
+}
 
 interface Props {
   /** What the core said as it ended, such as a farewell. */
@@ -7,9 +15,47 @@ interface Props {
   onQuit(): void;
   /** Watches the game again; absent until its recording has come, or if it can't replay. */
   onReplay?(): void;
+  /** The game's score, for a game that gets one. */
+  scoring?: Scoring;
 }
 
-export function GameOverDialog({ text, onNewGame, onQuit, onReplay }: Props) {
+/** How far along to show a wait expected to take `expectedMs`: steady until then, then ever slower, never quite done. */
+export function waitShown(elapsedMs: number, expectedMs: number): number {
+  if (elapsedMs < expectedMs) return (0.9 * elapsedMs) / expectedMs;
+  return 0.9 + 0.09 * (1 - Math.exp(-(elapsedMs - expectedMs) / expectedMs));
+}
+
+function ScoreWait({ startedAt, expectedMs }: { startedAt: number; expectedMs: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(timer);
+  }, []);
+  const shown = Math.round(100 * waitShown(now - startedAt, expectedMs));
+  return (
+    <div class="score-wait">
+      <div>Working out your score…</div>
+      <div class="meter-bar" role="progressbar" aria-label="Working out your score" aria-valuemin={0} aria-valuemax={100} aria-valuenow={shown}>
+        <div class="meter-fill" style={{ width: `${shown}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function ScoreLine({ scoring }: { scoring: Scoring }) {
+  const { score } = scoring;
+  if (!score) return <ScoreWait startedAt={scoring.startedAt} expectedMs={scoring.expectedMs} />;
+  if (score.kind === "unscored") return <div class="score-line">This game couldn't be scored.</div>;
+  if (score.kind === "later") return <div class="score-line">Your score will be on the home page in a few minutes.</div>;
+  return (
+    <div class="score-line" role="status">
+      {score.points !== undefined ? `You scored ${score.points.toLocaleString()} points. ` : "Your game is scored. "}
+      <a href={score.address}>See your game's page</a>
+    </div>
+  );
+}
+
+export function GameOverDialog({ text, onNewGame, onQuit, onReplay, scoring }: Props) {
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // not a key held from closing the last window, which the player pressed before this appeared
@@ -27,6 +73,7 @@ export function GameOverDialog({ text, onNewGame, onQuit, onReplay }: Props) {
       <div class="dialog" role="dialog" aria-label="The game is over">
         <div class="dialog-title">The game is over</div>
         <div>{text ? `${text} ` : ""}Start a new game, or quit to the home page.</div>
+        {scoring ? <ScoreLine scoring={scoring} /> : null}
         <div class="dialog-buttons">
           {onReplay ? <button onClick={onReplay}>Replay</button> : null}
           <button onClick={onQuit}>Quit</button>

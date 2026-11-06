@@ -6,7 +6,7 @@ import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/
 import { appCheckRefused, type OnlineDeps, refusedAddress } from "../session";
 import type { Profile } from "../account";
 import type { Achievement } from "../achievements";
-import type { FinishedGame, LeaderboardEntry } from "../results";
+import type { FinishedGame, GameResult, LeaderboardEntry } from "../results";
 import type { WriteResult } from "../upload";
 
 // Not a secret: a web app's Firebase config is public, and security rules decide what it may do.
@@ -134,6 +134,13 @@ export const resumeGame: OnlineDeps["resumeGame"] = (input) => userRequest("resu
 export const finishedGames = (input: { sentAt: number }) => userRequest<{ games: FinishedGame[] }>("finishedGames", input);
 
 export const deleteGame = (input: { game: string; sentAt: number }) => userRequest<{ status: "deleted" }>("deleteGame", input);
+
+/** Scores a game that has just ended, through the batch that ended it; on a function of its own, as it replays the game. */
+export async function scoreGame(input: { game: string; through: string; sentAt: number }): Promise<{ result?: GameResult }> {
+  await signedIn();
+  // longer than the server allows it, so its own answer comes first
+  return (await httpsCallable<unknown, { result?: GameResult }>(functions, "score", { timeout: 310_000 })({ method: "scoreGame", input })).data;
+}
 
 export const leaderboard = (input: { sentAt: number }) => publicRequest<{ entries: LeaderboardEntry[] }>("leaderboard", input);
 

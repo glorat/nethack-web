@@ -194,3 +194,17 @@ test("settling doesn't wait for an upload that has stopped", async () => {
   await vi.advanceTimersByTimeAsync(0);
   expect(settled).toBe(true);
 });
+
+test("the last batch is the one holding the last line, once everything has reached the server", async () => {
+  const up = uploader();
+  expect(up.lastBatch()).toBeNull();
+  up.add(numbered(2), true);
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(up.lastBatch()).toBe(batchId(1, 1));
+  server.next = ["down"];
+  up.finished(text([...numbered(2), "1 end over"]));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(up.lastBatch()).toBeNull();
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(up.lastBatch()).toBe(batchId(1, 3));
+});

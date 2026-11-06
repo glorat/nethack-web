@@ -46,6 +46,8 @@ export class LogUploader {
   private busy = false;
   private stopped = false;
   private waiters: (() => void)[] = [];
+  /** The ID of the batch holding the last line the server has. */
+  private last: string | null = null;
 
   constructor(
     private readonly deps: UploadDeps,
@@ -90,6 +92,11 @@ export class LogUploader {
 
   private done(): boolean {
     return this.stopped || this.sent >= this.lines.length;
+  }
+
+  /** The batch holding the recording's last line, once everything has reached the server, or null if it hasn't. */
+  lastBatch(): string | null {
+    return !this.stopped && this.sent >= this.lines.length ? this.last : null;
   }
 
   /** The whole recording, when the game ends. */
@@ -147,6 +154,7 @@ export class LogUploader {
       return;
     }
     this.retrying = false;
+    this.last = batchId(this.generation, this.sent + 1);
     this.sent += count;
     this.inflight = 0;
     this.deps.notice(null);

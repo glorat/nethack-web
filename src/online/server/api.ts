@@ -46,6 +46,9 @@ export function createOnlineSession(waiting: OnlineDeps["waiting"]): OnlineSessi
 
 export const listOnlineGames = (): Promise<GameSummary[]> => loadGames({ now: () => Date.now(), listGames: async (input) => (await server()).listGames(input) });
 
+/** Scores a game that has just ended, through the batch that ended it. */
+export const scoreFinishedGame = async (game: string, through: string) => (await server()).scoreGame({ game, through, sentAt: Date.now() });
+
 /** The player's finished games, latest first; asking waits for no one, as there's nothing to hold up. */
 export const listFinishedGames = async (): Promise<FinishedGame[]> => (await (await server()).finishedGames({ sentAt: Date.now() })).games;
 

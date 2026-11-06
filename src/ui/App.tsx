@@ -38,7 +38,7 @@ import { EquipmentView } from "./EquipmentView";
 import { InventoryView } from "./InventoryView";
 import { QuickActions } from "./QuickActions";
 import { keyLike } from "./keyevent";
-import { type PageMode, SAVED_FAREWELL } from "./mode";
+import { type FinishedScore, type PageMode, SAVED_FAREWELL } from "./mode";
 import { MapView } from "./MapView";
 import { type BarMenu, MenuBar, type MenuEntry } from "./MenuBar";
 import { COMMAND_MENUS, type CommandItem, GAME_MENU, HELP_MENU, WIZARD_MENU } from "./commands";
@@ -234,6 +234,8 @@ export function App({ handedOver, onReplay }: Props) {
   const replayLastTurn = useMemo(() => ((replay?.text && lastTurnIn(replay.text)) || 0), [replay]);
   /** The game's recording, once it has ended. */
   const [recorded, setRecorded] = useState<string | null>(null);
+  /** A finished game's score, on its way from when it was asked for, as long as it's expected to take. */
+  const [scoring, setScoring] = useState<{ startedAt: number; expectedMs: number; score: FinishedScore | null } | null>(null);
   // a developer's option: a second core follows the game by its recording, to catch one that would replay differently
   const shadow = useRef<ShadowClient | null>(null);
   const shadowRecording = useRef("");
@@ -405,6 +407,11 @@ export function App({ handedOver, onReplay }: Props) {
             if (e.type === "recording") {
               mode?.finished(e.text);
               setRecorded(e.text);
+              const pending = replay ? null : mode?.score?.();
+              if (pending) {
+                setScoring({ startedAt: Date.now(), expectedMs: pending.expectedMs, score: null });
+                void pending.score.then((score) => setScoring((s) => s && { ...s, score }));
+              }
             }
             if (e.type === "recorded_before") {
               shadowRecording.current = e.text;
@@ -904,6 +911,7 @@ export function App({ handedOver, onReplay }: Props) {
             onNewGame={() => location.reload()}
             onQuit={() => location.replace(LANDING_PATH)}
             onReplay={recorded !== null && replayable(recorded) ? () => replayHere(recorded) : undefined}
+            scoring={scoring ?? undefined}
           />
         ) : null}
         {optionsDialog}

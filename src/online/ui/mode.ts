@@ -1,7 +1,8 @@
 // An online game, from the page's side: the server holds it, so the page opens it there and sends it on as it's played.
 import type { PageMode } from "../../ui/mode";
 import { linesIn } from "../../port/recording";
-import { createOnlineSession, createUploader } from "../server/api";
+import { expectedScoringMs, scoreGame } from "../score";
+import { createOnlineSession, createUploader, scoreFinishedGame } from "../server/api";
 import { gameWatchAddress } from "../results";
 import type { OnlineSession } from "../session";
 import type { LogUploader, UploadNotice } from "../upload";
@@ -9,6 +10,8 @@ import { chosenZone } from "../zones";
 
 /** How long Save & Quit waits for the save to reach the server, as a player offline can't be kept here. */
 const SAVE_SEND_MS = 5000;
+/** The least time a finished game's player waits for its score before being told it will come later. */
+const SCORE_WAIT_MS = 60_000;
 
 /** What to tell the player about the server, or null for nothing. */
 export type ServerNotice = string | null;
@@ -19,6 +22,8 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
   let waiting = false;
   let unsent: UploadNotice | null = null;
   let refused = false;
+  let gameId: string | null = null;
+  let ended: string | null = null;
   const show = () =>
     notice(
       refused
@@ -67,6 +72,7 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
       params.set("tz", String(opened.utcOffset));
       history.replaceState(null, "", `${location.pathname}?${params}`);
       document.documentElement.dataset.serverGame = opened.game;
+      gameId = opened.game;
       uploader = createUploader(opened.game, { generation: opened.generation, sent: linesIn(opened.recording) }, (n) => {
         unsent = n;
         show();
@@ -93,6 +99,26 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
     },
     finished(text) {
       uploader?.finished(text);
+      ended = text;
+    },
+    score() {
+      const up = uploader;
+      const id = gameId;
+      // only a game that's over, not one saved to come back to
+      if (!up || !id || ended === null || !/(^|\n)\d+ end over\n?$/.test(ended)) return null;
+      const expectedMs = expectedScoringMs(linesIn(ended));
+      const giveUpMs = Math.max(SCORE_WAIT_MS, 3 * expectedMs);
+      const score = (async () => {
+        await Promise.race([up.settled(), new Promise((r) => setTimeout(r, SAVE_SEND_MS))]);
+        const through = up.lastBatch();
+        if (!through) return { kind: "later" as const };
+        return scoreGame(id, location.origin, giveUpMs, {
+          ask: () => scoreFinishedGame(id, through),
+          sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+          now: () => Date.now(),
+        });
+      })();
+      return { expectedMs, score };
     },
     replayAddress() {
       return gameWatchAddress(new URLSearchParams(location.search).get("game") ?? "");
