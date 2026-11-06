@@ -16,7 +16,7 @@ import { DeviceGames } from "../offline/ui/DeviceGames";
 import { finishSignIn, listOnlineGames, loadProfile, signInWithGoogle, signOut } from "../online/server/api";
 import { updateWhenIdle } from "../sw/register";
 import { AboutDialog } from "./dialogs/AboutDialog";
-import { OptionsDialog } from "./dialogs/OptionsDialog";
+import { GameSettingsDialog } from "./dialogs/GameSettingsDialog";
 
 // each mode's home loads this; only the online one reaches the network
 // an address it doesn't know is taken as offline, which reaches nothing
@@ -255,7 +255,7 @@ export function Landing() {
                     </button>
                   )}
                   <button type="button" onClick={() => setEditingOptions(true)}>
-                    Edit Options File...
+                    Game Settings...
                   </button>
                 </div>
               </>
@@ -307,7 +307,7 @@ export function Landing() {
         </p>
       </footer>
       {editingOptions ? (
-        <OptionsDialog
+        <GameSettingsDialog
           text={savedOptions()}
           onDone={(text) => {
             if (text !== null && !saveOptions(text)) return false;

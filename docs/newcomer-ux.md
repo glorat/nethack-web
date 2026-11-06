@@ -19,10 +19,15 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
 - [x] **Quick-action toolbar** of what you can do where you stand. Effort M, benefit high. Decided, as designed below.
   - **Where:** a floating group at the map's bottom-left, mirroring the zoom buttons at the bottom-right, so on a tablet actions are under the left thumb and zoom under the right.
   - **What:** the actions the core's here-menu (`there_cmd_menu_self`, clicking your own square) finds for your square, such as go up or down, drink, sit, sacrifice, pick up, loot, tip, eat, dismount and disarm, plus Search, Rest and Cast (when you know a spell) always. Not the here-menu's Inventory, Drop and Look Here, which the sidebar and right-click already cover, nor actions on the squares next to you, which need a direction.
-  - **From the core:** a fork change that lists those actions each turn without opening a menu, and runs one by its ID as picking it from the here-menu does, so it's recorded as an ordinary command. The list carries IDs and fixed labels, not the menu's item names: naming an object can mark it seen, which would change the game and break replays.
+  - **From the core:** a fork change that lists those actions each turn without opening a menu, and `#hereaction`, which runs one by its name as picking it from the here-menu does, so it's recorded as an ordinary command with the name as its answer. The list carries fixed names, not the menu's item names: naming an object can mark it seen, which would change the game and break replays.
   - **Labels:** short verbs with the key in small type, as "Go down >", like the menu bar's keys. An action just appears when it applies, without a pulse.
   - **Showing it:** View > Show Toolbar, on by default and remembered. Toolbar modes showing more or fewer buttons, icons or text may come later; for now there's this one.
   - Also listed under Later in `docs/tablet-support.md`.
+- [x] **Game Settings:** choices for the most common settings beside the options file, in one dialog (Game > Game Settings…, and on the home page). Effort M, benefit medium. Decided:
+  - The file is the only place settings are kept. A choice rewrites its option where the file sets it, or adds a line at the end, and shows in the file as it changes; editing the file changes the choices. An option written in a way no choice matches shows as written.
+  - Tutorial and Move with (`number_pad`) only, for now; more can be added to `src/port/game-settings.ts`.
+  - OK has a core of its own, loaded on the page and then dropped, read the file as a new game would (`nhweb_check_config`, a call that returns the problems), and the file isn't kept while it finds anything wrong, listed by line.
+  - The site's own settings, such as text size and tiles, stay on the View menu.
 - [ ] **Alerts for dangerous messages,** such as stoning, sliming, illness and lycanthropy ("You feel feverish"): coloured, and kept in view until dealt with. Effort M, benefit high.
   - Most of the work is a curated list of message patterns. Hallucination changes some wording.
 - [ ] **A sign that the game is waiting for a map position,** and Esc there. Effort M, benefit medium.
@@ -32,9 +37,8 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
 - [ ] **Contextual hints,** dismissible, the first time something comes up: entering a shop, a fountain or altar, first Burdened or Hungry. Effort M–L, benefit high.
   - Triggered from messages, status and room type. A cheaper route to much of what a tutorial would teach.
 - [ ] **Explain cryptic messages on hover.** Effort M, benefit low to medium. After the alerts, reusing their patterns.
-- [ ] **A first-game tutorial.** Effort L, benefit high. Needs a design first: a scripted level, or overlays on a real game.
-- [ ] **A settings panel** of common toggles that writes to the options file. Effort M (a full settings screen is L), benefit medium.
-  - Goes against `docs/cocoa-parity.md`'s decision of a raw `.nethackrc` editor, so needs deciding again.
+- [ ] **"No, and don't ask again" for the tutorial.** The core asks about its tutorial at every new game unless the options file sets `tutorial`, and says to edit the file to stop it. A third answer, added in the fork's core and recorded by name, which the front end turns into `OPTIONS=!tutorial` in the file. Effort S–M, benefit medium.
+  - No one has checked that the tutorial level plays through on the site; the tests always decline it.
 - [ ] **A count before a command by touch** (`n20s`). Effort M, benefit low. "Search 20" and rest buttons on the toolbar cover the common cases.
 - [ ] **The `number_pad` default.** Effort S, benefit low. Arrow keys already move.
 

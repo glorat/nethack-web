@@ -17,6 +17,9 @@ export const OPTIONS_TEMPLATE = `# NetHack options. Lines starting with # are ig
 #OPTIONS=fruit:slime mold
 `;
 
+/** The options the game sets, after the player's file. */
+export const BASE_OPTIONS = "perm_invent,!autopickup,menucolors,time,showexp,hilite_pet,hilite_pile,force_invmenu";
+
 // the menu colors the core adds for the web front end, which #saveoptions writes out with the player's
 const DEFAULT_MENU_COLORS = [
   'MENUCOLOR=" blessed "=green',
@@ -65,6 +68,45 @@ export function optionNames(file: string): Set<string> {
     }
   }
   return names;
+}
+
+const OPTIONS_LINE = /^(\s*OPTIONS\s*=)(.*)$/i;
+
+/** Whether an option as written, such as "!number_pad" or "number_pad:3", sets `name`. */
+function sets(option: string, name: string): boolean {
+  const written = option.split(/[:=]/)[0].trim().toLowerCase();
+  return written === name || written === `!${name}` || written === `no${name}`;
+}
+
+/** How the file's OPTIONS lines set `name`, as written, in order: none if it's left to the game. */
+export function optionSettings(file: string, name: string): string[] {
+  return file.split("\n").flatMap((line) => {
+    const m = OPTIONS_LINE.exec(line);
+    return m ? m[2].split(",").map((option) => option.trim()).filter((option) => sets(option, name)) : [];
+  });
+}
+
+/**
+ * The file with `name` set as `option`, or left to the game if null: changed where the file already sets it,
+ * any other settings of it dropped, or else added on a line at the end. The rest of the file is kept as it was.
+ */
+export function withOption(file: string, name: string, option: string | null): string {
+  let placed = option === null;
+  const lines = file.split("\n").flatMap((line) => {
+    const m = OPTIONS_LINE.exec(line);
+    if (!m) return [line];
+    const parts = m[2].split(",");
+    if (!parts.some((part) => sets(part, name))) return [line];
+    const kept = parts.flatMap((part) => {
+      if (!sets(part, name)) return [part];
+      if (placed) return [];
+      placed = true;
+      return [`${/^\s*/.exec(part)![0]}${option}`];
+    });
+    return kept.length ? [`${m[1]}${kept.join(",")}`] : [];
+  });
+  const text = lines.join("\n");
+  return placed ? text : `${text === "" ? "" : text.replace(/\n?$/, "\n")}OPTIONS=${option}\n`;
 }
 
 /**

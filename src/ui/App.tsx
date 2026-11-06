@@ -4,7 +4,7 @@ import { WIKI_URL } from "../port/describe";
 import { commandToRun, listCommands } from "../port/extcmd";
 import { ArrowChords, keyCode, takeLine, type KeyLike } from "../port/keys";
 import { playerName, savedName } from "../port/name";
-import { configFile, OPTIONS_KEY, savedOptions, savedOptionsFile, saveOptions as keepOptions } from "../port/options";
+import { BASE_OPTIONS, configFile, OPTIONS_KEY, savedOptions, savedOptionsFile, saveOptions as keepOptions } from "../port/options";
 import { applyEvents, initialState, nextBatch } from "../port/state";
 import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, textSizeFromOptions } from "../port/textsize";
 import type { Answer, GameRequest, ReplayProgress, ShadowStatus } from "../protocol";
@@ -30,7 +30,7 @@ import { FontDialog, SIZES } from "./dialogs/FontDialog";
 import { GameOverDialog } from "./dialogs/GameOverDialog";
 import { InputDialog } from "./dialogs/InputDialog";
 import { MenuDialog } from "./dialogs/MenuDialog";
-import { OptionsDialog } from "./dialogs/OptionsDialog";
+import { GameSettingsDialog } from "./dialogs/GameSettingsDialog";
 import { PlayerDialog } from "./dialogs/PlayerDialog";
 import { TextDialog } from "./dialogs/TextDialog";
 import { YesNoDialog } from "./dialogs/YesNoDialog";
@@ -179,8 +179,6 @@ function saveAsciiFont(font: AsciiFont | null) {
     else localStorage.removeItem(ASCII_FONT_KEY);
   } catch {}
 }
-
-const BASE_OPTIONS = "perm_invent,!autopickup,menucolors,time,showexp,hilite_pet,hilite_pile,force_invmenu";
 
 interface Pending {
   id: number;
@@ -745,7 +743,7 @@ export function App({ handedOver, onReplay }: Props) {
       entries: [
         ...GAME_MENU.slice(0, 1).map(command),
         // not over a question, whose keys the editor's text would answer
-        { title: "Edit Options File...", disabled: !!pending || ownDialog, run: () => setEditingOptions(true) },
+        { title: "Game Settings...", disabled: !!pending || ownDialog, run: () => setEditingOptions(true) },
         ...GAME_MENU.slice(1).map(command),
         null,
         {
@@ -833,7 +831,7 @@ export function App({ handedOver, onReplay }: Props) {
     );
   }
   if (!sheet) return <div class="loading">Loading tiles…</div>;
-  const optionsDialog = editingOptions ? <OptionsDialog text={savedOptions()} onDone={saveOptions} /> : null;
+  const optionsDialog = editingOptions ? <GameSettingsDialog text={savedOptions()} onDone={saveOptions} /> : null;
   if (!playing) return <div class="loading">Loading…</div>;
 
   return (
