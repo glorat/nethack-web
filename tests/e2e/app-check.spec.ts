@@ -301,10 +301,25 @@ test("a browser App Check refuses is told why at the online home, and offered of
   const alert = page.getByRole("alert").filter({ hasText: "isn't available" });
   await expect(alert).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/online/");
-  expect(new URL(page.url()).search).toBe("?refused");
+  await expect.poll(() => new URL(page.url()).search).toBe("");
   expect([...seen.keys()]).toEqual([]);
   await alert.getByRole("link", { name: "Go Offline" }).click();
   await expect(page).toHaveURL(/\/offline\/$/);
+});
+
+test("once App Check allows the browser again, a reload of the online home asks again and drops the refusal", async ({ page }) => {
+  const seen = await fakeServer(page);
+  await fakeRecaptcha(page);
+  let answer: "token" | "refuse" = "refuse";
+  await exchange(page, () => answer);
+  await page.goto(`${PROD}online/`);
+  const alert = page.getByRole("alert").filter({ hasText: "isn't available" });
+  await expect(alert).toBeVisible();
+  await expect.poll(() => new URL(page.url()).search).toBe("");
+  answer = "token";
+  await page.reload();
+  await expect.poll(() => seen.has("functions"), { timeout: 30_000 }).toBe(true);
+  await expect(alert).toBeHidden();
 });
 
 test("App Check refusing mid-game ends it at the landing page", async ({ page }) => {
@@ -314,8 +329,7 @@ test("App Check refusing mid-game ends it at the landing page", async ({ page })
   await exchange(page, () => answer);
   await startOnlineGame(page);
   answer = "refuse";
-  await untilReturned(page, async () => new URL(page.url()).search === "?refused");
-  await expect(page.getByRole("alert").filter({ hasText: "isn't available" })).toBeVisible();
+  await untilReturned(page, () => page.getByRole("alert").filter({ hasText: "isn't available" }).isVisible());
   // the landing page can show its alert before its own load event, which mustn't count as another
   await page.waitForLoadState("load");
   let loads = 0;
