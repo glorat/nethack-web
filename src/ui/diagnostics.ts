@@ -226,7 +226,7 @@ function report() {
   return JSON.stringify({ env: environment(), taps, longTasks: allLongTasks, slowFrames }, null, 0);
 }
 
-const BUILD = new URL(import.meta.url).pathname.split("/").pop()?.replace(/\.js$/, "") ?? "?";
+const BUILD = new URL(document.querySelector<HTMLScriptElement>("script[src*=\"/assets/main-\"]")?.src ?? location.href).pathname.split("/").pop()?.replace(/\.js$/, "") ?? "?";
 
 let summary: HTMLSpanElement;
 let scheduled = false;
