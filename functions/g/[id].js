@@ -22,7 +22,7 @@ export const onRequest = (context) => {
     const story = data && told?.ok ? await told.json().then((s) => (Array.isArray(s?.chronicle) && Array.isArray(s?.achievements) ? s : null), () => null) : null;
     return new Response(sharePage(origin, id, data, story), {
       status: data ? 200 : 404,
-      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": `public, max-age=60, s-maxage=${data ? 3600 : 300}` },
+      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": data ? "public, max-age=60, s-maxage=3600" : "no-store" },
     });
   });
 };
