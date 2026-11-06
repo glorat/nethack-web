@@ -37,8 +37,10 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
 - [ ] **Contextual hints,** dismissible, the first time something comes up: entering a shop, a fountain or altar, first Burdened or Hungry. Effort M–L, benefit high.
   - Triggered from messages, status and room type. A cheaper route to much of what a tutorial would teach.
 - [ ] **Explain cryptic messages on hover.** Effort M, benefit low to medium. After the alerts, reusing their patterns.
-- [ ] **"No, and don't ask again" for the tutorial.** The core asks about its tutorial at every new game unless the options file sets `tutorial`, and says to edit the file to stop it. A third answer, added in the fork's core and recorded by name, which the front end turns into `OPTIONS=!tutorial` in the file. Effort S–M, benefit medium.
-  - No one has checked that the tutorial level plays through on the site; the tests always decline it.
+- [x] **"No, and don't ask again" for the tutorial.** The core asks about its tutorial at every new game unless the options file sets `tutorial`. Effort S–M, benefit medium. Decided:
+  - A third choice, `d`, in the fork's core (web build only), recorded by its text like the others; `y` and `n` keep their text, so old recordings replay. The note under the choices says it can be changed in Game Settings rather than how to edit the file.
+  - Choosing it has the core tell the page (`NHWEB_EVENT_OPTION`), which keeps `OPTIONS=!tutorial` in the options file, where Game Settings shows Never. Not in replays.
+  - The tutorial plays through on the site (checked by hand); a headless test enters it and leaves by its first portal. A recording of a full playthrough could become a replay fixture later.
 - [ ] **A count before a command by touch** (`n20s`). Effort M, benefit low. "Search 20" and rest buttons on the toolbar cover the common cases.
 - [ ] **The `number_pad` default.** Effort S, benefit low. Arrow keys already move.
 

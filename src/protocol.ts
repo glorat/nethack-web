@@ -68,6 +68,8 @@ export type GameEvent =
   | { type: "bell" }
   /** The options file, as #saveoptions rewrote it. */
   | { type: "options_file"; text: string }
+  /** An option the player chose in the game, such as "!tutorial", to keep in the options file. */
+  | { type: "keep_option"; option: string }
   /** The tile_file option, as the game starts. */
   | { type: "tile_file"; name: string }
   /** font_size_message (or font_size_status), in points: as the game starts, or changed in the options menu. */
