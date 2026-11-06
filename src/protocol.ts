@@ -152,15 +152,7 @@ export type WorkerMessage =
   | { type: "shadow_status"; status: ShadowStatus }
   /** The core wants a seed for an online game; answered with a "seed_reply" of the same id. */
   | { type: "seed_request"; id: number }
-  /** The problems the core found in an options file; null if it couldn't be asked. */
-  | { type: "config_checked"; problems: ConfigProblem[] | null }
   | ReplayMessage;
-
-/** What the core says is wrong with a line of an options file; line is null if it doesn't say which. */
-export interface ConfigProblem {
-  line: number | null;
-  message: string;
-}
 
 /** How a second core following the game by its recording is getting on. */
 export interface ShadowStatus {
@@ -251,6 +243,4 @@ export type UiMessage =
   | { type: "answer"; id: number; answer: Answer }
   | { type: "seed_reply"; id: number; seed: number; now: number }
   /** Farlook's text for a map square; answered with a "description" message of the same id. */
-  | { type: "describe"; id: number; x: number; y: number }
-  /** Asks a core of the worker's own what's wrong with an options file; answered with "config_checked". */
-  | { type: "check_config"; assetBase: string; config: string };
+  | { type: "describe"; id: number; x: number; y: number };

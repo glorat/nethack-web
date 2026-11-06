@@ -26,7 +26,7 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
 - [x] **Game Settings:** choices for the most common settings beside the options file, in one dialog (Game > Game Settings…, and on the home page). Effort M, benefit medium. Decided:
   - The file is the only place settings are kept. A choice rewrites its option where the file sets it, or adds a line at the end, and shows in the file as it changes; editing the file changes the choices. An option written in a way no choice matches shows as written.
   - Tutorial and Move with (`number_pad`) only, for now; more can be added to `src/port/game-settings.ts`.
-  - OK asks a core of its own, in a worker of its own, to read the file as a game would, and isn't kept while the core finds anything wrong, listed by line.
+  - OK has a core of its own, loaded on the page and then dropped, read the file as a new game would (`nhweb_check_config`, a call that returns the problems), and the file isn't kept while it finds anything wrong, listed by line.
   - The site's own settings, such as text size and tiles, stay on the View menu.
 - [ ] **Alerts for dangerous messages,** such as stoning, sliming, illness and lycanthropy ("You feel feverish"): coloured, and kept in view until dealt with. Effort M, benefit high.
   - Most of the work is a curated list of message patterns. Hallucination changes some wording.

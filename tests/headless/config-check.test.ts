@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, test } from "vitest";
 import { BASE_OPTIONS, configFile, OPTIONS_TEMPLATE } from "../../src/port/options";
-import { checkConfig, type CreateModule } from "../../src/worker/config-check";
+import { checkConfig, type CreateModule } from "../../src/config-check";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 

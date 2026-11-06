@@ -1,6 +1,5 @@
 import type {
   Answer,
-  ConfigProblem,
   GameEvent,
   GameRequest,
   ReplayControl,
@@ -43,7 +42,7 @@ export class GameClient {
         this.debugFiles.get(msg.id)?.({ files: msg.files, bones: msg.bones });
         this.debugFiles.delete(msg.id);
       } else if (msg.type === "seed_request") handlers.seedWanted?.(msg.id);
-      else if (msg.type !== "shadow_status" && msg.type !== "config_checked") handlers.replay?.(msg);
+      else if (msg.type !== "shadow_status") handlers.replay?.(msg);
     };
     this.worker.onerror = (ev) => handlers.events([{ type: "error", text: ev.message || "worker failed" }]);
   }
@@ -128,19 +127,4 @@ export class ShadowClient {
   stop(): void {
     this.worker.terminate();
   }
-}
-
-const CHECK_TIMEOUT_MS = 15_000;
-
-/** What the core says is wrong with an options file, from a worker of its own; null if it couldn't be asked. */
-export function checkConfig(assetBase: string, config: string): Promise<ConfigProblem[] | null> {
-  const worker = new Worker(new URL("./worker/worker.ts", import.meta.url), { type: "module" });
-  return new Promise<ConfigProblem[] | null>((resolve) => {
-    worker.onmessage = (ev: MessageEvent<WorkerMessage>) => {
-      if (ev.data.type === "config_checked") resolve(ev.data.problems);
-    };
-    worker.onerror = () => resolve(null);
-    setTimeout(() => resolve(null), CHECK_TIMEOUT_MS);
-    worker.postMessage({ type: "check_config", assetBase, config } satisfies UiMessage);
-  }).finally(() => worker.terminate());
 }

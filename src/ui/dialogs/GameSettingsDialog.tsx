@@ -1,8 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
-import { checkConfig } from "../../client";
+import { checkOptionsFile, type ConfigProblem } from "../../config-check";
 import { choose, chosen, GAME_SETTINGS } from "../../port/game-settings";
 import { BASE_OPTIONS, configFile } from "../../port/options";
-import type { ConfigProblem } from "../../protocol";
 
 interface Props {
   text: string;
@@ -35,10 +34,15 @@ export function GameSettingsDialog({ text, onDone }: Props) {
   // nothing can change or close the dialog while the core checks the file, so its answer is about what's shown
   const save = async () => {
     setChecking(true);
-    const found = await checkConfig(new URL(import.meta.env.BASE_URL, location.href).href, configFile(BASE_OPTIONS, value));
+    const found = await checkOptionsFile(new URL(import.meta.env.BASE_URL, location.href).href, configFile(BASE_OPTIONS, value)).catch(
+      (e) => {
+        // kept unchecked, as the core will say what's wrong at the start of the next game
+        console.warn("couldn't check the options file", e);
+        return [];
+      },
+    );
     setChecking(false);
-    // a file the core couldn't be asked about is kept, as the core will say what's wrong at the start of the next game
-    if (found?.length) {
+    if (found.length) {
       setProblems(found);
       requestAnimationFrame(() => problemList.current?.querySelector("button")?.focus());
       return;

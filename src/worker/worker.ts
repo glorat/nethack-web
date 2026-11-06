@@ -12,7 +12,6 @@ import { BonesDb } from "../offline/bones";
 import { Recorder } from "./recorder";
 import { resumeUnseen } from "./resume";
 import { describeSquare, type NetHackModule } from "./memory";
-import { checkConfig } from "./config-check";
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -385,17 +384,6 @@ self.onmessage = (ev: MessageEvent<UiMessage>) => {
     case "shadow_before":
     case "shadow_lines":
       followShadow(msg);
-      break;
-    case "check_config":
-      loadCore(msg.assetBase)
-        .then((createModule) => checkConfig(createModule, { locateFile: (path: string) => new URL(path, msg.assetBase).href }, msg.config))
-        .then(
-          (problems) => send({ type: "config_checked", problems }),
-          (e) => {
-            console.warn("couldn't check the options file", e);
-            send({ type: "config_checked", problems: null });
-          },
-        );
       break;
     case "debug_files": {
       const db = module && new BonesDb(module.FS);
