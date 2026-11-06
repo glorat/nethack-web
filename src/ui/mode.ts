@@ -31,4 +31,9 @@ export interface PageMode {
   closing(): void;
   /** Where a game that can't come back can start again instead. */
   newGameAddress(): string;
+  /** For a game that has just ended, its score as it comes, and how long that's expected to take; absent if it has none. */
+  score?(): { expectedMs: number; score: Promise<FinishedScore> } | null;
 }
+
+/** A finished game's score: the points and where to see the game, none because it couldn't be scored, or not yet. */
+export type FinishedScore = { kind: "scored"; points?: number; address: string } | { kind: "unscored" } | { kind: "later" };

@@ -165,7 +165,7 @@ test("a game swept during and after play can be rebuilt from its archive and rep
   const after = sweepAndRead(game);
   expect(after.recording).toBe(text);
   expect(after.finished).toBe(true);
-  expect(after.segments).toBe(2);
+  expect(after.segments).toBe(1);
 
   await page.evaluate((rebuilt) => localStorage.setItem("nethack.lastGame", rebuilt), after.recording);
   await page.goto("/offline/watch/");
@@ -480,6 +480,16 @@ test("a real game, reloaded, saved and restored, validates on the server's core 
   expect(validation!.resumes).toBeGreaterThanOrEqual(2);
 });
 
+test("a game just ended is scored at once, with a link to its page", async ({ page }) => {
+  await online(page);
+  await untilPlaying(page, `Sc${Date.now() % 100000}`);
+  await pass(page, 3);
+  const over = await endGame(page);
+  await expect(over.getByRole("progressbar", { name: "Working out your score" }).or(over.getByText(/You scored/))).toBeVisible();
+  await expect(over.getByText(/You scored \d+ points?\./)).toBeVisible({ timeout: 60_000 });
+  await expect(over.getByRole("link", { name: "See your game's page" })).toHaveAttribute("href", /\/g\/[A-Za-z0-9_-]{22}$/);
+});
+
 test("a real game that was cut back still validates, with the cut-back noted", async ({ page }) => {
   await online(page);
   await untilPlaying(page, `Vc${Date.now() % 100000}`);
@@ -652,21 +662,18 @@ test("an online game in another tab doesn't hold up an offline game coming back"
   await expect(offline.getByRole("dialog")).toHaveCount(0);
 });
 
-test("a finished online game is listed on the landing page, scored once validated, and can be watched", async ({ page }) => {
+test("a finished online game is listed on the landing page, scored as it ended, and can be watched", async ({ page }) => {
   await online(page);
   const name = `Fi${Date.now() % 100000}`;
   await untilPlaying(page, name);
   const game = await gameId(page);
   await pass(page, 2);
-  await quit(page);
+  const over = await endGame(page);
+  await expect(over.getByText(/You scored/)).toBeVisible({ timeout: 60_000 });
   await expect.poll(async () => (await stored(page, game)).map((b) => b.lines).join("\n"), { timeout: 10_000 }).toMatch(/\d+ end over/);
 
   await page.goto("/online/");
   const row = page.locator(".online-scores li", { hasText: name });
-  await expect(row).toContainText("score not ready yet", { timeout: 20_000 });
-
-  expect(sweepAndRead(game).result).toBeTruthy();
-  await page.reload();
   await expect(row).toContainText(/\(Val-\w+\): quit, turn \d+/, { timeout: 20_000 });
 
   await row.getByRole("link", { name: "Watch" }).click();
