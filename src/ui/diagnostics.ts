@@ -5,7 +5,7 @@ type Tap = {
   target: string;
   commandingAtDown: boolean;
   downDelay: number;
-  touchToMarkPaint?: number;
+  liftToMarkPaint?: number;
   pressMs?: number;
   movedPx?: number;
   cancelled?: boolean;
@@ -19,6 +19,7 @@ type Tap = {
   cursorChanges: number;
   events: { name: string; duration: number; inputDelay: number; processing: number; presentation: number }[];
   longTasks: number[];
+  scrolls: { after: number; what: string; dx: number; dy: number }[];
 };
 
 const MAX_TAPS = 60;
@@ -52,12 +53,11 @@ function onPointerDown(e: PointerEvent) {
     cursorChanges: 0,
     events: [],
     longTasks: [],
+    scrolls: [],
   };
   taps.push(current);
   if (taps.length > MAX_TAPS) taps.shift();
-  const tap = current;
-  const touched = e.timeStamp;
-  requestAnimationFrame(() => requestAnimationFrame(() => (tap.touchToMarkPaint = r(performance.now() - touched))));
+  for (const el of [document.querySelector(".map"), document.scrollingElement]) if (el) scrolled.set(el, { x: el.scrollLeft, y: el.scrollTop });
   update();
 }
 
@@ -66,6 +66,11 @@ function onPointerUp(e: PointerEvent) {
   current.pressMs = r(performance.now() - down.t);
   current.movedPx = r(Math.hypot(e.clientX - down.x, e.clientY - down.y));
   if (e.type === "pointercancel") current.cancelled = true;
+  else {
+    const tap = current;
+    const lifted = e.timeStamp;
+    requestAnimationFrame(() => requestAnimationFrame(() => (tap.liftToMarkPaint = r(performance.now() - lifted))));
+  }
   update();
 }
 
@@ -104,6 +109,27 @@ function watchDom() {
     update();
   }).observe(canvas, { attributes: true, attributeFilter: ["data-cursor"] });
   return true;
+}
+
+const scrolled = new WeakMap<object, { x: number; y: number }>();
+function onScroll(e: Event) {
+  const page = e.target === document;
+  const el = page ? document.scrollingElement : (e.target as Element);
+  if (!el) return;
+  const now = { x: el.scrollLeft, y: el.scrollTop };
+  const before = scrolled.get(el) ?? now;
+  scrolled.set(el, now);
+  const tap = current;
+  if (!tap || performance.now() - tap.at > 3000 || tap.scrolls.length >= 40) return;
+  tap.scrolls.push({ after: r(performance.now() - tap.at), what: page ? "page" : describeTarget(el), dx: r(now.x - before.x), dy: r(now.y - before.y) });
+  update();
+}
+
+function onViewportScroll() {
+  const v = visualViewport;
+  const tap = current;
+  if (!v || !tap || performance.now() - tap.at > 3000 || tap.scrolls.length >= 40) return;
+  tap.scrolls.push({ after: r(performance.now() - tap.at), what: "visualViewport", dx: r(v.offsetLeft), dy: r(v.offsetTop) });
 }
 
 function observePerformance() {
@@ -175,8 +201,9 @@ function update() {
     const mapTaps = taps.filter((t) => t.target === "map");
     const toMove = mapTaps.map((t) => t.toCursorPaint).filter((n): n is number => n !== undefined);
     const noClick = mapTaps.filter((t) => t.clickDelay === undefined).length;
-    const upToClick = taps.map((t) => t.upToClick).filter((n): n is number => n !== undefined);
-    summary.textContent = `map taps ${mapTaps.length} · move p50 ${median(toMove) ?? "-"} max ${toMove.length ? Math.max(...toMove) : "-"}ms · no click ${noClick} · up→click max ${upToClick.length ? Math.max(...upToClick) : "-"}ms · long tasks ${allLongTasks.length}`;
+    const stalls = taps.filter((t) => t.events.some((e) => e.duration >= 200));
+    const withScroll = stalls.filter((t) => t.scrolls.length).length;
+    summary.textContent = `map taps ${mapTaps.length} · move p50 ${median(toMove) ?? "-"} max ${toMove.length ? Math.max(...toMove) : "-"}ms · no click ${noClick} · stalls ${stalls.length} (scrolled ${withScroll})`;
   }, 250);
 }
 
@@ -215,6 +242,8 @@ export function startDiagnostics() {
   if (!diagnosticsWanted()) return;
   for (const type of ["pointerdown", "pointerup", "pointercancel"]) document.addEventListener(type, ((e: PointerEvent) => (type === "pointerdown" ? onPointerDown(e) : onPointerUp(e))) as EventListener, { capture: true });
   document.addEventListener("click", onClick, { capture: true });
+  document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+  visualViewport?.addEventListener("scroll", onViewportScroll);
   observePerformance();
 
   const bar = document.createElement("div");

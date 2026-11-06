@@ -197,9 +197,8 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
     if (at) onClick(at.x, at.y, CLICK_PRIMARY);
   };
 
-  // the move only comes once the finger lifts, so show at once that the tap landed
   const tapMark = useRef<HTMLDivElement>(null);
-  const pressed = (e: PointerEvent) => {
+  const tapped = (e: PointerEvent) => {
     const mark = tapMark.current;
     if (e.pointerType !== "touch" || !e.isPrimary || !mark) return;
     const at = square(e);
@@ -207,6 +206,8 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
     Object.assign(mark.style, { left: `${at.x * width}px`, top: `${at.y * height}px`, width: `${width}px`, height: `${height}px` });
     mark.classList.remove("released");
     mark.hidden = false;
+    // one frame at full strength, then the fade
+    requestAnimationFrame(() => requestAnimationFrame(() => mark.classList.add("released")));
   };
 
   const openMenu = (e: MouseEvent) => {
@@ -284,9 +285,7 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
           onContextMenu={openMenu}
           onMouseMove={move}
           onMouseLeave={cancelTooltip}
-          onPointerDown={pressed}
-          onPointerUp={() => tapMark.current?.classList.add("released")}
-          onPointerCancel={() => tapMark.current && (tapMark.current.hidden = true)}
+          onPointerUp={tapped}
         />
         <div class="tap-mark" ref={tapMark} hidden />
       </div>
