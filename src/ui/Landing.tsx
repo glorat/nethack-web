@@ -63,8 +63,9 @@ export function Landing() {
   const [signedOut] = useState(() => online && new URLSearchParams(location.search).has("signedout"));
   const [signOutFailed, setSignOutFailed] = useState(false);
   useEffect(() => {
-    // the note is for coming here from signing out, not for a reload later
-    if (new URLSearchParams(location.search).has("signedout")) history.replaceState(history.state, "", addressWithout("signedout"));
+    // these notes are for how the page was reached, not for a reload later
+    const params = new URLSearchParams(location.search);
+    if (params.has("signedout") || params.has("refused")) history.replaceState(history.state, "", addressWithout("signedout", "refused"));
   }, []);
   useEffect(() => {
     if (!finishing) return;
