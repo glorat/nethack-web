@@ -201,6 +201,7 @@ function environment() {
   const canvas = document.querySelector<HTMLCanvasElement>(".map canvas");
   const nav = navigator as Navigator & { deviceMemory?: number };
   return {
+    build: BUILD,
     ua: navigator.userAgent,
     dpr: devicePixelRatio,
     layoutViewport: `${innerWidth}x${innerHeight}`,
@@ -225,6 +226,8 @@ function report() {
   return JSON.stringify({ env: environment(), taps, longTasks: allLongTasks, slowFrames }, null, 0);
 }
 
+const BUILD = new URL(import.meta.url).pathname.split("/").pop()?.replace(/\.js$/, "") ?? "?";
+
 let summary: HTMLSpanElement;
 let scheduled = false;
 function update() {
@@ -237,7 +240,7 @@ function update() {
     const noClick = mapTaps.filter((t) => t.clickDelay === undefined).length;
     const stalls = taps.filter((t) => t.events.some((e) => e.duration >= 200));
     const withScroll = stalls.filter((t) => t.scrolls.length).length;
-    summary.textContent = `map taps ${mapTaps.length} · move p50 ${median(toMove) ?? "-"} max ${toMove.length ? Math.max(...toMove) : "-"}ms · no click ${noClick} · stalls ${stalls.length} (scrolled ${withScroll})`;
+    summary.textContent = `${BUILD} · map taps ${mapTaps.length} · move p50 ${median(toMove) ?? "-"} max ${toMove.length ? Math.max(...toMove) : "-"}ms · no click ${noClick} · stalls ${stalls.length} (scrolled ${withScroll})`;
   }, 250);
 }
 
