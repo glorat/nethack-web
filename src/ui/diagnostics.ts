@@ -5,6 +5,7 @@ type Tap = {
   target: string;
   commandingAtDown: boolean;
   downDelay: number;
+  touchToMarkPaint?: number;
   pressMs?: number;
   movedPx?: number;
   cancelled?: boolean;
@@ -54,6 +55,9 @@ function onPointerDown(e: PointerEvent) {
   };
   taps.push(current);
   if (taps.length > MAX_TAPS) taps.shift();
+  const tap = current;
+  const touched = e.timeStamp;
+  requestAnimationFrame(() => requestAnimationFrame(() => (tap.touchToMarkPaint = r(performance.now() - touched))));
   update();
 }
 
