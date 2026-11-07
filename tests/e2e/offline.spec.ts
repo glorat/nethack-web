@@ -56,4 +56,6 @@ test("a production build has each mode's pages, and its root only sends the visi
   const root = await (await page.request.get(PROD)).text();
   expect(root).not.toContain('id="app"');
   expect(root).toContain('property="og:image"');
+  // the post links to a home, not the root, so each needs its own preview
+  for (const home of ["offline/", "online/"]) expect(await (await page.request.get(`${PROD}${home}`)).text()).toContain('<meta property="og:image" content="https://nethack.app/social.jpg" />');
 });
