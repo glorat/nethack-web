@@ -68,6 +68,9 @@ test("bot plays a game", async () => {
       ]);
       if (reply.done) {
         stopped = true;
+        // a bot that registers SIGUSR1 (as AutoAscend's bridge does) says where it was stuck
+        bot.kill("SIGUSR1");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         break;
       }
       const action = JSON.parse(reply.value) as Action;
