@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { HANDLE_FORMAT, HANDLE_HINT, type Profile, requestNote } from "../account";
-import { askForHandle, loadProfile } from "../server/api";
+import { askForHandle, loadProfile, signInWithPassword } from "../server/api";
 
 interface AccountBarProps {
   profile: Profile | null;
@@ -118,6 +118,53 @@ export function HandlePrompt({ profile, onProfile }: { profile: Profile; onProfi
       {note ? <p role="alert">{note}</p> : null}
       {state === "awaiting" ? <p role="status">Checking your handle…</p> : null}
       {state === "failed" ? <p role="alert">Can't reach the server. Try again.</p> : null}
+    </form>
+  );
+}
+
+/** Sign-in by email and password, which only an address with `?password` shows. */
+export function PasswordSignIn({ profile, onSignOut }: { profile: Profile; onSignOut: () => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [state, setState] = useState<"ready" | "sending" | "failed">("ready");
+  if (profile.email) {
+    return (
+      <section class="frame password-sign-in">
+        <h2 class="frame-label">Verify your email</h2>
+        <p>Open the link sent to {profile.email}, then reload this page.</p>
+        <button type="button" onClick={onSignOut}>
+          Sign Out
+        </button>
+      </section>
+    );
+  }
+  const send = async () => {
+    setState("sending");
+    try {
+      await signInWithPassword(email, password);
+      location.reload();
+    } catch (e) {
+      console.warn("couldn't sign in", e);
+      setState("failed");
+    }
+  };
+  return (
+    <form
+      class="frame password-sign-in"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (state !== "sending") void send();
+      }}
+    >
+      <h2 class="frame-label">Sign in with a password</h2>
+      <label for="password-email">Email</label>
+      <input id="password-email" type="email" required autoComplete="username" value={email} onInput={(e) => setEmail((e.target as HTMLInputElement).value)} />
+      <label for="password">Password</label>
+      <input id="password" type="password" required minLength={6} autoComplete="current-password" value={password} onInput={(e) => setPassword((e.target as HTMLInputElement).value)} />
+      <button type="submit" class="primary" disabled={state === "sending"}>
+        Sign In
+      </button>
+      {state === "failed" ? <p role="alert">Couldn't sign in. Check the email and password, and try again.</p> : null}
     </form>
   );
 }

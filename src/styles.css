@@ -396,9 +396,9 @@ a.landing-title { text-decoration: none; }
 .account-popup hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
 .account-popup [role="menuitem"] { width: 100%; background: none; border: none; padding: 4px 10px; text-align: left; }
 .account-popup [role="menuitem"]:hover, .account-popup [role="menuitem"]:focus-visible { background: var(--menu-hover); color: var(--on-menu-hover); }
-.handle-prompt { display: flex; flex-direction: column; gap: 8px; }
+.handle-prompt, .password-sign-in { display: flex; flex-direction: column; gap: 8px; }
 .handle-prompt small { color: var(--muted); }
-.handle-prompt button { align-self: flex-start; }
+.handle-prompt button, .password-sign-in button { align-self: flex-start; }
 .landing-main { display: grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); gap: 28px; align-items: start; max-width: 1120px; margin: 0 auto; padding: 32px 16px; }
 .landing-col { display: grid; gap: 28px; align-content: start; min-width: 0; }
 .finished-games { grid-column: 1 / -1; }
@@ -517,7 +517,7 @@ button[aria-disabled="true"] { opacity: 0.5; cursor: default; }
   .landing-main { display: flex; flex-direction: column; align-items: stretch; gap: 28px; }
   .landing-col { display: contents; }
   .landing-main > .landing-col > * { order: 2; }
-  .landing-main .handle-prompt { order: 0; }
+  .landing-main .handle-prompt, .landing-main .password-sign-in { order: 0; }
   .landing-main .start-frame { order: 0; }
   .landing-main .scene-frame { order: 1; }
   .landing-main .finished-games { order: 2; }

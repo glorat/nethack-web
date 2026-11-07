@@ -82,6 +82,8 @@ export const signInWithGoogle = async (): Promise<void> => (await server()).sign
 
 export const finishSignIn = async (): Promise<boolean> => (await server()).finishSignIn();
 
+export const signInWithPassword = async (email: string, password: string): Promise<void> => (await server()).signInWithPassword(email, password);
+
 export const signOut = async (): Promise<void> => (await server()).signOut();
 
 /** Asks for a handle, which the server grants or not in its own time; the profile says which. */
