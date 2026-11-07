@@ -93,7 +93,7 @@ export function OnlineChoice({ name, onBack }: { name: string; onBack: () => voi
         Back
       </button>
       {/* below the buttons, as it arrives late and mustn't move them */}
-      {signedIn === false ? <p class="start-sub">Until you sign in, your online games are kept for this browser only, and clearing this site's data loses them.</p> : null}
+      {signedIn === false ? <p class="start-sub">Until you sign in, your games are kept for this browser only, and clearing this site's data loses them.</p> : null}
     </div>
   );
 }

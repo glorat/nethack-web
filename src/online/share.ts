@@ -3,6 +3,7 @@
 
 import { alignmentName, ascended, characterName } from "../port/xlog";
 import { tombstone } from "../port/tombstone";
+import { PITCH } from "../port/pitch";
 import { shortId } from "./game-id";
 import { type Chapter, chaptersOf } from "./story";
 import type { GameResult } from "./results";
@@ -102,8 +103,6 @@ h2 { font: 600 12px ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-
 @media (max-width: 640px) { .hero, .story { grid-template-columns: 1fr; } pre { font-size: 12px; } dl div { border-right: 0; border-bottom: 1px solid var(--border); } }
 `;
 
-const SITE_DESCRIPTION = "The classic dungeon crawl in your browser: online with high scores, or offline on your device.";
-
 interface Head {
   title: string;
   description: string;
@@ -141,7 +140,7 @@ ${meta("name", "twitter:card", "summary_large_image")}
 </head>
 <body>
 <main>
-<header><a href="/">NetHack</a><span>Online games</span></header>
+<header><a href="/">nethack.app</a><span>Online games</span></header>
 ${body}
 </main>
 </body>
@@ -177,7 +176,7 @@ export function sharePage(origin: string, id: string, g: PublicGame | null, stor
   const url = `${origin}/g/${id}`;
   if (!g) {
     return page(
-      { title: "NetHack in your browser", description: SITE_DESCRIPTION, url, image: `${origin}/social.jpg`, imageAlt: "NetHack played in a browser", themeColor: "#3b82f6" },
+      { title: "NetHack in your browser", description: PITCH, url, image: `${origin}/social.jpg`, imageAlt: "NetHack played in a browser", themeColor: "#3b82f6" },
       `<div><h1>This game can't be shown</h1><p>If it finished just now, its score may not be ready yet, so try again in a few minutes. Otherwise, check the link.</p></div>\n${play}`,
     );
   }

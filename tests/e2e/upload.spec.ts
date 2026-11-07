@@ -575,7 +575,7 @@ test("starting an online game says what a dropped connection costs, and what not
   await page.getByRole("button", { name: "Play Online" }).click();
   await page.getByRole("button", { name: /^Start New Game/ }).waitFor();
   await expect(page.getByText("If your connection drops, you may lose your last few moves.")).toBeVisible();
-  await expect(page.getByText("Until you sign in, your online games are kept for this browser only, and clearing this site's data loses them.")).toBeVisible();
+  await expect(page.getByText("Until you sign in, your games are kept for this browser only, and clearing this site's data loses them.")).toBeVisible();
 });
 
 test("a long name fits on a phone", async ({ page }) => {
@@ -717,7 +717,8 @@ test("signing in keeps the anonymous player's games, and the name they chose", a
 
   await page.goto("/online/");
   await signInWithGoogle(page, `${crypto.randomUUID()}@example.com`);
-  await expect(page.locator(".landing-bar .account")).toHaveText("Signed in");
+  await expect(page.locator(".landing-bar .account")).toHaveText("Signed In");
+  await expect(page.locator(".start-sub")).not.toContainText("Sign in");
   const handle = `Hd${crypto.randomUUID().slice(0, 8).replaceAll("-", "")}`;
   await page.getByLabel("Handle").fill(handle);
   await page.getByRole("button", { name: "Request Handle" }).click();
@@ -778,7 +779,7 @@ test("signing out comes home as a new player, and signing in again brings the ac
 
   await account.click();
   await Promise.all([page.waitForEvent("load"), page.getByRole("menuitem", { name: "Sign Out" }).click()]);
-  await expect(page.getByRole("status")).toHaveText("You're signed out. Your online games and handle are kept for when you sign in again.");
+  await expect(page.getByRole("status")).toHaveText("You're signed out. Your games and handle are kept for when you sign in again.");
   await expect(page.getByRole("button", { name: "Sign In with Google" })).toBeVisible();
   await expect.poll(() => new URL(page.url()).searchParams.has("signedout")).toBe(false);
 
@@ -791,7 +792,7 @@ test("signing in to an account that's already someone's shows that account's fin
   const email = `${crypto.randomUUID()}@example.com`;
   await page.goto("/online/");
   await signInWithGoogle(page, email);
-  await expect(page.locator(".landing-bar .account")).toHaveText("Signed in", { timeout: 20_000 });
+  await expect(page.locator(".landing-bar .account")).toHaveText("Signed In", { timeout: 20_000 });
   await page.locator(".landing-bar .account").click();
   await Promise.all([page.waitForEvent("load"), page.getByRole("menuitem", { name: "Sign Out" }).click()]);
 
@@ -806,7 +807,7 @@ test("signing in to an account that's already someone's shows that account's fin
   await expect(theirs).toBeVisible({ timeout: 20_000 });
 
   await signInWithGoogle(page, email, true);
-  await expect(page.locator(".landing-bar .account")).toHaveText("Signed in", { timeout: 20_000 });
+  await expect(page.locator(".landing-bar .account")).toHaveText("Signed In", { timeout: 20_000 });
   await page.waitForTimeout(2000);
   await expect(theirs).toHaveCount(0);
 });
