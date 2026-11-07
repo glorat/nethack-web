@@ -54,7 +54,7 @@ jobs:
 
       - run: pnpm test
 
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright install --only-shell chromium
 
       - run: pnpm run test:e2e
 
