@@ -1,23 +1,33 @@
 :root {
-  /* the landing page's warm dungeon, in the game's lighter greys */
-  --bg: #1c1814;
-  --panel: #241f1a;
-  --panel-2: #2c261f;
-  --border: #42392e;
-  --text: #ebe3d6;
-  --muted: #a2967f;
-  --accent: #e8a33a;
-  /* text on the accent, which is too light for white */
-  --on-accent: #1b1206;
-  --selected: #4a3a1c;
-  --hover: #352d24;
-  --field: #15120f;
+  --bg: #1e1e1e;
+  --panel: #262626;
+  --panel-2: #2e2e2e;
+  --border: #3a3a3a;
+  --text: #e6e6e6;
+  --muted: #9a9a9a;
+  /* the game's colour for what's chosen and what has focus; the landing page has amber instead */
+  --accent: #3b82f6;
+  --on-accent: #fff;
+  --selected: #23395d;
+  --hover: #333;
+  --field: #161616;
+  --slot: #3a3a3a;
+  --border-hover: #555;
+  --badge: #444;
+  /* what the accent does, so a page can give each role its own colour */
+  --action: var(--accent);
+  --on-action: var(--on-accent);
+  --link: var(--accent);
+  --label: var(--accent);
+  --focus: var(--accent);
+  --menu-hover: var(--accent);
+  --on-menu-hover: var(--on-accent);
   /* offline's own colours, so the two modes never look alike */
   --offline: #8a7d63;
   --offline-bar: #34312b;
   --hp: #3fb950;
   --pw: #4c8dff;
-  --danger: #d9573f;
+  --danger: #e5534b;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   /* the text size chosen in the View keys or font_size_message, over the 13px the sizes here are drawn at */
@@ -45,8 +55,8 @@ button {
   padding: 4px 12px;
   cursor: pointer;
 }
-button:hover:not(:disabled) { border-color: #6a5c48; }
-button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+button:hover:not(:disabled) { border-color: var(--border-hover); }
+button.primary { background: var(--action); border-color: var(--action); color: var(--on-action); }
 button:disabled { opacity: 0.5; cursor: default; }
 
 input {
@@ -57,7 +67,7 @@ input {
   border-radius: 6px;
   padding: 6px 8px;
 }
-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 
 /* layout: stats, equipment and messages across the top, map below, inventory on the right */
 .app { display: flex; flex-direction: column; height: 100%; }
@@ -76,7 +86,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 .menubar-list button { display: flex; justify-content: space-between; gap: 24px; background: none; border: none; padding: 4px 10px; border-radius: 4px; text-align: left; }
-.menubar-list button:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
+.menubar-list button:hover:not(:disabled) { background: var(--menu-hover); color: var(--on-menu-hover); }
 .menubar-list hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
 .menubar-key { color: var(--muted); font-family: var(--mono); }
 .menubar-check { display: inline-block; width: 16px; }
@@ -106,7 +116,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .quick-key { margin-left: 6px; font-family: var(--mono); font-size: 0.85em; color: var(--muted); }
 .map-zoom button { width: 28px; padding: 2px 0; opacity: 0.8; }
 .map-zoom .ascii-toggle { width: auto; padding: 2px 8px; }
-.map-zoom .ascii-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.map-zoom .ascii-toggle[aria-pressed="true"] { background: var(--action); border-color: var(--action); color: var(--on-action); }
 .tooltip {
   position: fixed; z-index: 5; pointer-events: none; max-width: 320px;
   background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
@@ -162,7 +172,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 /* Cocoa's: grey, then yellow, orange and red as it gets worse, darkened for white text to read */
 .badge { font-size: calc(11px * var(--text-scale)); font-weight: 600; padding: 0 6px; border-radius: 8px; }
-.badge.info { background: #4a4238; color: var(--text); }
+.badge.info { background: var(--badge); color: var(--text); }
 .badge.caution { background: #f5c518; color: #000; }
 .badge.warning { background: #c2410c; color: #fff; }
 .badge.danger { background: #c0392b; color: #fff; }
@@ -197,7 +207,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 }
 .equip-slot {
   width: 32px; height: 32px; padding: 0; border-radius: 3px;
-  background-color: #3a332b; background-repeat: no-repeat;
+  background-color: var(--slot); background-repeat: no-repeat;
   image-rendering: auto;
 }
 .equip-slot:disabled { opacity: 1; }
@@ -258,7 +268,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .settings-dialog .hint { margin-right: auto; font-size: 12px; }
 .about-dialog { width: min(480px, 92vw); }
 .about-dialog p { margin: 0; line-height: 1.45; }
-.about-dialog a { color: var(--accent); }
+.about-dialog a { color: var(--link); }
 .font-choice { display: flex; gap: 8px; }
 .font-choice select:first-child { flex: 1; }
 .font-sample { font: bold 18px var(--mono); background: #000; color: #bfbfbf; padding: 10px; border-radius: 6px; white-space: pre; overflow: hidden; }
@@ -338,25 +348,30 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
 /* landing page: its own darker dungeon, labelled frames, and the terminal faces */
 .landing {
-  --bg: #0e0b08; --frame: #43392c; --text: #d6cdbd; --bright: #fbf3e4; --muted: #958a78; --danger: #e0603f; --online: #5fb8c0;
+  --bg: #0b0b0c; --frame: #3a3a3e; --text: #cfcfcc; --bright: #fafafa; --muted: #8e8e8a; --danger: #e0603f; --online: #5fb8c0;
+  --field-border: #55555a; --rule: #2a2a2d; --rule-strong: #1f1f22; --earned: #4f6b3c; --field: #121213;
+  /* amber here is nethack.app's own colour; a cool one in the game recedes, and amber there would read as a warning */
+  --accent: #e8a33a; --on-accent: #1b1206;
+  --action: var(--accent); --on-action: var(--on-accent); --link: var(--accent); --label: var(--accent); --focus: var(--accent);
+  --menu-hover: var(--accent); --on-menu-hover: var(--on-accent); --mark-offline: var(--accent);
   --display: "VT323", var(--mono); --type: "IBM Plex Mono", var(--mono);
   height: 100%; overflow-y: auto; background: var(--bg); color: var(--text); font: 14px/1.5 var(--type);
 }
-.landing a { color: var(--accent); }
+.landing a { color: var(--link); }
 .landing button { border-radius: 0; }
-.landing input { background: var(--field); border: 1px solid #5a4d3b; border-radius: 0; color: var(--bright); padding: 8px 12px; }
-.landing kbd { font: 12.5px var(--type); padding: 0 4px; border: 1px solid #5a4d3b; color: var(--bright); }
+.landing input { background: var(--field); border: 1px solid var(--field-border); border-radius: 0; color: var(--bright); padding: 8px 12px; }
+.landing kbd { font: 12.5px var(--type); padding: 0 4px; border: 1px solid var(--field-border); color: var(--bright); }
 .hotkey { text-decoration: underline; text-underline-offset: 3px; }
-.landing-bar { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: baseline; justify-content: space-between; padding: 12px max(16px, calc((100% - 1088px) / 2)); border-bottom: 1px solid #241e17; }
+.landing-bar { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: baseline; justify-content: space-between; padding: 12px max(16px, calc((100% - 1088px) / 2)); border-bottom: 1px solid var(--rule-strong); }
 .landing-title { display: flex; gap: 14px; align-items: baseline; font: 28px/1 var(--display, var(--mono)); color: var(--bright, var(--text)); }
 a.landing-title { text-decoration: none; }
-.mode-badge { font: 19px/1 var(--display); color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; }
+.mode-badge { font: 19px/1 var(--display); color: var(--mark-offline); text-transform: uppercase; letter-spacing: 0.08em; }
 .mode-badge.online { color: var(--online); }
 .landing-bar-end { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; gap: 4px 18px; }
 .landing-bar-end > * { white-space: nowrap; }
 .landing-bar .mode-switch, .bar-link, .landing .account { padding: 0; background: none; border: none; color: var(--text); font: inherit; text-decoration: none; cursor: pointer; }
 .landing-bar .mode-switch:hover, .bar-link:hover, .landing .account:hover { color: var(--bright); }
-.mode-switch { color: var(--accent); white-space: nowrap; }
+.mode-switch { color: var(--link); white-space: nowrap; }
 /* in the page's flow, unlike the game's toast, so it never covers the bar's way out */
 .landing-note { margin: 16px max(16px, calc((100% - 1088px) / 2)) 0; padding: 8px 12px; border: 1px solid var(--frame); }
 .landing-note .mode-switch { margin-left: 8px; }
@@ -370,7 +385,7 @@ a.landing-title { text-decoration: none; }
 .account-who span { color: var(--muted); overflow-wrap: anywhere; }
 .account-popup hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
 .account-popup [role="menuitem"] { width: 100%; background: none; border: none; padding: 4px 10px; text-align: left; }
-.account-popup [role="menuitem"]:hover, .account-popup [role="menuitem"]:focus-visible { background: var(--accent); color: var(--on-accent); }
+.account-popup [role="menuitem"]:hover, .account-popup [role="menuitem"]:focus-visible { background: var(--menu-hover); color: var(--on-menu-hover); }
 .handle-prompt { display: flex; flex-direction: column; gap: 8px; }
 .handle-prompt small { color: var(--muted); }
 .handle-prompt button { align-self: flex-start; }
@@ -379,13 +394,13 @@ a.landing-title { text-decoration: none; }
 
 /* a frame with its label set into the top line */
 .frame { position: relative; margin: 0; padding: 22px 16px 16px; border: 1px solid var(--frame); min-width: 0; }
-.frame-label { position: absolute; top: 0; left: 12px; transform: translateY(-50%); margin: 0; padding: 0 6px; background: var(--bg); color: var(--accent); font: 400 20px/1 var(--display); letter-spacing: 0.04em; }
+.frame-label { position: absolute; top: 0; left: 12px; transform: translateY(-50%); margin: 0; padding: 0 6px; background: var(--bg); color: var(--label); font: 400 20px/1 var(--display); letter-spacing: 0.04em; }
 .frame p { margin: 8px 0 0; }
 .frame ul { margin: 0; padding-left: 18px; }
 .frame li + li { margin-top: 4px; }
 details.frame > summary { list-style: none; cursor: pointer; min-height: 4px; }
 details.frame > summary:focus-visible { outline: none; }
-details.frame > summary:focus-visible .frame-label { outline: 2px solid var(--accent); outline-offset: 2px; }
+details.frame > summary:focus-visible .frame-label { outline: 2px solid var(--focus); outline-offset: 2px; }
 details.frame > summary::-webkit-details-marker { display: none; }
 details.frame:not([open]) { padding-bottom: 6px; }
 .landing-help .frame-label::after { content: " +" / ""; }
@@ -397,7 +412,7 @@ details.frame:not([open]) { padding-bottom: 6px; }
 .start-card label { color: var(--muted); font-size: 12.5px; }
 .start-buttons { display: flex; flex-wrap: wrap; gap: 12px; }
 .landing button.primary { padding: 8px 22px; font-weight: 600; }
-.start-buttons button:not(.primary) { padding: 8px 18px; background: none; border-color: #5a4d3b; }
+.start-buttons button:not(.primary) { padding: 8px 18px; background: none; border-color: var(--field-border); }
 .start-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .start-links button { padding: 4px 0; background: none; border: none; color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; }
 .start-links button:hover { color: var(--text); }
@@ -408,10 +423,10 @@ details.frame:not([open]) { padding-bottom: 6px; }
 .scene-frame { padding: 0; }
 .scene-messages { padding: 24px 16px 10px; font-size: 13px; }
 .scene-messages p { margin: 0; }
-.scene-map { display: flex; justify-content: center; padding: 16px; border-top: 1px dashed #2e271e; border-bottom: 1px dashed #2e271e; overflow: hidden; }
+.scene-map { display: flex; justify-content: center; padding: 16px; border-top: 1px dashed var(--rule); border-bottom: 1px dashed var(--rule); overflow: hidden; }
 .scene { --square: clamp(22px, 4vw, 48px); position: relative; display: grid; grid-template-columns: repeat(10, var(--square)); }
 .scene > span:not(.scene-note) { width: var(--square); height: var(--square); background-size: calc(var(--square) * 40) auto; background-repeat: no-repeat; }
-.scene-note { position: absolute; z-index: 1; transform: translate(-50%, -100%); margin-top: -4px; padding: 2px 7px; border: 1px solid var(--accent); background: rgba(14, 11, 8, 0.92); color: var(--bright); font-size: 12px; line-height: 1.25; white-space: nowrap; }
+.scene-note { position: absolute; z-index: 1; transform: translate(-50%, -100%); margin-top: -4px; padding: 2px 7px; border: 1px solid var(--label); background: color-mix(in srgb, var(--bg) 92%, transparent); color: var(--bright); font-size: 12px; line-height: 1.25; white-space: nowrap; }
 .scene-note.below { transform: translate(-50%, 0); margin-top: 4px; }
 /* too small a room for its notes, which the room's description carries for screen readers anyway */
 @media (max-width: 640px) { .scene-note { display: none; } }
@@ -419,10 +434,10 @@ details.frame:not([open]) { padding-bottom: 6px; }
 
 .grave { margin: 4px 0 8px; font: 10.5px/1.2 var(--type); color: var(--text); overflow-x: auto; }
 .landing-device h3 { margin: 8px 0 4px; color: var(--muted); font: 600 12px var(--type); }
-.landing-device a { color: var(--accent); }
-.landing-footer { max-width: 1120px; margin: 0 auto; padding: 16px 16px 28px; border-top: 1px solid #241e17; color: var(--muted); font-size: 12px; }
+.landing-device a { color: var(--link); }
+.landing-footer { max-width: 1120px; margin: 0 auto; padding: 16px 16px 28px; border-top: 1px solid var(--rule-strong); color: var(--muted); font-size: 12px; }
 .landing-footer p { margin: 4px 0; }
-.landing-footer a { color: var(--accent); }
+.landing-footer a { color: var(--link); }
 .device-scores { list-style: none; margin: 0 0 8px; padding: 0; font-size: 13px; }
 .device-scores li { display: grid; grid-template-columns: 6em 1fr auto; gap: 8px; padding: 3px 0; overflow-wrap: anywhere; }
 .device-scores strong { font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -453,26 +468,26 @@ button[aria-disabled="true"] { opacity: 0.5; cursor: default; }
 .achievements li { display: flex; flex-direction: column; gap: 2px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }
 .landing .achievements li { border-color: var(--frame); border-radius: 0; }
 .achievements .earned { border-color: var(--hp); }
-.landing .achievements .earned { border-color: #4f6b3c; }
+.landing .achievements .earned { border-color: var(--earned); }
 .achievements .locked strong, .achievements .locked span { color: var(--muted); }
 .achievements small { color: var(--muted); }
 .achievement-progress { display: block; width: 100%; height: 6px; margin: 0 0 12px; accent-color: var(--hp); }
-.link-button { margin-top: 12px; padding: 0; background: none; border: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+.link-button { margin-top: 12px; padding: 0; background: none; border: none; color: var(--link); font: inherit; text-decoration: underline; cursor: pointer; }
 .achievements-dialog { width: min(720px, 92vw); }
 .achievements-groups { overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
 .achievements-groups h3 { margin: 0 0 8px; font-size: 14px; }
 .achievements-groups h3 small { color: var(--muted); font-weight: normal; }
 .achievements-groups .achievements { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(14em, 1fr)); gap: 8px; }
 .achievements-groups .hint { margin: 0; }
-.achievements a { color: var(--accent); }
+.achievements a { color: var(--link); }
 .legal { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; font: 14px/1.55 var(--font); }
 .legal h1 { margin: 0; font-size: 24px; }
 .legal h2 { margin: 24px 0 4px; font-size: 16px; }
 .legal p, .legal ul { margin: 8px 0; }
 .legal li + li { margin-top: 4px; }
-.legal a { color: var(--accent); }
+.legal a { color: var(--link); }
 .legal-date { color: var(--muted); }
-.online-notice a { color: var(--accent); }
+.online-notice a { color: var(--link); }
 
 /* start screen */
 .start, .loading, .fatal { height: 100%; display: flex; align-items: center; justify-content: center; }
