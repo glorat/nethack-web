@@ -122,7 +122,7 @@ export function HandlePrompt({ profile, onProfile }: { profile: Profile; onProfi
   );
 }
 
-/** Sign-in by email and password, which only an address with `?password` shows. */
+/** Sign-in by email and password, for a player not yet signed in. */
 export function PasswordSignIn({ profile, onSignOut }: { profile: Profile; onSignOut: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
