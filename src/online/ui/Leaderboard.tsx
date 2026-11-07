@@ -13,10 +13,18 @@ export function Leaderboard({ reload }: { reload: number }) {
   }, [reload]);
   if (!entries) return null;
   return (
-    <section class="landing-panel landing-device secondary">
-      <h2>Online high scores</h2>
+    <section class="frame landing-device" aria-labelledby="high-scores">
+      <h2 class="frame-label" id="high-scores">
+        Online high scores
+      </h2>
       {entries.length ? (
-        <ol class="device-scores leaderboard">
+        <>
+          <div class="leaderboard-head" aria-hidden="true">
+            <small>No</small>
+            <small>Points</small>
+            <small>Name</small>
+          </div>
+          <ol class="device-scores leaderboard">
           {entries.map((entry, i) => (
             <li key={i} class={[ascended(entry.result) && "ascended", entry.yours && "yours"].filter(Boolean).join(" ") || undefined}>
               <small>{i + 1}</small>
@@ -28,7 +36,8 @@ export function Leaderboard({ reload }: { reload: number }) {
               <small>{entry.endedAt !== undefined ? endedOn(entry.endedAt) : null}</small>
             </li>
           ))}
-        </ol>
+          </ol>
+        </>
       ) : (
         <p>No online games have been scored yet.</p>
       )}

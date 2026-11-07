@@ -158,7 +158,7 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
       finished: (text) => {
         send({ type: "events", events: [{ type: "recording", text }] });
         const scores = mode.scores(m);
-        if (scores !== null) send({ type: "events", events: [{ type: "scores", text: scores }] });
+        if (scores !== null) send({ type: "events", events: [{ type: "scores", text: scores.record, last: scores.last ?? undefined }] });
       },
       resume: replayFailed || !mode.keptHere ? undefined : resume,
       recording: mode.recording || undefined,

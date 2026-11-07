@@ -43,3 +43,39 @@ export function savedScores(): Score[] {
     return [];
   }
 }
+
+const LAST_KEY = "nethack-web.lastEnding";
+
+/** The latest game to score, from its line in the core's game log. */
+export interface Ending {
+  name: string;
+  points: number;
+  death: string;
+  /** As the core writes it, YYYYMMDD. */
+  date: number;
+}
+
+/** A line of the core's xlogfile: tab-separated fields of the form name=value. */
+export function parseEnding(line: string): Ending | null {
+  const fields = new Map(line.split("\t").map((f) => [f.slice(0, f.indexOf("=")), f.slice(f.indexOf("=") + 1)] as const));
+  const name = fields.get("name");
+  const points = Number(fields.get("points"));
+  const date = Number(fields.get("deathdate"));
+  if (!name || !Number.isFinite(points) || !Number.isFinite(date)) return null;
+  return { name, points, death: fields.get("death") ?? "", date };
+}
+
+export function keepLastEnding(line: string): void {
+  try {
+    localStorage.setItem(LAST_KEY, line);
+  } catch {}
+}
+
+export function lastEnding(): Ending | null {
+  try {
+    const line = localStorage.getItem(LAST_KEY);
+    return line ? parseEnding(line) : null;
+  } catch {
+    return null;
+  }
+}

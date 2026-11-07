@@ -19,6 +19,6 @@ export interface WorkerMode {
   bones(files: Files): (hash: string) => Uint8Array | undefined;
   /** Puts what a replay left of the game named in the /save of the core that carries on. */
   place(m: NetHackModule, name: string, files: Map<string, Uint8Array>): void;
-  /** The high score file a finished game left, if it's for the page to keep. */
-  scores(m: NetHackModule): string | null;
+  /** The high score file a finished game left, and the game log's last line, if they're for the page to keep. */
+  scores(m: NetHackModule): { record: string; last: string | null } | null;
 }

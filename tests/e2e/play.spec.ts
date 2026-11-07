@@ -163,9 +163,9 @@ test("the landing page opens without loading the game, and Back returns to it fr
   const core: string[] = [];
   page.on("request", (r) => /nethack\.(js|wasm)/.test(r.url()) && core.push(r.url()));
   await page.goto("/offline/");
-  await expect(page.getByRole("heading", { name: "NetHack", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome to NetHack!", exact: true })).toBeVisible();
   await expect(page.getByText(/unofficial web port/)).toBeVisible();
-  await expect(page.locator(".landing-shot")).toHaveJSProperty("complete", true);
+  await expect(page.getByRole("img", { name: /A room on the first level/ })).toBeVisible();
   expect(core).toEqual([]);
 
   for (const asset of ["/favicon.png", "/apple-touch-icon.png", "/social.jpg"]) expect((await page.request.get(asset)).ok()).toBe(true);
@@ -207,7 +207,7 @@ test("the site's root opens online the first time, then whichever mode was visit
 
 test("Go Offline and Go Online move between the two homes, and Back returns", async ({ page }) => {
   await page.goto("/online/");
-  await expect(page.locator(".mode-badge")).toHaveCount(0);
+  await expect(page.locator(".mode-badge")).toHaveText("Online");
   await expect(page.locator(".start-sub")).toContainText("count for the high scores");
   await page.locator(".landing-bar").getByRole("link", { name: "Go Offline" }).click();
   await expect(page).toHaveURL(/\/offline\/$/);
@@ -1644,6 +1644,34 @@ test("when the game ends, a dialog offers a new game under the same name, or the
   expect(new URL(page.url()).pathname).toBe("/offline/watch/");
 });
 
+test("the landing page's marked letters work as keys, but not while typing a name, and Enter with nothing focused plays", async ({ page }) => {
+  await page.goto("/offline/");
+  await page.evaluate(() => localStorage.setItem("nethack-web.name", "Keys"));
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Play Offline as Keys" })).toBeVisible();
+  await page.keyboard.press("s");
+  const settings = page.getByRole("dialog", { name: "Game Settings" });
+  await expect(settings).toBeVisible();
+  await settings.getByRole("button", { name: "Cancel" }).click();
+  await page.keyboard.press("a");
+  await expect(page.getByRole("dialog", { name: /About/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "Change Name" }).click();
+  await page.getByLabel("Who are you?").fill("");
+  await page.keyboard.type("gasp");
+  await expect(page.getByLabel("Who are you?")).toHaveValue("gasp");
+  await expect(page).toHaveURL(/\/offline\/$/);
+
+  await page.getByLabel("Who are you?").blur();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: "Choose your character" })).toBeVisible({ timeout: 15_000 });
+  await page.goBack();
+  await expect(page.getByRole("button", { name: /Offline as gasp$/ })).toBeVisible();
+  await page.keyboard.press("g");
+  await expect(page).toHaveURL(/\/online\/$/);
+});
+
 test("the help for new players is open for a new visitor, and folded away once they've played", async ({ page }) => {
   await page.goto("/offline/");
   const help = page.locator("details", { has: page.getByRole("heading", { name: "New to NetHack?" }) });
@@ -1669,8 +1697,9 @@ test("a saved game is what the landing page offers first, and a new visitor sees
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
 });
 
-test("the high score file a finished game leaves shows on the landing page", async ({ page }) => {
-  await startGame(page, `Best${Date.now() % 100000}`);
+test("the high score file and game log a finished game leaves show on the landing page, the latest game as a tombstone", async ({ page }) => {
+  const name = `Best${Date.now() % 100000}`;
+  await startGame(page, name);
   const quit = async () => {
     await page.keyboard.press("#");
     await page.keyboard.type("quit");
@@ -1681,22 +1710,32 @@ test("the high score file a finished game leaves shows on the landing page", asy
   await quit();
   // a fresh hero scores nothing, which the core wouldn't list, so the file gets an earlier game's line
   await page.evaluate(
-    (line) =>
-      new Promise((resolve, reject) => {
-        const open = indexedDB.open("/save");
-        open.onsuccess = () => {
-          const contents = new TextEncoder().encode(line);
-          const put = open.result.transaction("FILE_DATA", "readwrite").objectStore("FILE_DATA").put({ timestamp: new Date(), mode: 33188, contents }, "/save/record");
-          put.onsuccess = resolve;
-          put.onerror = reject;
-        };
-      }),
-    "5.0.0 1234 0 3 3 0 16 1 20261102 20261101 0 Val Hum Fem Law Agnes,killed by a newt\n",
+    (files) =>
+      Promise.all(
+        Object.entries(files).map(
+          ([file, line]) =>
+            new Promise((resolve, reject) => {
+              const open = indexedDB.open("/save");
+              open.onsuccess = () => {
+                const contents = new TextEncoder().encode(line);
+                const put = open.result.transaction("FILE_DATA", "readwrite").objectStore("FILE_DATA").put({ timestamp: new Date(), mode: 33188, contents }, `/save/${file}`);
+                put.onsuccess = resolve;
+                put.onerror = reject;
+              };
+            }),
+        ),
+      ),
+    {
+      record: "5.0.0 1234 0 3 3 0 16 1 20261102 20261101 0 Val Hum Fem Law Agnes,killed by a newt\n",
+    },
   );
   await page.keyboard.press("Enter");
   await untilPlaying(page);
   await quit();
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("heading", { name: "Your last game" })).toBeVisible();
+  // though the core logs it, as it doesn't list it
+  await expect(page.getByRole("img", { name: new RegExp(`^${name}, 0 points, quit, \\d{4}$`) })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Your best games on this device" })).toBeVisible();
   await expect(page.locator(".device-scores li")).toContainText("Agnes (Val-Hum): killed by a newt");
 });

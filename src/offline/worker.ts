@@ -14,12 +14,17 @@ export function offlineWorker(choice: Exclude<AuthorityChoice, { kind: "online" 
     bones: (files) => (hash) => new BonesDb(files()).get(hash),
     place: placeGameFiles,
     scores(m) {
-      try {
-        return m.FS.readFile("/save/record", { encoding: "utf8" }) as string;
-      } catch {
-        // a game scoring nothing may leave no file
-        return null;
-      }
+      const read = (file: string) => {
+        try {
+          return m.FS.readFile(`/save/${file}`, { encoding: "utf8" }) as string;
+        } catch {
+          // a game scoring nothing may leave no file
+          return null;
+        }
+      };
+      const record = read("record");
+      if (record === null) return null;
+      return { record, last: read("xlogfile")?.trimEnd().split("\n").pop() || null };
     },
   };
 }

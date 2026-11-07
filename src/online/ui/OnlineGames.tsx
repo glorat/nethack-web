@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { ascended, type FinishedGame, outcome, gameWatchAddress } from "../results";
 import { deleteFinishedGame, listFinishedGames } from "../server/api";
 import { shareAddress } from "../share";
+import { Grave } from "../../ui/landing/Grave";
 
 const SHOWN = 10;
 
@@ -22,6 +23,7 @@ export function OnlineGames({ onDeleted }: { onDeleted: () => void }) {
     );
   }, []);
   if (!games?.length && !note) return null;
+  const latest = games?.reduce<FinishedGame | null>((a, g) => (a && a.endedAt >= g.endedAt ? a : g), null);
   const gone = (deleted: FinishedGame) => {
     setGames((all) => all!.filter((g) => g.game !== deleted.game));
     setNote(`Deleted ${described(deleted)}.`);
@@ -30,10 +32,11 @@ export function OnlineGames({ onDeleted }: { onDeleted: () => void }) {
     onDeleted();
   };
   return (
-    <section class="landing-panel landing-device">
-      <h2 ref={heading} tabIndex={-1}>
+    <section class="frame landing-device" aria-labelledby="finished-games">
+      <h2 class="frame-label" id="finished-games" ref={heading} tabIndex={-1}>
         Your finished online games
       </h2>
+      {latest?.result ? <Grave who={latest.name} points={latest.result.points} death={latest.result.death} year={new Date(latest.endedAt).getFullYear()} /> : null}
       {/* there from the start, so screen readers announce what it comes to say */}
       <p role="status" class={note ? undefined : "visually-hidden"}>
         {note}
