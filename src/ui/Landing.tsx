@@ -174,7 +174,8 @@ export function Landing() {
       {keyed ? <Keyed label={label} /> : label}
     </a>
   );
-  const greeting = remembered && !changing ? `Hello ${online ? (profile?.handle ?? remembered) : remembered}, welcome to NetHack!` : "Welcome to NetHack!";
+  // as the game greets the character, not the player's handle
+  const greeting = remembered && !changing ? `Hello ${remembered}, welcome to NetHack!` : "Welcome to NetHack!";
   const otherLink = useRef<HTMLAnchorElement>(null);
   const continueButton = useRef<HTMLButtonElement>(null);
   const settingsButton = useRef<HTMLButtonElement>(null);
@@ -186,7 +187,7 @@ export function Landing() {
   // before paint, so a key pressed as soon as the page shows finds it listening
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (dialogOpen.current || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+      if (dialogOpen.current || e.repeat || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, select, textarea, [contenteditable], [role=dialog], [role=menu]")) return;
       // with nothing focused, Enter does what the form's highlighted button does
@@ -248,7 +249,9 @@ export function Landing() {
         <div class="landing-col">
           {onlinePanels && profile?.signedIn && !profile.handle ? <HandlePrompt profile={profile} onProfile={setProfile} /> : null}
           <section class="frame start-frame" aria-labelledby="start-title">
-            <h2 class="frame-label">Play</h2>
+            <div class="frame-label" aria-hidden="true">
+              Play
+            </div>
             <form
               class="start-card"
               ref={form}

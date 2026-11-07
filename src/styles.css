@@ -338,7 +338,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
 /* landing page: its own darker dungeon, labelled frames, and the terminal faces */
 .landing {
-  --bg: #0e0b08; --frame: #43392c; --text: #d6cdbd; --bright: #fbf3e4; --muted: #958a78; --danger: #cf4b33; --online: #5fb8c0;
+  --bg: #0e0b08; --frame: #43392c; --text: #d6cdbd; --bright: #fbf3e4; --muted: #958a78; --danger: #e0603f; --online: #5fb8c0;
   --display: "VT323", var(--mono); --type: "IBM Plex Mono", var(--mono);
   height: 100%; overflow-y: auto; background: var(--bg); color: var(--text); font: 14px/1.5 var(--type);
 }
@@ -384,6 +384,8 @@ a.landing-title { text-decoration: none; }
 .frame ul { margin: 0; padding-left: 18px; }
 .frame li + li { margin-top: 4px; }
 details.frame > summary { list-style: none; cursor: pointer; min-height: 4px; }
+details.frame > summary:focus-visible { outline: none; }
+details.frame > summary:focus-visible .frame-label { outline: 2px solid var(--accent); outline-offset: 2px; }
 details.frame > summary::-webkit-details-marker { display: none; }
 details.frame:not([open]) { padding-bottom: 6px; }
 .landing-help .frame-label::after { content: " +" / ""; }
@@ -397,7 +399,7 @@ details.frame:not([open]) { padding-bottom: 6px; }
 .landing button.primary { padding: 8px 22px; font-weight: 600; }
 .start-buttons button:not(.primary) { padding: 8px 18px; background: none; border-color: #5a4d3b; }
 .start-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
-.start-links button { padding: 4px 0; background: none; border: none; color: var(--muted); font: inherit; font-size: 12.5px; text-decoration: underline; cursor: pointer; }
+.start-links button { padding: 4px 0; background: none; border: none; color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; }
 .start-links button:hover { color: var(--text); }
 .landing-ready { margin: 0; color: var(--hp); font-size: 12.5px; }
 .landing-warning { color: #e3b341; }
@@ -411,6 +413,8 @@ details.frame:not([open]) { padding-bottom: 6px; }
 .scene > span:not(.scene-note) { width: var(--square); height: var(--square); background-size: calc(var(--square) * 40) auto; background-repeat: no-repeat; }
 .scene-note { position: absolute; z-index: 1; transform: translate(-50%, -100%); margin-top: -4px; padding: 2px 7px; border: 1px solid var(--accent); background: rgba(14, 11, 8, 0.92); color: var(--bright); font-size: 12px; line-height: 1.25; white-space: nowrap; }
 .scene-note.below { transform: translate(-50%, 0); margin-top: 4px; }
+/* too small a room for its notes, which the room's description carries for screen readers anyway */
+@media (max-width: 640px) { .scene-note { display: none; } }
 .scene-status { margin: 0; padding: 8px 16px 12px; color: var(--muted); font-size: 12.5px; }
 
 .grave { margin: 4px 0 8px; font: 10.5px/1.2 var(--type); color: var(--text); overflow-x: auto; }
@@ -461,7 +465,7 @@ button[aria-disabled="true"] { opacity: 0.5; cursor: default; }
 .achievements-groups .achievements { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(14em, 1fr)); gap: 8px; }
 .achievements-groups .hint { margin: 0; }
 .achievements a { color: var(--accent); }
-.legal { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; font-size: 14px; line-height: 1.55; }
+.legal { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; font: 14px/1.55 var(--font); }
 .legal h1 { margin: 0; font-size: 24px; }
 .legal h2 { margin: 24px 0 4px; font-size: 16px; }
 .legal p, .legal ul { margin: 8px 0; }
@@ -497,6 +501,7 @@ button[aria-disabled="true"] { opacity: 0.5; cursor: default; }
   .in-progress li { grid-template-columns: 1fr auto; }
   .in-progress small { grid-column: 1; grid-row: 2; }
   .leaderboard li, .leaderboard-head { grid-template-columns: 2.4em 6.5em 1fr; }
+  .leaderboard li small:first-child { grid-column: 1; }
   .leaderboard li small:last-child { grid-column: 3; }
   .inventory, .inv-resize, .show-inventory { display: none; }
   .top { height: auto; flex-wrap: wrap; }
