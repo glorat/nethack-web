@@ -68,7 +68,6 @@ export function Landing() {
   const [signingIn, setSigningIn] = useState(false);
   const [signInFailed, setSignInFailed] = useState(false);
   const [signedOut] = useState(() => online && new URLSearchParams(location.search).has("signedout"));
-  const [withPassword] = useState(() => online && new URLSearchParams(location.search).has("password"));
   const [signOutFailed, setSignOutFailed] = useState(false);
   useEffect(() => {
     // these notes are for how the page was reached, not for a reload later
@@ -252,7 +251,7 @@ export function Landing() {
       <main class="landing-main">
         <div class="landing-col">
           {onlinePanels && profile?.signedIn && !profile.handle ? <HandlePrompt profile={profile} onProfile={setProfile} /> : null}
-          {onlinePanels && withPassword && profile && !profile.signedIn ? <PasswordSignIn profile={profile} onSignOut={signOutHere} /> : null}
+          {onlinePanels && profile && !profile.signedIn ? <PasswordSignIn profile={profile} onSignOut={signOutHere} /> : null}
           <section class="frame start-frame" aria-labelledby="start-title">
             <div class="frame-label" aria-hidden="true">
               Play

@@ -549,7 +549,7 @@ test("the landing page lists games in flight, goes back to one, and starts a new
   await page.waitForTimeout(1200);
 
   await page.goto("/online/");
-  const first = page.locator("form button").first();
+  const first = page.locator(".start-card button").first();
   await expect(first).toHaveText(`Continue Online as ${name}`);
   await expect(first).toHaveClass(/primary/);
   await page.getByRole("button", { name: `Play Online as ${name}` }).click();
@@ -739,7 +739,7 @@ test("signing in keeps the anonymous player's games, and the name they chose", a
   await expect(page.getByLabel("Handle")).toHaveCount(0);
 
   // the same uid, so the game played before signing in is still there to go back to
-  await expect(page.locator("form button").first()).toHaveText(`Continue Online as ${name}`);
+  await expect(page.locator(".start-card button").first()).toHaveText(`Continue Online as ${name}`);
   // a name was kept from before, so it stays the player's choice
   await page.getByRole("button", { name: "Change Name" }).click();
   await expect(page.getByLabel("Who are you?")).toHaveValue(name);
@@ -776,19 +776,10 @@ async function playAnonymously(page: Page): Promise<string> {
   return name;
 }
 
-test("password sign-in is only offered when the address asks for it", async ({ page }) => {
-  await online(page);
-  await page.goto("/online/");
-  await expect(page.getByRole("button", { name: "Sign In with Google" })).toBeVisible();
-  await expect(page.getByLabel("Password")).toHaveCount(0);
-  await page.goto("/online/?password");
-  await expect(page.getByLabel("Password")).toBeVisible();
-});
-
 test("a password account keeps the anonymous player's games, and counts once its email is verified", async ({ page }) => {
   const name = await playAnonymously(page);
   const email = `${crypto.randomUUID()}@example.com`;
-  await page.goto("/online/?password");
+  await page.goto("/online/");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("correct horse");
   await page.getByRole("button", { name: "Sign In", exact: true }).click();
@@ -799,12 +790,13 @@ test("a password account keeps the anonymous player's games, and counts once its
   await page.reload();
   await expect(page.locator(".landing-bar .account")).toHaveText("Signed In", { timeout: 20_000 });
   await expect(page.getByLabel("Handle")).toBeVisible();
+  await expect(page.getByLabel("Password")).toHaveCount(0);
   await expect(page.getByRole("button", { name: `Continue Online as ${name}` })).toBeVisible();
 
   // signing in again with the password comes back to the same account
   await page.locator(".landing-bar .account").click();
   await Promise.all([page.waitForEvent("load"), page.getByRole("menuitem", { name: "Sign Out" }).click()]);
-  await page.goto("/online/?password");
+  await page.goto("/online/");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("correct horse");
   await page.getByRole("button", { name: "Sign In", exact: true }).click();
@@ -814,7 +806,7 @@ test("a password account keeps the anonymous player's games, and counts once its
 
 test("signing in with Google while a password account waits to be verified keeps its games", async ({ page }) => {
   const name = await playAnonymously(page);
-  await page.goto("/online/?password");
+  await page.goto("/online/");
   await page.getByLabel("Email").fill(`${crypto.randomUUID()}@example.com`);
   await page.getByLabel("Password").fill("correct horse");
   await page.getByRole("button", { name: "Sign In", exact: true }).click();
@@ -828,7 +820,7 @@ test("a wrong password doesn't sign in", async ({ page }) => {
   const email = `${crypto.randomUUID()}@example.com`;
   await online(page);
   const signIn = async (password: string) => {
-    await page.goto("/online/?password");
+    await page.goto("/online/");
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill(password);
     await page.getByRole("button", { name: "Sign In", exact: true }).click();
@@ -968,12 +960,12 @@ test("the landing page lists every online game in progress, latest first, once t
   });
   const heading = page.getByRole("heading", { name: "Your games in progress" });
   await page.goto("/online/");
-  await expect(page.locator("form button").first()).toHaveText("Continue Online as Older");
+  await expect(page.locator(".start-card button").first()).toHaveText("Continue Online as Older");
   await expect(heading).toHaveCount(0);
 
   games = [game(1, "Older"), game(3, "Latest"), game(2, "Middle")];
   await page.goto("/online/");
-  await expect(page.locator("form button").first()).toHaveText("Continue Online as Latest");
+  await expect(page.locator(".start-card button").first()).toHaveText("Continue Online as Latest");
   const links = page.locator("section", { has: heading }).getByRole("link");
   await expect(page.locator("section", { has: heading }).getByRole("listitem").locator("strong")).toHaveText(["Latest", "Middle", "Older"]);
   await expect(links).toHaveText(["Continue", "Continue", "Continue"]);
