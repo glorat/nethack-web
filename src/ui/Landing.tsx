@@ -268,7 +268,7 @@ export function Landing() {
               <h1 id="start-title">{greeting}</h1>
               <p class="start-sub">
                 {gameToContinue ? "" : `${PITCH} `}
-                {online ? `Finished games go on the public high scores.${profile?.signedIn ? "" : " Sign in, and your games follow you to any device."}` : "Your games stay on this device, seen by no one else."}
+                {online ? `Finished games go on the public high scores.${profile?.signedIn ? "" : " Sign in, and your games follow you to any device."}` : "Your games stay in this browser, seen by no one else, and aren't backed up."}
               </p>
               {choosingOnline ? (
                 <OnlineChoice name={playerName(name)} onBack={backFromOnline} />
