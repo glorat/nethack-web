@@ -96,7 +96,7 @@ This covers all text we write, on the landing pages and in the game's interface.
 - Never in errors, delete prompts, sign-in, privacy or the terms.
 - Beside the plain sentence, never in place of it.
 
-**The case for the site.** `PITCH` in `src/port/pitch.ts` is the case to a veteran. The Play frame shows it when there's no game to continue in that mode, whether or not it's a first visit, then the mode's one line, which shows on every visit. The page descriptions in the HTML files and the share page's fallback repeat it, so they change together. A shared game's page leads with that game, not the case.
+**The case for the site.** `PITCH` in `src/port/pitch.ts` is the case to a veteran. The Play frame shows it when there's no game to continue in that mode, whether or not it's a first visit, then the mode's one line, which shows on every visit. The page descriptions in the HTML files and the share page's fallback repeat it, so they change together. A shared game's page leads with that game, not the case. The link preview's image, `public/social.jpg`, is a screenshot of the offline home (`public/README` says how it's taken), so retake it when the home's look changes.
 
 **Rules**
 - Title Case for anything that acts as a command: buttons, menu items, and links styled or used as one, such as the way to the other home. Follow Apple's style: lower case for articles, coordinating conjunctions and prepositions of four or fewer letters, unless first or last. Everything else, other links included, in sentence case.
