@@ -412,6 +412,8 @@ export class Session {
       persist: async () => {
         this.persisted = this.saves();
       },
+      // nobody watches a headless game's animations
+      delayOutput: () => Promise.resolve(),
       alone: !options.otherTab,
       now: () => now,
       utcOffset: () => options.utcOffset ?? 0,
@@ -435,8 +437,9 @@ export class Session {
     if (!give || !this.queue.length) return;
     this.giveInput = null;
     const input = this.queue.shift()!;
-    // a macrotask, or a core that only ever waits on resolved promises starves timers
-    setTimeout(() => give(input), 0);
+    // a macrotask, or a core that only ever waits on resolved promises starves timers; setImmediate is one
+    // without setTimeout's millisecond's wait
+    setImmediate(() => give(input));
   }
 
   private untilSettled(): Promise<void> {
