@@ -35,5 +35,8 @@ export interface PageMode {
   score?(): { expectedMs: number; score: Promise<FinishedScore> } | null;
 }
 
-/** A finished game's score: the points and where to see the game, none because it couldn't be scored, or not yet. */
-export type FinishedScore = { kind: "scored"; points?: number; address: string } | { kind: "unscored" } | { kind: "later" };
+/**
+ * A finished game's score: the points and where to see the game, none because it couldn't be scored, or not yet. A game
+ * scored for a player not signed in is public as Anonymous until they sign in, at `signIn`.
+ */
+export type FinishedScore = { kind: "scored"; points?: number; address: string; signIn?: string } | { kind: "unscored" } | { kind: "later" };
