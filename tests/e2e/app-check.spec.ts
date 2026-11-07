@@ -130,6 +130,9 @@ test("a finished online game can be deleted from the home, after saying what tha
   await page.goto(`${PROD}online/`);
   const panel = page.locator("section", { has: page.getByRole("heading", { name: "Your finished games" }) });
   await expect(panel.getByRole("listitem")).toHaveCount(2);
+  // across both columns, as a row needs the width for its death and its actions
+  const [list, play] = [await panel.boundingBox(), await page.locator(".start-frame").boundingBox()];
+  expect(list!.width).toBeGreaterThan(play!.width * 2);
   const remove = panel.getByRole("button", { name: /^Delete Agnes's game/ });
   await remove.click();
   const asking = panel.getByRole("group", { name: /^Delete Agnes's game/ });
