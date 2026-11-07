@@ -399,6 +399,7 @@ a.landing-title { text-decoration: none; }
 .handle-prompt button { align-self: flex-start; }
 .landing-main { display: grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); gap: 28px; align-items: start; max-width: 1120px; margin: 0 auto; padding: 32px 16px; }
 .landing-col { display: grid; gap: 28px; align-content: start; min-width: 0; }
+.finished-games { grid-column: 1 / -1; }
 
 /* a frame with its label set into the top line */
 .frame { position: relative; margin: 0; padding: 22px 16px 16px; border: 1px solid var(--frame); min-width: 0; }
@@ -517,6 +518,7 @@ button[aria-disabled="true"] { opacity: 0.5; cursor: default; }
   .landing-main .handle-prompt { order: 0; }
   .landing-main .start-frame { order: 0; }
   .landing-main .scene-frame { order: 1; }
+  .landing-main .finished-games { order: 2; }
   .device-scores li { grid-template-columns: 6.5em 1fr; }
   .device-scores small { grid-column: 2; }
   .online-scores li { grid-template-columns: 6.5em 1fr; }

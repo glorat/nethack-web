@@ -5,7 +5,7 @@ import { type GameMode, homeAddress, keepLastMode, lastMode, placeOf, playAddres
 import { type GameSummary, onlineAddress } from "../online/session";
 import { OnlineChoice } from "../online/ui/OnlineChoice";
 import { Leaderboard } from "../online/ui/Leaderboard";
-import { OnlineGames } from "../online/ui/OnlineGames";
+import { LastOnlineGame, OnlineGames, useFinishedGames } from "../online/ui/OnlineGames";
 import { GamesInProgress } from "../online/ui/GamesInProgress";
 import { Achievements } from "../online/ui/Achievements";
 import { saveOptions, savedOptions } from "../port/options";
@@ -171,6 +171,7 @@ export function Landing() {
   const onlinePanels = online && !refused;
   // each asks once, as it appears, which has to be as the signed-in player
   const accountPanels = onlinePanels && !finishing;
+  const [finished, setFinished] = useFinishedGames(accountPanels);
   const goOther = (label: string, keyed?: boolean) => (
     <a class={`mode-switch to-${OTHER}`} href={homeAddress(OTHER)} ref={keyed ? otherLink : undefined}>
       {keyed ? <Keyed label={label} /> : label}
@@ -321,7 +322,7 @@ export function Landing() {
             <>
               {/* one is already the Continue button */}
               {inProgress.length > 1 ? <GamesInProgress games={inProgress} /> : null}
-              <OnlineGames onDeleted={() => setDeletions((n) => n + 1)} />
+              <LastOnlineGame games={finished} />
               {/* a deletion can change both */}
               <Achievements reload={deletions} />
             </>
@@ -380,6 +381,8 @@ export function Landing() {
           </section>
           {accountPanels ? <Leaderboard reload={deletions} /> : null}
         </div>
+        {/* across both columns, as a row needs the width for its death and its actions */}
+        {accountPanels ? <OnlineGames games={finished} onGames={setFinished} onDeleted={() => setDeletions((n) => n + 1)} /> : null}
       </main>
       <footer class="landing-footer">
         <p>
