@@ -137,6 +137,7 @@ export interface RecorderStart {
 export class Recorder implements GameHost {
   // missing once a replay has failed, as it would only fail the same way again
   readonly resume?: () => Promise<boolean>;
+  readonly delayOutput?: () => Promise<void>;
   private readonly fs: FS;
   private readonly wallClock: () => number;
   /** Lines from before the game is in play, when it isn't yet known which game they belong to. */
@@ -165,6 +166,7 @@ export class Recorder implements GameHost {
     this.fs = m.FS as FS;
     this.wallClock = start.wallClock ?? (() => Date.now());
     this.resume = start.resume && (() => this.replayRecorded());
+    this.delayOutput = inner.delayOutput && (() => inner.delayOutput!());
   }
 
   get alone(): boolean {
