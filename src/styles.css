@@ -359,7 +359,10 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
   --display: "VT323", var(--mono); --type: "IBM Plex Mono", var(--mono);
   height: 100%; overflow-y: auto; background: var(--bg); color: var(--text); font: 14px/1.5 var(--type);
 }
-.landing.online { --mode: var(--online); }
+.landing.online { --mode: var(--online); --action: var(--online); --on-action: #06181a; }
+/* a way to the other home is in that home's colour */
+.landing .mode-switch.to-online { color: var(--online); }
+.landing .mode-switch.to-offline { color: var(--accent); }
 /* the offline home's invitation to online play is in online's colour */
 .landing.offline .landing-panel { --label: var(--online); --frame: color-mix(in srgb, var(--online) 24%, #3a3a3e); }
 .landing a { color: var(--link); }
