@@ -41,7 +41,7 @@ function AccountMenu({ profile, onSignOut }: { profile: Profile; onSignOut: () =
       window.removeEventListener("blur", close);
     };
   }, [open]);
-  const name = profile.handle ?? "Signed in";
+  const name = profile.handle ?? "Signed In";
   return (
     <div
       class="account-menu"
@@ -108,7 +108,7 @@ export function HandlePrompt({ profile, onProfile }: { profile: Profile; onProfi
       }}
     >
       <h2 class="frame-label">Choose your handle</h2>
-      <p>The name others see beside your online games and scores, whatever you call your characters. It can't be changed for now.</p>
+      <p>The name others see beside your games and scores, whatever you call your characters. It can't be changed for now.</p>
       <label for="handle">Handle</label>
       <input id="handle" value={handle} maxLength={20} autoComplete="off" onInput={(e) => setHandle((e.target as HTMLInputElement).value)} aria-describedby="handle-hint" />
       <small id="handle-hint">{HANDLE_HINT}</small>

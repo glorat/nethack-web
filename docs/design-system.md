@@ -76,24 +76,30 @@ The game uses the system font, as Cocoa does, and keeps its own monospace for ke
 
 This covers all text we write, on the landing pages and in the game's interface. The core's own messages are the game's, and stay as they are.
 
-**Who it's for.** Veterans first. The words' job is to show a NetHack player that this is the real game, done well. Regulars need almost no words, and newcomers get the "New to NetHack?" frame.
+**Who it's for.** Veterans first: the words' job is to show a NetHack player that this is the real game, done well. A first visit serves newcomers too, so it can carry a little for them (the room's notes, "New to NetHack?"), but a veteran reads every first-visit line as well, so nothing there may read as a simplified game. Regulars need almost no words.
 
-**The voice: Guidebook, old hand.** Plain, exact, brief and dry, and it knows the dungeon.
-- Say what the player gets and what they can do, not how the system works ("Your games stay on this device", not "Games are stored locally").
-- Say what something is, not what it isn't.
-- Claim only what's true for every player. "The keys are the ones you know from the terminal", not "every key works": browsers on Windows and Linux keep Ctrl-T, Ctrl-W and Ctrl-N.
-- No selling: no "experience", no "adventure", no exclamation marks.
+**The voice: Guidebook, old hand.** Plain, exact, brief and dry, and it knows the dungeon. No selling.
 
-**The game's own lines.** Where the game has words for something, use them: the greeting, "Who are you?", the tombstone, the fortune cookies. Beyond that, a game message may add flavour:
-- Only real messages, quoted exactly from the core. Never one written in its style, as veterans can tell.
+**Before writing a line, name its reader and their doubt.** Who reads this spot, and what are they wondering at that moment? Write the line that settles that doubt, and stop. Then test every phrase:
+- **Does it answer this reader?** A phrase that would persuade someone else (a newcomer in a veteran's spot, or the other way round) waters down the line, and can raise the very doubt the line is there to settle. It belongs where that other reader looks.
+- **Did a doubt choose it, or did a feature list?** Something being true and ours is not a reason to say it. Start from what the reader doubts, not from what the site has.
+- **Does the page already show it?** Don't tell what a picture, a label or the layout already shows. Words go to what can't be seen.
+- **Would the reader miss it if it were cut?** If not, cut it.
+- **Is it already said on this page?** Say each fact once, in the place the reader looks for it.
+- **Is it true for every player?** It must hold on every device, browser and mode. A claim may stand with rare exceptions only if a player who meets one can find it explained in the help. Otherwise claim less.
+- **Is it about the player or the system?** Say what the player gets and can do, never how it works underneath.
+- **Does it say what something is?** A line made of what something isn't or lacks leaves the reader to work out what's left.
+
+**Borrowed words must be genuine.** Where the game has words for something, use them. Beyond that, a game message may add flavour:
+- Only real messages, quoted exactly from the core: a whole message or an unchanged part of one. Never one written in its style, as veterans can tell.
 - Only where nothing is at stake: empty states, waiting, the not-found page, and a confirmation after something is done.
 - Never in errors, delete prompts, sign-in, privacy or the terms.
-- Beside the plain sentence, never in place of it: "No one is on the high scores yet. You hear the footsteps of a guard on patrol."
+- Beside the plain sentence, never in place of it.
 
-**The case for the site.** When there's no game to continue, the Play frame says what this is: "The real NetHack 5.0, free, with no sign-up. The keys are the ones you know from the terminal, and you can also play with the mouse and painted tiles." Then one line for the mode. Page descriptions and link previews use the same sentence. Online play works without signing in, so "no sign-up" is true of both homes.
+**The case for the site.** `PITCH` in `src/port/pitch.ts` is the case to a veteran. The Play frame shows it when there's no game to continue in that mode, whether or not it's a first visit, then the mode's one line, which shows on every visit. The page descriptions in the HTML files and the share page's fallback repeat it, so they change together. A shared game's page leads with that game, not the case.
 
 **Rules**
-- Buttons and menu items in Title Case, as Cocoa's are ("Delete Game"). Everything else, links included, in sentence case.
+- Title Case for anything that acts as a command: buttons, menu items, and links styled or used as one, such as the way to the other home. Follow Apple's style: lower case for articles, coordinating conjunctions and prepositions of four or fewer letters, unless first or last. Everything else, other links included, in sentence case.
 - "…", never "...". Straight quotes and apostrophes. No semicolons.
 - Dates and numbers in the player's locale (`toLocaleString`).
 
@@ -109,4 +115,4 @@ This covers all text we write, on the landing pages and in the game's interface.
 | sign in | The verb. "Sign In" on buttons | log in |
 | game | One run, from start to death or ascension | session, run |
 
-On a home's own page, leave out its mode: "Your finished games" on the online home, not "Your finished online games".
+On a home's own page, leave out its mode, as the page already says it. Privacy notices and the terms keep it, where being explicit matters more than being brief.

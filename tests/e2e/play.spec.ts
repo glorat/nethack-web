@@ -149,7 +149,7 @@ test("Save & Quit goes to the landing page, and Play and a reload both bring the
   await expect(play).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/offline/");
   // with a game to continue, the page doesn't make its case again
-  await expect(page.locator(".start-sub")).toHaveText("It plays with no connection, and your games stay on this device, seen by no one else.");
+  await expect(page.locator(".start-sub")).toHaveText("Your games stay on this device, seen by no one else.");
 
   await play.click();
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
@@ -228,7 +228,7 @@ test("an online home that can't reach the server says the games are safe, and of
   // no emulators here, so the server can't be reached
   await page.goto("/online/");
   const banner = page.getByRole("alert").filter({ hasText: "Can't reach the server right now" });
-  await expect(banner).toContainText("Your online games are safe");
+  await expect(banner).toContainText("Your games are safe");
   await banner.getByRole("link", { name: "Play Offline Instead" }).click();
   await expect(page).toHaveURL(/\/offline\/$/);
 });
@@ -1901,7 +1901,7 @@ test("the Help menu's About box credits NetHack, this version, the painted tiles
   await page.getByRole("menu", { name: "Help" }).getByRole("menuitem", { name: "About NetHack" }).click();
   const about = page.getByRole("dialog", { name: "About NetHack" });
   await expect(about).toContainText(/Based on NetHack \d+\.\d+\.\d+ by the NetHack DevTeam/);
-  await expect(about).toContainText("Web version by Kevin Tam");
+  await expect(about).toContainText("Web port by Kevin Tam");
   await expect(about).toContainText("Painted tiles by Kevin Tam");
   await expect(about).toContainText("Cocoa interface by Bryce Cogswell and Dirk Zimmermann");
   // the game doesn't hear keys while it's open

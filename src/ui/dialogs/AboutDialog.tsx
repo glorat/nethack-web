@@ -33,7 +33,7 @@ export function AboutDialog({ onClose }: { onClose(): void }) {
           .
         </p>
         <p>
-          Web version by Kevin Tam (
+          Web port by Kevin Tam (
           <a href="https://github.com/glorat" target="_blank" rel="noopener">
             glorat
           </a>

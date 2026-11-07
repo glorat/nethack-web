@@ -18,6 +18,7 @@ import { updateWhenIdle } from "../sw/register";
 import { AboutDialog } from "./dialogs/AboutDialog";
 import { GameSettingsDialog } from "./dialogs/GameSettingsDialog";
 import { Scene } from "./landing/Scene";
+import { PITCH } from "../port/pitch";
 import { cookie, omens, rumors } from "../port/omens";
 import RUMORS from "../../nethack/dat/rumors.tru?raw";
 import "@fontsource/vt323/latin-400.css";
@@ -32,7 +33,6 @@ const SLOW_MS = 8000;
 const OTHER: GameMode = MODE === "online" ? "offline" : "online";
 // read before this visit is kept, so a first visit opens the help; kept at once, as the page may be left before it paints
 const RETURNING = lastMode();
-const PITCH = "The real NetHack 5.0, free, with no sign-up. The keys are the ones you know from the terminal, and you can also play with the mouse and painted tiles.";
 keepLastMode(MODE);
 
 /** This page's address without the given parameters. */
@@ -235,7 +235,7 @@ export function Landing() {
       )}
       {signedOut && (
         <p class="landing-note" role="status">
-          You're signed out. Your online games and handle are kept for when you sign in again.
+          You're signed out. Your games and handle are kept for when you sign in again.
         </p>
       )}
       {refused ? (
@@ -244,7 +244,7 @@ export function Landing() {
         </p>
       ) : unreachable ? (
         <p class="landing-note" role="alert">
-          Can't reach the server right now. Your online games are safe and will be here when you're back. {goOther("Play Offline Instead")}
+          Can't reach the server right now. Your games are safe and will be here when you're back. {goOther("Play Offline Instead")}
         </p>
       ) : null}
       <main class="landing-main">
@@ -268,7 +268,7 @@ export function Landing() {
               <h1 id="start-title">{greeting}</h1>
               <p class="start-sub">
                 {gameToContinue ? "" : `${PITCH} `}
-                {online ? "Finished games go on the public high scores. Sign in, and your games follow you to any device." : "It plays with no connection, and your games stay on this device, seen by no one else."}
+                {online ? `Finished games go on the public high scores.${profile?.signedIn ? "" : " Sign in, and your games follow you to any device."}` : "Your games stay on this device, seen by no one else."}
               </p>
               {choosingOnline ? (
                 <OnlineChoice name={playerName(name)} onBack={backFromOnline} />
