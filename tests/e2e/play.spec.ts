@@ -149,7 +149,7 @@ test("Save & Quit goes to the landing page, and Play and a reload both bring the
   await expect(play).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/offline/");
   // with a game to continue, the page doesn't make its case again
-  await expect(page.locator(".start-sub")).toHaveText("Your games stay on this device, seen by no one else.");
+  await expect(page.locator(".start-sub")).toHaveText("Your games stay in this browser, seen by no one else, and aren't backed up.");
 
   await play.click();
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
