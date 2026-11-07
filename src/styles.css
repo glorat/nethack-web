@@ -348,15 +348,20 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 
 /* landing page: its own darker dungeon, labelled frames, and the terminal faces */
 .landing {
-  --bg: #0b0b0c; --frame: #3a3a3e; --text: #cfcfcc; --bright: #fafafa; --muted: #8e8e8a; --danger: #e0603f; --online: #5fb8c0;
+  --bg: #0b0b0c; --text: #cfcfcc; --bright: #fafafa; --muted: #8e8e8a; --danger: #e0603f; --online: #5fb8c0;
   --field-border: #55555a; --rule: #2a2a2d; --rule-strong: #1f1f22; --earned: #4f6b3c; --field: #121213;
   /* amber here is nethack.app's own colour; a cool one in the game recedes, and amber there would read as a warning */
   --accent: #e8a33a; --on-accent: #1b1206;
-  --action: var(--accent); --on-action: var(--on-accent); --link: var(--accent); --label: var(--accent); --focus: var(--accent);
+  --action: var(--accent); --on-action: var(--on-accent); --link: var(--accent); --focus: var(--accent);
   --menu-hover: var(--accent); --on-menu-hover: var(--on-accent); --mark-offline: var(--accent);
+  /* each mode's own colour on its frames, so the two homes never look alike; Play stays amber in both */
+  --mode: var(--accent); --label: var(--mode); --frame: color-mix(in srgb, var(--mode) 24%, #3a3a3e);
   --display: "VT323", var(--mono); --type: "IBM Plex Mono", var(--mono);
   height: 100%; overflow-y: auto; background: var(--bg); color: var(--text); font: 14px/1.5 var(--type);
 }
+.landing.online { --mode: var(--online); }
+/* the offline home's invitation to online play is in online's colour */
+.landing.offline .landing-panel { --label: var(--online); --frame: color-mix(in srgb, var(--online) 24%, #3a3a3e); }
 .landing a { color: var(--link); }
 .landing button { border-radius: 0; }
 .landing input { background: var(--field); border: 1px solid var(--field-border); border-radius: 0; color: var(--bright); padding: 8px 12px; }
