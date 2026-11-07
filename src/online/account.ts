@@ -23,3 +23,24 @@ export function requestNote(profile: Profile): string | null {
   if (request.outcome === "refused") return `${request.handle} can't be used. Choose another.`;
   return null;
 }
+
+/** What the sign-in dialog says when making an account or signing in fails, from the error's code. */
+export function signInFailure(code: string | undefined): string {
+  switch (code) {
+    case "taken":
+      return "There's already an account for that email.";
+    case "auth/invalid-credential":
+    case "auth/wrong-password":
+    case "auth/user-not-found":
+    case "auth/invalid-email":
+      return "Wrong email or password. If you made your account with Google, use Sign In with Google.";
+    case "auth/too-many-requests":
+      return "Too many tries. Wait a few minutes, or use Reset Password.";
+    case "auth/weak-password":
+      return "Use a password of at least 6 characters.";
+    case "auth/network-request-failed":
+      return "Can't reach the server. Try again.";
+    default:
+      return "Couldn't sign in. Try again.";
+  }
+}

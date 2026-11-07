@@ -25,7 +25,7 @@ export function useFinishedGames(shown: boolean) {
 }
 
 /** The tombstone of the player's latest finished online game that has a result. */
-export function LastOnlineGame({ games }: { games: FinishedGame[] | null }) {
+export function LastOnlineGame({ games, onSignIn }: { games: FinishedGame[] | null; onSignIn?: () => void }) {
   const latest = games?.reduce<FinishedGame | null>((a, g) => (a && a.endedAt >= g.endedAt ? a : g), null);
   if (!latest?.result) return null;
   return (
@@ -34,6 +34,14 @@ export function LastOnlineGame({ games }: { games: FinishedGame[] | null }) {
         Your last game
       </h2>
       <Grave who={latest.name} points={latest.result.points} death={latest.result.death} year={new Date(latest.endedAt).getFullYear()} />
+      {onSignIn ? (
+        <div class="last-game-sign-in">
+          <p>It's public as Anonymous. Sign in to put your handle on it.</p>
+          <button type="button" onClick={onSignIn}>
+            Sign In…
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }

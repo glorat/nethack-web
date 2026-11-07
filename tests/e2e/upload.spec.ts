@@ -693,9 +693,23 @@ test("a game the server won't give to watch says so", async ({ page }) => {
   await expect(page.getByText("This game can't be watched.")).toBeVisible({ timeout: 20_000 });
 });
 
-/** Signs in through the Auth emulator's stand-in for Google's sign-in page, as a new account unless it's one used before. */
+/** Opens the sign-in dialog from the landing bar, on the tab asked for. */
+async function openSignIn(page: Page, tab: "New Account" | "Sign In") {
+  await page.locator(".landing-bar .account").click();
+  await page.getByRole("tab", { name: tab }).click();
+}
+
+/**
+ * Through the Auth emulator's stand-in for Google's sign-in page: makes a new account of the player here, or signs in
+ * to one used before.
+ */
 async function signInWithGoogle(page: Page, email: string, used = false) {
-  await page.getByRole("button", { name: "Sign In with Google" }).click();
+  await openSignIn(page, used ? "Sign In" : "New Account");
+  await page.getByRole("button", { name: used ? "Sign In with Google" : "Create Account with Google" }).click();
+  await googlePage(page, email, used);
+}
+
+async function googlePage(page: Page, email: string, used: boolean) {
   await page.waitForURL(/\/emulator\/auth\/handler/);
   // the widget wires its buttons up only once it has loaded
   await page.waitForLoadState();
@@ -712,10 +726,11 @@ async function signInWithGoogle(page: Page, email: string, used = false) {
 test("backing out of Google's sign-in comes back ready to try again", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("nethack-web.lastMode", "online"));
   await page.goto("/online/");
-  await page.getByRole("button", { name: "Sign In with Google" }).click();
+  await openSignIn(page, "New Account");
+  await page.getByRole("button", { name: "Create Account with Google" }).click();
   await page.waitForURL(/\/emulator\/auth\/handler/);
   await page.goBack();
-  await expect(page.getByRole("button", { name: "Sign In with Google" })).toBeEnabled();
+  await expect(page.locator(".landing-bar .account")).toBeEnabled();
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
@@ -776,60 +791,173 @@ async function playAnonymously(page: Page): Promise<string> {
   return name;
 }
 
+/** Makes a password account of the player here, who is left waiting to verify its address. */
+async function createPasswordAccount(page: Page, email: string) {
+  await openSignIn(page, "New Account");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password", { exact: true }).fill("correct horse");
+  await page.getByRole("button", { name: "Create Account", exact: true }).click();
+  await expect(page.getByText(`Open the link sent to ${email}. You're signed in here as soon as you have.`)).toBeVisible({ timeout: 20_000 });
+}
+
 test("a password account keeps the anonymous player's games, and counts once its email is verified", async ({ page }) => {
   const name = await playAnonymously(page);
   const email = `${crypto.randomUUID()}@example.com`;
   await page.goto("/online/");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("correct horse");
-  await page.getByRole("button", { name: "Sign In", exact: true }).click();
-  await expect(page.getByText(`Open the link sent to ${email}, then reload this page.`)).toBeVisible({ timeout: 20_000 });
+  // a player with games here starts on the tab that keeps them
+  await page.locator(".landing-bar .account").click();
+  await expect(page.getByRole("tab", { name: "New Account" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("dialog")).toContainText("Your game comes with you.");
+  await page.getByRole("tab", { name: "Sign In" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Signing in swaps your game here for that account's. New Account keeps it.");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await createPasswordAccount(page, email);
+  await expect(page.locator(".landing-bar .account")).toHaveText("Verify Email…");
   await expect(page.getByLabel("Handle")).toHaveCount(0);
 
   expect((await fetch(await verificationLink(email))).ok).toBe(true);
-  await page.reload();
+  // coming back to the page, from the email, finds the address verified
+  await Promise.all([page.waitForEvent("load"), page.evaluate(() => dispatchEvent(new Event("focus")))]);
   await expect(page.locator(".landing-bar .account")).toHaveText("Signed In", { timeout: 20_000 });
   await expect(page.getByLabel("Handle")).toBeVisible();
-  await expect(page.getByLabel("Password")).toHaveCount(0);
   await expect(page.getByRole("button", { name: `Continue Online as ${name}` })).toBeVisible();
 
   // signing in again with the password comes back to the same account
   await page.locator(".landing-bar .account").click();
   await Promise.all([page.waitForEvent("load"), page.getByRole("menuitem", { name: "Sign Out" }).click()]);
-  await page.goto("/online/");
+  await openSignIn(page, "Sign In");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("correct horse");
-  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await page.getByLabel("Password", { exact: true }).fill("correct horse");
+  await page.getByRole("dialog").getByRole("button", { name: "Sign In", exact: true }).click();
   await expect(page.locator(".landing-bar .account")).toHaveText("Signed In", { timeout: 20_000 });
   await expect(page.getByRole("button", { name: `Continue Online as ${name}` })).toBeVisible();
 });
 
-test("signing in with Google while a password account waits to be verified keeps its games", async ({ page }) => {
+test("another email in place of one waiting to be verified keeps the games", async ({ page }) => {
   const name = await playAnonymously(page);
   await page.goto("/online/");
-  await page.getByLabel("Email").fill(`${crypto.randomUUID()}@example.com`);
-  await page.getByLabel("Password").fill("correct horse");
-  await page.getByRole("button", { name: "Sign In", exact: true }).click();
-  await expect(page.getByText(/^Open the link sent to/)).toBeVisible({ timeout: 20_000 });
-  await signInWithGoogle(page, `${crypto.randomUUID()}@example.com`);
+  await createPasswordAccount(page, `${crypto.randomUUID()}@example.com`);
+  await page.getByRole("button", { name: "Use Another Email" }).click();
+  await expect(page.getByRole("tab", { name: "New Account" })).toBeVisible();
+  await expect(page.locator(".landing-bar .account")).toHaveText("Sign In");
+  await page.getByRole("button", { name: "Create Account with Google" }).click();
+  await googlePage(page, `${crypto.randomUUID()}@example.com`, false);
   await expect(page.locator(".landing-bar .account")).toHaveText("Signed In", { timeout: 20_000 });
   await expect(page.getByRole("button", { name: `Continue Online as ${name}` })).toBeVisible();
 });
 
-test("a wrong password doesn't sign in", async ({ page }) => {
+test("another email after signing in to an unverified account signs out, leaving that account as it was", async ({ browser }) => {
   const email = `${crypto.randomUUID()}@example.com`;
+  const first = await browser.newContext();
+  const page = await first.newPage();
   await online(page);
-  const signIn = async (password: string) => {
-    await page.goto("/online/");
-    await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(password);
-    await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await page.goto("/online/");
+  await createPasswordAccount(page, email);
+  await first.close();
+
+  const second = await browser.newContext();
+  const other = await second.newPage();
+  await online(other);
+  await other.goto("/online/");
+  const signIn = async () => {
+    await openSignIn(other, "Sign In");
+    await other.getByLabel("Email").fill(email);
+    await other.getByLabel("Password", { exact: true }).fill("correct horse");
+    await other.getByRole("dialog").getByRole("button", { name: "Sign In", exact: true }).click();
+    await expect(other.getByText(`Open the link sent to ${email}.`, { exact: false })).toBeVisible({ timeout: 20_000 });
   };
-  await signIn("correct horse");
-  await page.getByRole("button", { name: "Sign Out" }).click();
-  await page.waitForURL(/signedout/);
-  await signIn("wrong horse");
-  await expect(page.getByRole("alert")).toHaveText("Couldn't sign in. Check the email and password, and try again.");
+  await signIn();
+  await Promise.all([other.waitForEvent("load"), other.getByRole("button", { name: "Use Another Email" }).click()]);
+  await expect(other.locator(".landing-bar .account")).toHaveText("Sign In");
+  // the account still signs in with its password
+  await signIn();
+  await second.close();
+});
+
+test("a new account for an email that has one changes nothing, and a wrong password doesn't sign in", async ({ browser }) => {
+  const email = `${crypto.randomUUID()}@example.com`;
+  const first = await browser.newContext();
+  const page = await first.newPage();
+  await online(page);
+  await page.goto("/online/");
+  await createPasswordAccount(page, email);
+  await first.close();
+
+  const second = await browser.newContext();
+  const other = await second.newPage();
+  const name = await playAnonymously(other);
+  await other.goto("/online/");
+  await openSignIn(other, "New Account");
+  await other.getByLabel("Email").fill(email);
+  await other.getByLabel("Password", { exact: true }).fill("correct horse");
+  await other.getByRole("button", { name: "Create Account", exact: true }).click();
+  await expect(other.getByRole("alert")).toHaveText("There's already an account for that email. Sign In Instead");
+  await expect(other.locator(".landing-bar .account")).toHaveText("Sign In");
+  await other.getByRole("button", { name: "Sign In Instead" }).click();
+  await expect(other.getByRole("tab", { name: "Sign In" })).toHaveAttribute("aria-selected", "true");
+  await expect(other.getByLabel("Email")).toHaveValue(email);
+
+  await other.getByLabel("Password", { exact: true }).fill("wrong horse");
+  await other.getByRole("dialog").getByRole("button", { name: "Sign In", exact: true }).click();
+  await expect(other.getByRole("alert")).toHaveText("Wrong email or password. If you made your account with Google, use Sign In with Google.");
+  await other.keyboard.press("Escape");
+  await expect(other.getByRole("button", { name: `Continue Online as ${name}` })).toBeVisible();
+  await second.close();
+});
+
+test("a password reset is sent without saying whether the email has an account", async ({ page }) => {
+  await online(page);
+  await page.goto("/online/");
+  await openSignIn(page, "Sign In");
+  await page.getByRole("button", { name: "Reset Password" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Enter your email, then choose Reset Password.");
+  const email = `${crypto.randomUUID()}@example.com`;
+  await page.getByLabel("Email").fill(email);
+  await page.getByRole("button", { name: "Reset Password" }).click();
+  await expect(page.getByRole("status")).toHaveText(`If ${email} has an account, an email to set a new password is on its way.`);
+});
+
+test("a Google account that already has an account is left alone, then signed in to without going back to Google", async ({ browser }) => {
+  const email = `${crypto.randomUUID()}@example.com`;
+  const first = await browser.newContext();
+  const page = await first.newPage();
+  await online(page);
+  await page.goto("/online/");
+  await signInWithGoogle(page, email);
+  await expect(page.locator(".landing-bar .account")).toHaveText("Signed In", { timeout: 20_000 });
+  await first.close();
+
+  const second = await browser.newContext();
+  const other = await second.newPage();
+  await playAnonymously(other);
+  await other.goto("/online/");
+  await openSignIn(other, "New Account");
+  await other.getByRole("button", { name: "Create Account with Google" }).click();
+  await googlePage(other, email, true);
+  await expect(other.getByRole("alert")).toHaveText("There's already an account for that Google account. Sign In Instead", { timeout: 20_000 });
+  await expect(other.locator(".landing-bar .account")).toHaveText("Sign In");
+  await other.getByRole("button", { name: "Sign In Instead" }).click();
+  await Promise.all([other.waitForEvent("load"), other.getByRole("button", { name: "Sign In with Google" }).click()]);
+  expect(new URL(other.url()).port).toBe("5199");
+  await expect(other.locator(".landing-bar .account")).toHaveText("Signed In", { timeout: 20_000 });
+  await second.close();
+});
+
+test("an anonymous player's scored game offers to sign in, at the end and at home", async ({ page }) => {
+  await online(page);
+  await untilPlaying(page, `Ag${Date.now() % 100000}`);
+  await pass(page, 2);
+  const over = await endGame(page);
+  await expect(over.getByText("It's public as Anonymous. Sign in to put your handle on it.")).toBeVisible({ timeout: 60_000 });
+  await over.getByRole("button", { name: "Sign In…" }).click();
+  await expect(page.getByRole("tab", { name: "New Account" })).toHaveAttribute("aria-selected", "true", { timeout: 20_000 });
+  await expect(page.getByRole("dialog")).toContainText("Your game comes with you.");
+  await expect.poll(() => new URL(page.url()).searchParams.has("signin")).toBe(false);
+  await page.keyboard.press("Escape");
+  const last = page.locator("section", { has: page.getByRole("heading", { name: "Your last game" }) });
+  await expect(last).toContainText("It's public as Anonymous.", { timeout: 20_000 });
 });
 
 test("a handle someone else has is refused, and another can be chosen", async ({ browser }) => {
@@ -876,7 +1004,7 @@ test("signing out comes home as a new player, and signing in again brings the ac
   await account.click();
   await Promise.all([page.waitForEvent("load"), page.getByRole("menuitem", { name: "Sign Out" }).click()]);
   await expect(page.getByRole("status")).toHaveText("You're signed out. Your games and handle are kept for when you sign in again.");
-  await expect(page.getByRole("button", { name: "Sign In with Google" })).toBeVisible();
+  await expect(page.locator(".landing-bar .account")).toHaveText("Sign In");
   await expect.poll(() => new URL(page.url()).searchParams.has("signedout")).toBe(false);
 
   await signInWithGoogle(page, email, true);

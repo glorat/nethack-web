@@ -2,7 +2,8 @@
 import type { PageMode } from "../../ui/mode";
 import { linesIn } from "../../port/recording";
 import { expectedScoringMs, scoreGame } from "../score";
-import { createOnlineSession, createUploader, scoreFinishedGame } from "../server/api";
+import { createOnlineSession, createUploader, loadProfile, scoreFinishedGame } from "../server/api";
+import { homeAddress } from "../../port/modes";
 import { gameWatchAddress } from "../results";
 import type { OnlineSession } from "../session";
 import type { LogUploader, UploadNotice } from "../upload";
@@ -112,11 +113,15 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
         await Promise.race([up.settled(), new Promise((r) => setTimeout(r, giveUpMs))]);
         const through = up.lastBatch();
         if (!through) return { kind: "later" as const };
-        return scoreGame(id, location.origin, giveUpMs, {
-          ask: () => scoreFinishedGame(id, through),
-          sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
-          now: () => Date.now(),
-        });
+        const [scored, profile] = await Promise.all([
+          scoreGame(id, location.origin, giveUpMs, {
+            ask: () => scoreFinishedGame(id, through),
+            sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+            now: () => Date.now(),
+          }),
+          loadProfile().catch((e) => console.warn("couldn't read the profile", e)),
+        ]);
+        return scored.kind === "scored" && profile && !profile.signedIn ? { ...scored, signIn: `${homeAddress("online")}?signin` } : scored;
       })();
       return { expectedMs, score };
     },
