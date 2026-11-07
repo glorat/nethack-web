@@ -21,7 +21,8 @@ export interface Observation {
   conditions: number;
   /** Messages since the last observation. */
   messages: string[];
-  inventory: { letter: string; text: string; tile: number }[];
+  /** heading: the inventory's class heading above the item, such as "Weapons". */
+  inventory: { letter: string; text: string; tile: number; heading: string }[];
   gameOver: string | null;
 }
 
@@ -32,6 +33,16 @@ export class Observer {
     private session: Session,
     private unexplored: number,
   ) {}
+
+  private inventory(items: MenuItem[]): Observation["inventory"] {
+    let heading = "";
+    const out: Observation["inventory"] = [];
+    for (const i of items) {
+      if (i.identifier === 0) heading = i.text;
+      else out.push({ letter: i.accelerator, text: i.text, tile: i.tile, heading });
+    }
+    return out;
+  }
 
   observe(): Observation {
     const { state, prompt } = this.session;
@@ -62,11 +73,7 @@ export class Observer {
       status,
       conditions: state.status.BL_CONDITION?.mask ?? 0,
       messages,
-      inventory: state.inventory.filter((i) => i.identifier !== 0).map((i: MenuItem) => ({
-        letter: i.accelerator,
-        text: i.text,
-        tile: i.tile,
-      })),
+      inventory: this.inventory(state.inventory),
       gameOver: state.gameOver,
     };
   }
