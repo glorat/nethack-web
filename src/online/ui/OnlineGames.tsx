@@ -10,33 +10,51 @@ const endedOn = (at: number) => new Date(at).toLocaleDateString(undefined, { dat
 
 const described = ({ name, endedAt }: FinishedGame) => `${name}'s game of ${endedOn(endedAt)}`;
 
-/** The player's finished online games, with each one's result once the server has replayed it, and a way to delete each. */
-export function OnlineGames({ onDeleted }: { onDeleted: () => void }) {
+/** The player's finished online games, loaded once for the frames that show them. */
+export function useFinishedGames(shown: boolean) {
   const [games, setGames] = useState<FinishedGame[] | null>(null);
-  const [note, setNote] = useState("");
-  const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
+    if (!shown) return;
     listFinishedGames().then(
       (found) => setGames(found),
       // offline play has to work without the server, so this says nothing
       (e) => console.warn("couldn't list finished online games", e),
     );
-  }, []);
-  if (!games?.length && !note) return null;
+  }, [shown]);
+  return [games, setGames] as const;
+}
+
+/** The tombstone of the player's latest finished online game that has a result. */
+export function LastOnlineGame({ games }: { games: FinishedGame[] | null }) {
   const latest = games?.reduce<FinishedGame | null>((a, g) => (a && a.endedAt >= g.endedAt ? a : g), null);
+  if (!latest?.result) return null;
+  return (
+    <section class="frame landing-device" aria-labelledby="last-online-game">
+      <h2 class="frame-label" id="last-online-game">
+        Your last game
+      </h2>
+      <Grave who={latest.name} points={latest.result.points} death={latest.result.death} year={new Date(latest.endedAt).getFullYear()} />
+    </section>
+  );
+}
+
+/** The player's finished online games, with each one's result once the server has replayed it, and a way to delete each. */
+export function OnlineGames({ games, onGames, onDeleted }: { games: FinishedGame[] | null; onGames: (update: (games: FinishedGame[] | null) => FinishedGame[] | null) => void; onDeleted: () => void }) {
+  const [note, setNote] = useState("");
+  const heading = useRef<HTMLHeadingElement>(null);
+  if (!games?.length && !note) return null;
   const gone = (deleted: FinishedGame) => {
-    setGames((all) => all!.filter((g) => g.game !== deleted.game));
+    onGames((all) => all!.filter((g) => g.game !== deleted.game));
     setNote(`Deleted ${described(deleted)}. You have a sad feeling for a moment, then it passes.`);
     // the row that held focus has gone
     heading.current?.focus();
     onDeleted();
   };
   return (
-    <section class="frame landing-device" aria-labelledby="finished-games">
+    <section class="frame landing-device finished-games" aria-labelledby="finished-games">
       <h2 class="frame-label" id="finished-games" ref={heading} tabIndex={-1}>
         Your finished games
       </h2>
-      {latest?.result ? <Grave who={latest.name} points={latest.result.points} death={latest.result.death} year={new Date(latest.endedAt).getFullYear()} /> : null}
       {/* there from the start, so screen readers announce what it comes to say */}
       <p role="status" class={note ? undefined : "visually-hidden"}>
         {note}
