@@ -5,8 +5,10 @@ const playedOn = (at: number) => new Date(at).toLocaleString(undefined, { dateSt
 /** The player's online games still in flight, the latest played first. */
 export function GamesInProgress({ games }: { games: GameSummary[] }) {
   return (
-    <section class="landing-panel landing-device">
-      <h2>Your online games in progress</h2>
+    <section class="frame landing-device" aria-labelledby="in-progress">
+      <h2 class="frame-label" id="in-progress">
+        Your online games in progress
+      </h2>
       <ol class="device-scores in-progress">
         {[...games]
           .sort((a, b) => b.lastPlayedAt - a.lastPlayedAt)

@@ -101,13 +101,13 @@ export function HandlePrompt({ profile, onProfile }: { profile: Profile; onProfi
   };
   return (
     <form
-      class="landing-panel handle-prompt"
+      class="frame handle-prompt"
       onSubmit={(e) => {
         e.preventDefault();
         if (valid && state !== "sending") void send();
       }}
     >
-      <h2>Choose your handle</h2>
+      <h2 class="frame-label">Choose your handle</h2>
       <p>Your public name on the server, shown with your online games and scores whatever you call your characters. It can't be changed for now.</p>
       <label for="handle">Handle</label>
       <input id="handle" value={handle} maxLength={20} autoComplete="off" onInput={(e) => setHandle((e.target as HTMLInputElement).value)} aria-describedby="handle-hint" />

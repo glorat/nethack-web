@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { WIKI_URL } from "../port/describe";
 import { playerName, savedName, saveName } from "../port/name";
 import { type GameMode, homeAddress, keepLastMode, lastMode, placeOf, playAddress } from "../port/modes";
@@ -17,6 +17,12 @@ import { finishSignIn, listOnlineGames, loadProfile, signInWithGoogle, signOut }
 import { updateWhenIdle } from "../sw/register";
 import { AboutDialog } from "./dialogs/AboutDialog";
 import { GameSettingsDialog } from "./dialogs/GameSettingsDialog";
+import { Scene } from "./landing/Scene";
+import { cookie, omens, rumors } from "../port/omens";
+import RUMORS from "../../nethack/dat/rumors.tru?raw";
+import "@fontsource/vt323/latin-400.css";
+import "@fontsource/ibm-plex-mono/latin-400.css";
+import "@fontsource/ibm-plex-mono/latin-600.css";
 
 // each mode's home loads this; only the online one reaches the network
 // an address it doesn't know is taken as offline, which reaches nothing
@@ -163,21 +169,55 @@ export function Landing() {
   const onlinePanels = online && !refused;
   // each asks once, as it appears, which has to be as the signed-in player
   const accountPanels = onlinePanels && !finishing;
-  const goOther = (label: string) => (
-    <a class="mode-switch" href={homeAddress(OTHER)}>
-      {label}
+  const goOther = (label: string, keyed?: boolean) => (
+    <a class="mode-switch" href={homeAddress(OTHER)} ref={keyed ? otherLink : undefined}>
+      {keyed ? <Keyed label={label} /> : label}
     </a>
   );
+  const greeting = remembered && !changing ? `Hello ${online ? (profile?.handle ?? remembered) : remembered}, welcome to NetHack!` : "Welcome to NetHack!";
+  const otherLink = useRef<HTMLAnchorElement>(null);
+  const continueButton = useRef<HTMLButtonElement>(null);
+  const settingsButton = useRef<HTMLButtonElement>(null);
+  const aboutButton = useRef<HTMLButtonElement>(null);
+  const form = useRef<HTMLFormElement>(null);
+  // read as a key arrives, as an effect re-run after a dialog closes can come after the next key
+  const dialogOpen = useRef(false);
+  dialogOpen.current = editingOptions || about || choosingOnline;
+  // before paint, so a key pressed as soon as the page shows finds it listening
+  useLayoutEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (dialogOpen.current || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, select, textarea, [contenteditable], [role=dialog], [role=menu]")) return;
+      // with nothing focused, Enter does what the form's highlighted button does
+      if (e.key === "Enter" && (target === document.body || target === null)) {
+        e.preventDefault();
+        form.current?.requestSubmit();
+        return;
+      }
+      const keyed: Record<string, { current: HTMLElement | null }> = { p: playButton, c: continueButton, s: settingsButton, g: otherLink, a: aboutButton };
+      const el = keyed[e.key.toLowerCase()]?.current;
+      if (!el || (el as HTMLButtonElement).disabled) return;
+      e.preventDefault();
+      el.click();
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, []);
+  const [messages] = useState(() => [...omens(new Date()), ...cookie(pick(rumors(RUMORS)))]);
+  const hero = remembered && !changing ? `${remembered} the Evoker  ` : "";
   return (
     <div class={`landing ${MODE}`}>
       <header class={`landing-bar ${MODE}`}>
         <span class="landing-title">
-          NetHack{online ? null : <span class="mode-badge">Offline</span>}
+          nethack.app<span class={`mode-badge ${MODE}`}>{online ? "Online" : "Offline"}</span>
         </span>
         <span class="landing-bar-end">
           {onlinePanels ? <AccountBar profile={profile} onSignIn={signIn} signingIn={signingIn || finishing} onSignOut={signOutHere} /> : null}
-          {goOther(online ? "Go Offline" : "Go Online")}
-          <button onClick={() => setAbout(true)}>About</button>
+          {goOther(online ? "Go Offline" : "Go Online", true)}
+          <button class="bar-link" ref={aboutButton} onClick={() => setAbout(true)}>
+            <Keyed label="About" />
+          </button>
         </span>
       </header>
       {signInFailed && (
@@ -205,103 +245,164 @@ export function Landing() {
         </p>
       ) : null}
       <main class="landing-main">
-        {onlinePanels && profile?.signedIn && !profile.handle ? <HandlePrompt profile={profile} onProfile={setProfile} /> : null}
-        <section class="landing-hero">
-          <form
-            class="start-card"
-            onSubmit={(e) => {
-              e.preventDefault();
-              // Enter does what's highlighted
-              if (!online) playOffline();
-              else if (continueOnline) continueOnline();
-              else chooseOnline();
-            }}
-          >
-            <h1>NetHack</h1>
-            <p class="start-sub">
-              {online
-                ? "Your games are kept for you, so you can pick them up on any device, and the ones you finish count for the high scores. Needs a connection."
-                : "Games stay on this device and play with no connection. They aren't backed up or scored, and they're separate from your online games."}
-            </p>
-            {choosingOnline ? (
-              <OnlineChoice name={playerName(name)} onBack={backFromOnline} />
-            ) : (
-              <>
-                {changing ? (
-                  <>
-                    <label for="name">Who are you?</label>
-                    <input id="name" value={name} autofocus maxLength={31} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
-                  </>
-                ) : null}
-                {online ? (
-                  <>
-                    {continueOnline && latestOnline ? (
-                      <button type="submit" class="primary">
-                        Continue Online as {latestOnline.name}
+        <div class="landing-col">
+          {onlinePanels && profile?.signedIn && !profile.handle ? <HandlePrompt profile={profile} onProfile={setProfile} /> : null}
+          <section class="frame start-frame" aria-labelledby="start-title">
+            <h2 class="frame-label">Play</h2>
+            <form
+              class="start-card"
+              ref={form}
+              onSubmit={(e) => {
+                e.preventDefault();
+                // Enter does what's highlighted
+                if (!online) playOffline();
+                else if (continueOnline) continueOnline();
+                else chooseOnline();
+              }}
+            >
+              <h1 id="start-title">{greeting}</h1>
+              <p class="start-sub">
+                {online
+                  ? "Your games are kept for you, so you can pick them up on any device, and the ones you finish count for the high scores. Needs a connection."
+                  : "NetHack 5.0, complete. Games stay on this device and play with no connection. They aren't backed up or scored, and they're separate from your online games."}
+              </p>
+              {choosingOnline ? (
+                <OnlineChoice name={playerName(name)} onBack={backFromOnline} />
+              ) : (
+                <>
+                  {changing ? (
+                    <>
+                      <label for="name">Who are you?</label>
+                      <input id="name" value={name} autofocus maxLength={31} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
+                    </>
+                  ) : null}
+                  <div class="start-buttons">
+                    {online ? (
+                      <>
+                        {continueOnline && latestOnline ? (
+                          <button type="submit" class="primary" ref={continueButton}>
+                            <Keyed label="Continue" hidden={` Online as ${latestOnline.name}`} />
+                          </button>
+                        ) : null}
+                        <button type={continueOnline ? "button" : "submit"} class={continueOnline ? undefined : "primary"} disabled={!valid} ref={playButton} onClick={continueOnline ? chooseOnline : undefined}>
+                          <Keyed label="Play" hidden={changing ? " Online" : ` Online as ${remembered}`} />
+                        </button>
+                      </>
+                    ) : offlineInProgress ? (
+                      <button type="submit" class="primary" disabled={!valid} ref={continueButton}>
+                        <Keyed label="Continue" hidden={` Offline as ${remembered}`} />
                       </button>
-                    ) : null}
-                    <button type={continueOnline ? "button" : "submit"} class={continueOnline ? undefined : "primary"} disabled={!valid} ref={playButton} onClick={continueOnline ? chooseOnline : undefined}>
-                      {changing ? "Play Online" : `Play Online as ${remembered}`}
+                    ) : (
+                      <button type="submit" class="primary" disabled={!valid} ref={playButton}>
+                        <Keyed label="Play" hidden={changing ? " Offline" : ` Offline as ${remembered}`} />
+                      </button>
+                    )}
+                  </div>
+                  <div class="start-links">
+                    {changing ? null : (
+                      <button type="button" onClick={() => setChanging(true)}>
+                        Change Name
+                      </button>
+                    )}
+                    <button type="button" ref={settingsButton} onClick={() => setEditingOptions(true)}>
+                      Game <Keyed label="Settings..." />
                     </button>
-                  </>
-                ) : (
-                  <button type="submit" class="primary" disabled={!valid}>
-                    {changing ? "Play Offline" : `${offlineInProgress ? "Continue" : "Play"} Offline as ${remembered}`}
-                  </button>
-                )}
-                <div class="start-links">
-                  {changing ? null : (
-                    <button type="button" onClick={() => setChanging(true)}>
-                      Change Name
-                    </button>
-                  )}
-                  <button type="button" onClick={() => setEditingOptions(true)}>
-                    Game Settings...
-                  </button>
-                </div>
-              </>
-            )}
-            {!online && offlineReady ? <p class="landing-ready">✓ Ready to play offline</p> : null}
-          </form>
-          <img class="landing-shot" src={`${import.meta.env.BASE_URL}screenshot.jpg`} alt="A NetHack game: the dungeon map in painted tiles, with stats, equipment, messages and inventory around it" />
-        </section>
-        {accountPanels ? (
-          <>
-            {/* one is already the Continue button */}
-            {inProgress.length > 1 ? <GamesInProgress games={inProgress} /> : null}
-            <OnlineGames onDeleted={() => setDeletions((n) => n + 1)} />
-            {/* a deletion can change both */}
-            <Achievements reload={deletions} />
-            <Leaderboard reload={deletions} />
-          </>
-        ) : null}
-        {online ? null : <DeviceGames />}
-        <section class="landing-panels">
-          <details class={`landing-panel landing-help${returning ? " secondary" : ""}`} open={!returning}>
+                  </div>
+                </>
+              )}
+              {!online && offlineReady ? <p class="landing-ready">✓ Ready to play offline</p> : null}
+            </form>
+          </section>
+          {accountPanels ? (
+            <>
+              {/* one is already the Continue button */}
+              {inProgress.length > 1 ? <GamesInProgress games={inProgress} /> : null}
+              <OnlineGames onDeleted={() => setDeletions((n) => n + 1)} />
+              {/* a deletion can change both */}
+              <Achievements reload={deletions} />
+            </>
+          ) : null}
+          {online ? null : <DeviceGames />}
+          <details class="frame landing-help" open={!returning}>
             <summary>
-              <h2>New to NetHack?</h2>
+              <h2 class="frame-label">New to NetHack?</h2>
             </summary>
             <ul>
-              <li>Move with the arrow keys or <kbd>h j k l</kbd>, and <kbd>y u b n</kbd> for diagonals.</li>
+              <li>
+                Move with the arrow keys or <kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd>, and <kbd>y</kbd> <kbd>u</kbd> <kbd>b</kbd> <kbd>n</kbd> for diagonals.
+              </li>
               <li>Click the map to walk somewhere, and right-click to look at it.</li>
               <li>Every command is in the menus, with its key beside it.</li>
-              <li><kbd>?</kbd> opens the game's help, and <kbd>S</kbd> saves and brings you back here.</li>
+              <li>
+                <kbd>?</kbd> opens the game's help, and <kbd>S</kbd> saves and brings you back here.
+              </li>
             </ul>
-            <p>The <a href={WIKI_URL} target="_blank" rel="noopener">NetHack Wiki</a> covers everything.</p>
+            <p>
+              The{" "}
+              <a href={WIKI_URL} target="_blank" rel="noopener">
+                NetHack Wiki
+              </a>{" "}
+              covers everything.
+            </p>
           </details>
           {online ? null : (
-            <div class="landing-panel">
-              <h2>Play online</h2>
+            <section class="frame landing-panel" aria-labelledby="play-online">
+              <h2 class="frame-label" id="play-online">
+                Play online
+              </h2>
               <p>Online games are kept for you, so you can pick them up on any device, and the ones you finish count for the high scores. They're separate from the games on this device.</p>
               {goOther("Go Online")}
-            </div>
+            </section>
           )}
-        </section>
+        </div>
+        <div class="landing-col">
+          <section class="frame scene-frame" aria-labelledby="scene-title">
+            <h2 class="frame-label" id="scene-title">
+              The Dungeons of Doom, level 1
+            </h2>
+            <div class="scene-messages">
+              {messages.map((m, i) => (
+                <p key={i}>{m}</p>
+              ))}
+            </div>
+            <div class="scene-map">
+              <Scene notes={!returning} />
+            </div>
+            <p class="scene-status" aria-hidden="true">
+              {hero}St:10 Dx:14 Co:12 In:18 Wi:11 Ch:9 Neutral
+              <br />
+              Dlvl:1 $:0 HP:12(12) Pw:7(7) AC:9 Xp:1
+            </p>
+          </section>
+          {accountPanels ? <Leaderboard reload={deletions} /> : null}
+        </div>
       </main>
       <footer class="landing-footer">
-        <p>NetHack {__NETHACK_VERSION__}. An unofficial web port, not affiliated with the NetHack DevTeam. The official NetHack is at <a href="https://www.nethack.org/" target="_blank" rel="noopener">nethack.org</a>.</p>
         <p>
-          Report problems on <a href="https://github.com/glorat/nethack-web/issues" target="_blank" rel="noopener">this site's issue tracker</a>, not to the DevTeam. <a href="https://github.com/glorat/nethack-web" target="_blank" rel="noopener">Source code</a>, <a href={`${import.meta.env.BASE_URL}license.txt`} target="_blank" rel="noopener">NetHack General Public License</a>, and <a href={`${import.meta.env.BASE_URL}third-party-licenses.txt`} target="_blank" rel="noopener">other open source software</a>.
+          NetHack {__NETHACK_VERSION__}. An unofficial web port, not affiliated with the NetHack DevTeam. The official NetHack is at{" "}
+          <a href="https://www.nethack.org/" target="_blank" rel="noopener">
+            nethack.org
+          </a>
+          .
+        </p>
+        <p>
+          Report problems on{" "}
+          <a href="https://github.com/glorat/nethack-web/issues" target="_blank" rel="noopener">
+            this site's issue tracker
+          </a>
+          , not to the DevTeam.{" "}
+          <a href="https://github.com/glorat/nethack-web" target="_blank" rel="noopener">
+            Source code
+          </a>
+          ,{" "}
+          <a href={`${import.meta.env.BASE_URL}license.txt`} target="_blank" rel="noopener">
+            NetHack General Public License
+          </a>
+          , and{" "}
+          <a href={`${import.meta.env.BASE_URL}third-party-licenses.txt`} target="_blank" rel="noopener">
+            other open source software
+          </a>
+          .
         </p>
         <p>
           <a href={`${import.meta.env.BASE_URL}terms/`}>Terms of Use</a> · <a href={`${import.meta.env.BASE_URL}privacy/`}>Privacy Policy</a>
@@ -321,3 +422,16 @@ export function Landing() {
     </div>
   );
 }
+
+/** A label whose first letter is its key on this page, as the game's menus mark theirs, and words only a screen reader needs. */
+function Keyed({ label, hidden }: { label: string; hidden?: string }) {
+  return (
+    <>
+      <span class="hotkey">{label[0]}</span>
+      {label.slice(1)}
+      {hidden ? <span class="visually-hidden">{hidden}</span> : null}
+    </>
+  );
+}
+
+const pick = <T,>(list: T[]): T => list[Math.floor(Math.random() * list.length)];

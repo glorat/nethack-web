@@ -18,7 +18,9 @@ test("the production build plays offline after one visit", async ({ page, contex
 
   await context.setOffline(true);
   await page.reload();
-  await expect(page.locator(".landing-shot")).toHaveJSProperty("naturalWidth", 1280);
+  // the room's tiles and the page's faces come from the worker's copy too
+  await expect.poll(() => page.evaluate(async () => (await fetch("/tiles/tiles64.png")).ok)).toBe(true);
+  await expect.poll(() => page.evaluate(async () => (await document.fonts.ready, document.fonts.check("20px VT323") && document.fonts.check("14px 'IBM Plex Mono'")))).toBe(true);
   await page.getByLabel("Who are you?").fill(`Off${Date.now() % 100000}`);
   await page.getByRole("button", { name: "Play Offline" }).click();
   const picker = page.getByRole("dialog", { name: "Choose your character" });

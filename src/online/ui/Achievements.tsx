@@ -22,8 +22,8 @@ export function Achievements({ reload }: { reload: number }) {
   if (!list || !earned(list).length) return null;
   const count = earned(list).length;
   return (
-    <section class="landing-panel landing-device">
-      <h2>
+    <section class="frame landing-device" aria-labelledby="achievements">
+      <h2 class="frame-label" id="achievements">
         Your achievements <small>{`${count} of ${list.length} earned`}</small>
       </h2>
       <progress class="achievement-progress" max={list.length} value={count} aria-hidden="true" />

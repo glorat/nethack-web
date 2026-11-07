@@ -5,7 +5,7 @@ import { SAVED_FAREWELL } from "../../ui/mode";
 import { gameAuthority } from "../fixed-inputs";
 import { keepLastGame } from "../last-game";
 import { offlineGameEnded, offlineGameStarted } from "../progress";
-import { keepScores } from "../scores";
+import { keepLastEnding, keepScores } from "../scores";
 
 export const SAVE_FAILING = "Your game isn't being saved right now. If you close this page, you may lose your latest moves.";
 
@@ -23,7 +23,10 @@ export function offlineMode(notice: (text: string | null) => void): PageMode {
     },
     events(events) {
       for (const e of events) {
-        if (e.type === "scores") keepScores(e.text);
+        if (e.type === "scores") {
+          keepScores(e.text);
+          if (e.last) keepLastEnding(e.last);
+        }
         if (e.type === "game_over" && e.text !== SAVED_FAREWELL) offlineGameEnded(name);
         if (e.type === "save_failing") notice(e.failing ? SAVE_FAILING : null);
       }
