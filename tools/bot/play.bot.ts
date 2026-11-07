@@ -35,6 +35,8 @@ const OPTIONS = [
 
 type Action = { key: number } | { answer: Answer | null };
 
+const REPLY_MS = 120_000;
+
 test("bot plays a game", async () => {
   const seed = Number(process.env.BOT_SEED ?? 1);
   const steps = Number(process.env.BOT_STEPS ?? 5000);
@@ -59,7 +61,11 @@ test("bot plays a game", async () => {
   try {
     for (; taken < steps && !session.ended; taken++) {
       bot.stdin.write(`${JSON.stringify(observer.observe())}\n`);
-      const reply = await replies.next();
+      // a bot that stops answering is stuck, and the recording so far is still worth keeping
+      const reply = await Promise.race([
+        replies.next(),
+        new Promise<IteratorResult<string>>((resolve) => setTimeout(() => resolve({ done: true, value: undefined }), REPLY_MS)),
+      ]);
       if (reply.done) {
         stopped = true;
         break;
