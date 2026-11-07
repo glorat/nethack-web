@@ -100,9 +100,9 @@ test("before an online game starts, the player is told finished games are public
   const notice = page.locator(".online-notice");
   await expect(notice).toContainText("Finished online games are public");
   await notice.getByRole("link", { name: "Privacy Policy" }).click();
-  await expect(page).toHaveTitle("Privacy Policy · NetHack");
+  await expect(page).toHaveTitle("Privacy Policy · nethack.app");
   await page.getByRole("link", { name: "Terms of Use" }).click();
-  await expect(page).toHaveTitle("Terms of Use · NetHack");
+  await expect(page).toHaveTitle("Terms of Use · nethack.app");
 });
 
 test("a finished online game can be deleted from the home, after saying what that means, and is told when it can't be yet", async ({ page }) => {
@@ -128,7 +128,7 @@ test("a finished online game can be deleted from the home, after saying what tha
     return route.fulfill({ json: { result: { status: "deleted" } }, headers: cors });
   });
   await page.goto(`${PROD}online/`);
-  const panel = page.locator("section", { has: page.getByRole("heading", { name: "Your finished online games" }) });
+  const panel = page.locator("section", { has: page.getByRole("heading", { name: "Your finished games" }) });
   await expect(panel.getByRole("listitem")).toHaveCount(2);
   const remove = panel.getByRole("button", { name: /^Delete Agnes's game/ });
   await remove.click();
@@ -179,7 +179,7 @@ test("a scored online game's link can be copied from the home, and one without a
     return route.fallback();
   });
   await page.goto(`${PROD}online/`);
-  const panel = page.locator("section", { has: page.getByRole("heading", { name: "Your finished online games" }) });
+  const panel = page.locator("section", { has: page.getByRole("heading", { name: "Your finished games" }) });
   await expect(panel.getByRole("listitem")).toHaveCount(2);
   await expect(panel.getByRole("button", { name: /^Share Bert's game/ })).toHaveCount(0);
   await panel.getByRole("button", { name: /^Share Agnes's game/ }).click();

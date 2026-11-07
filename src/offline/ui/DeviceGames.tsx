@@ -13,7 +13,7 @@ export function DeviceGames() {
   return (
     <section class="frame landing-device" aria-labelledby="device-games">
       <h2 class="frame-label" id="device-games">
-        {last ? "Your last game" : scores.length ? "Your best games on this device" : "On this device"}
+        {last ? "Your last game" : scores.length ? "Your best games on this device" : "Your last game"}
       </h2>
       {last ? <Grave who={last.name} points={last.points} death={last.death} year={Math.floor(last.date / 10000)} /> : null}
       {scores.length ? (

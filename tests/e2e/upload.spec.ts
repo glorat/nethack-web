@@ -861,7 +861,7 @@ test("the landing page lists every online game in progress, latest first, once t
     if ((route.request().postDataJSON() as { data?: { method?: string } }).data?.method !== "listGames") return route.fallback();
     await route.fulfill({ json: { result: { games } } });
   });
-  const heading = page.getByRole("heading", { name: "Your online games in progress" });
+  const heading = page.getByRole("heading", { name: "Your games in progress" });
   await page.goto("/online/");
   await expect(page.locator("form button").first()).toHaveText("Continue Online as Older");
   await expect(heading).toHaveCount(0);

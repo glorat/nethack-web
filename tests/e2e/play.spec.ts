@@ -148,6 +148,8 @@ test("Save & Quit goes to the landing page, and Play and a reload both bring the
   const play = page.getByRole("button", { name: `Continue Offline as ${name}` });
   await expect(play).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/offline/");
+  // with a game to continue, the page doesn't make its case again
+  await expect(page.locator(".start-sub")).toHaveText("It plays with no connection, and your games stay on this device, seen by no one else.");
 
   await play.click();
   await expect(page.locator(".messages")).toContainText(/welcome back/i, { timeout: 15_000 });
@@ -208,10 +210,11 @@ test("the site's root opens online the first time, then whichever mode was visit
 test("Go Offline and Go Online move between the two homes, and Back returns", async ({ page }) => {
   await page.goto("/online/");
   await expect(page.locator(".mode-badge")).toHaveText("Online");
-  await expect(page.locator(".start-sub")).toContainText("count for the high scores");
+  await expect(page.locator(".start-sub")).toContainText("The real NetHack 5.0");
+  await expect(page.locator(".start-sub")).toContainText("public high scores");
   await page.locator(".landing-bar").getByRole("link", { name: "Go Offline" }).click();
   await expect(page).toHaveURL(/\/offline\/$/);
-  await expect(page.locator(".start-sub")).toContainText("separate from your online games");
+  await expect(page.locator(".start-sub")).toContainText("seen by no one else");
   await page.locator(".landing-bar").getByRole("link", { name: "Go Online" }).click();
   await expect(page).toHaveURL(/\/online\/$/);
   await page.goBack();
@@ -1415,7 +1418,7 @@ test("a menu's lines of text read as text, its headings as headings", async ({ p
 
 test("the options file is edited in the browser and read when a game starts", async ({ page }) => {
   await page.goto("/offline/");
-  await page.getByRole("button", { name: "Game Settings..." }).click();
+  await page.getByRole("button", { name: "Game Settings…" }).click();
   const editor = page.getByRole("dialog", { name: "Game Settings" });
   const text = editor.getByLabel("Options file", { exact: true });
   await expect(text).toHaveValue(/#OPTIONS=autodig/);
@@ -1445,7 +1448,7 @@ test("the options file is edited in the browser and read when a game starts", as
 
 test("Game Settings' choices and the options file show each other's changes, and a file the core finds wrong isn't kept", async ({ page }) => {
   await page.goto("/offline/");
-  await page.getByRole("button", { name: "Game Settings..." }).click();
+  await page.getByRole("button", { name: "Game Settings…" }).click();
   const settings = page.getByRole("dialog", { name: "Game Settings" });
   const tutorial = settings.getByLabel("Tutorial");
   const move = settings.getByLabel("Move with");
@@ -1475,7 +1478,7 @@ test("Game Settings' choices and the options file show each other's changes, and
   expect(saved).toMatch(/\nOPTIONS=!tutorial\n\n?$/);
 
   // while the core checks it, the file can't be changed or the dialog closed, so what's kept is what was checked
-  await page.getByRole("button", { name: "Game Settings..." }).click();
+  await page.getByRole("button", { name: "Game Settings…" }).click();
   await tutorial.selectOption({ label: "Always play it first" });
   await settings.getByRole("button", { name: "OK" }).click();
   await expect(settings.getByRole("button", { name: "Checking…" })).toBeVisible();
@@ -1515,7 +1518,7 @@ test("an imported tile set is kept in the browser, used, and can be removed", as
   const importSets = async (files: { name: string; mimeType: string; buffer: Buffer }[]) => {
     await bar.getByRole("menuitem", { name: "View" }).click();
     const chooser = page.waitForEvent("filechooser");
-    await view.getByRole("menuitem", { name: "Import Tile Set..." }).click();
+    await view.getByRole("menuitem", { name: "Import Tile Set…" }).click();
     await (await chooser).setFiles(files);
   };
 
@@ -1547,7 +1550,7 @@ test("an imported tile set the browser can't read this time stays the saved choi
   await startGame(page, name);
   await page.getByRole("menubar").getByRole("menuitem", { name: "View" }).click();
   const chooser = page.waitForEvent("filechooser");
-  await page.getByRole("menu", { name: "View" }).getByRole("menuitem", { name: "Import Tile Set..." }).click();
+  await page.getByRole("menu", { name: "View" }).getByRole("menuitem", { name: "Import Tile Set…" }).click();
   await (await chooser).setFiles({ name: "mine.bmp", mimeType: "image/bmp", buffer: readFileSync("public/tiles/tiles16.bmp") });
   await expect(page.locator(".inv-icon").first()).toHaveCSS("background-image", /blob:/);
 
@@ -1577,7 +1580,7 @@ test("a tile set the browser won't keep is used until the page closes, and says 
   const view = page.getByRole("menu", { name: "View" });
   await bar.getByRole("menuitem", { name: "View" }).click();
   const chooser = page.waitForEvent("filechooser");
-  await view.getByRole("menuitem", { name: "Import Tile Set..." }).click();
+  await view.getByRole("menuitem", { name: "Import Tile Set…" }).click();
   await (await chooser).setFiles({ name: "mine.bmp", mimeType: "image/bmp", buffer: readFileSync("public/tiles/tiles16.bmp") });
   await expect(page.locator(".messages")).toContainText(/the tile set "mine\.bmp" will be gone when you close this page/);
   await expect(page.locator(".inv-icon").first()).toHaveCSS("background-image", /blob:/);
@@ -1918,7 +1921,7 @@ test("Choose Font sets the ASCII map's font and size, switches to ASCII, and is 
   const tiled = await height();
   const choose = async () => {
     await page.getByRole("menubar").getByRole("menuitem", { name: "View" }).click();
-    await page.getByRole("menu", { name: "View" }).getByRole("menuitem", { name: "Choose Font..." }).click();
+    await page.getByRole("menu", { name: "View" }).getByRole("menuitem", { name: "Choose Font…" }).click();
     return page.getByRole("dialog", { name: "ASCII map font" });
   };
 
