@@ -10,10 +10,10 @@ import { GamesInProgress } from "../online/ui/GamesInProgress";
 import { Achievements } from "../online/ui/Achievements";
 import { saveOptions, savedOptions } from "../port/options";
 import type { Profile } from "../online/account";
-import { AccountBar, HandlePrompt, PasswordSignIn } from "../online/ui/Account";
+import { AccountBar, HandlePrompt, SignInDialog, type SignInStart } from "../online/ui/Account";
 import { offlineGameUnder } from "../offline/progress";
 import { DeviceGames } from "../offline/ui/DeviceGames";
-import { finishSignIn, listOnlineGames, loadProfile, signInWithGoogle, signOut } from "../online/server/api";
+import { finishSignIn, listOnlineGames, loadProfile, signOut } from "../online/server/api";
 import { updateWhenIdle } from "../sw/register";
 import { AboutDialog } from "./dialogs/AboutDialog";
 import { GameSettingsDialog } from "./dialogs/GameSettingsDialog";
@@ -65,19 +65,25 @@ export function Landing() {
   }, []);
   // asking again would only be refused again
   const [finishing, setFinishing] = useState(online && !refused);
-  const [signingIn, setSigningIn] = useState(false);
+  const [signInStart, setSignInStart] = useState<SignInStart | null>(null);
+  const [askedToSignIn] = useState(() => online && new URLSearchParams(location.search).has("signin"));
   const [signInFailed, setSignInFailed] = useState(false);
   const [signedOut] = useState(() => online && new URLSearchParams(location.search).has("signedout"));
   const [signOutFailed, setSignOutFailed] = useState(false);
   useEffect(() => {
     // these notes are for how the page was reached, not for a reload later
     const params = new URLSearchParams(location.search);
-    if (params.has("signedout") || params.has("refused")) history.replaceState(history.state, "", addressWithout("signedout", "refused"));
+    if (params.has("signedout") || params.has("refused") || params.has("signin")) history.replaceState(history.state, "", addressWithout("signedout", "refused", "signin"));
   }, []);
   useEffect(() => {
     if (!finishing) return;
     // a page Google sent back after signing in has its answer to read first; any other has none, and asks nothing
     finishSignIn()
+      .then((back) => {
+        if (back.kind === "taken")
+          setSignInStart({ tab: "new", email: back.email ?? undefined, taken: true, note: back.byGoogle ? "There's already an account for that Google account." : "There's already an account for that email." });
+        if (back.kind === "password account") setSignInStart({ tab: "sign in", email: back.email ?? undefined, note: "That email signs in with a password." });
+      })
       .catch((e) => {
         console.warn("couldn't sign in", e);
         setSignInFailed(true);
@@ -109,20 +115,11 @@ export function Landing() {
     return () => removeEventListener("offline", gone);
   }, []);
   useEffect(() => {
-    // back from Google without signing in, the browser may show this page as it was left
-    const shown = (e: PageTransitionEvent) => e.persisted && setSigningIn(false);
+    // back from Google without signing in, the browser may show this page as it was left, waiting on Google
+    const shown = (e: PageTransitionEvent) => e.persisted && setSignInStart(null);
     addEventListener("pageshow", shown);
     return () => removeEventListener("pageshow", shown);
   }, []);
-  const signIn = () => {
-    setSigningIn(true);
-    setSignInFailed(false);
-    signInWithGoogle().catch((e) => {
-      setSigningIn(false);
-      console.warn("couldn't sign in", e);
-      setSignInFailed(true);
-    });
-  };
   const signOutHere = () => {
     setSignOutFailed(false);
     signOut().then(
@@ -137,6 +134,17 @@ export function Landing() {
   useEffect(() => {
     if (profile?.handle && !name) setName(profile.handle);
   }, [profile?.handle]);
+  const [finished, setFinished] = useFinishedGames(online && !refused && !finishing);
+  const gamesHere = inProgress.length + (finished?.length ?? 0);
+  // a player with games here most likely wants to keep them, and one with none has nothing to lose by signing in
+  const signIn = () => {
+    setSignInFailed(false);
+    setSignInStart({ tab: gamesHere > 0 ? "new" : "sign in" });
+  };
+  useEffect(() => {
+    // the games here choose the tab it opens on
+    if (askedToSignIn && profile && !profile.signedIn && finished !== null) signIn();
+  }, [profile !== null, finished !== null]);
   const latestOnline = inProgress.reduce<GameSummary | null>((a, g) => (a && a.lastPlayedAt >= g.lastPlayedAt ? a : g), null);
   const offlineInProgress = !online && !changing && offlineGameUnder(remembered);
   const continueOnline = latestOnline && !changing ? () => location.assign(onlineAddress(latestOnline.name, { game: latestOnline.game })) : null;
@@ -171,7 +179,6 @@ export function Landing() {
   const onlinePanels = online && !refused;
   // each asks once, as it appears, which has to be as the signed-in player
   const accountPanels = onlinePanels && !finishing;
-  const [finished, setFinished] = useFinishedGames(accountPanels);
   const goOther = (label: string, keyed?: boolean) => (
     <a class={`mode-switch to-${OTHER}`} href={homeAddress(OTHER)} ref={keyed ? otherLink : undefined}>
       {keyed ? <Keyed label={label} /> : label}
@@ -186,7 +193,8 @@ export function Landing() {
   const form = useRef<HTMLFormElement>(null);
   // read as a key arrives, as an effect re-run after a dialog closes can come after the next key
   const dialogOpen = useRef(false);
-  dialogOpen.current = editingOptions || about || choosingOnline;
+  const signingIn = signInStart !== null && profile !== null && !profile.signedIn;
+  dialogOpen.current = editingOptions || about || choosingOnline || signingIn;
   // before paint, so a key pressed as soon as the page shows finds it listening
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -217,7 +225,7 @@ export function Landing() {
           nethack.app<span class={`mode-badge ${MODE}`}>{online ? "Online" : "Offline"}</span>
         </span>
         <span class="landing-bar-end">
-          {onlinePanels ? <AccountBar profile={profile} onSignIn={signIn} signingIn={signingIn || finishing} onSignOut={signOutHere} /> : null}
+          {onlinePanels ? <AccountBar profile={profile} onSignIn={signIn} signingIn={finishing} onSignOut={signOutHere} /> : null}
           {goOther(online ? "Go Offline" : "Go Online", true)}
           <button class="bar-link" ref={aboutButton} onClick={() => setAbout(true)}>
             <Keyed label="About" />
@@ -251,7 +259,6 @@ export function Landing() {
       <main class="landing-main">
         <div class="landing-col">
           {onlinePanels && profile?.signedIn && !profile.handle ? <HandlePrompt profile={profile} onProfile={setProfile} /> : null}
-          {onlinePanels && profile && !profile.signedIn ? <PasswordSignIn profile={profile} onSignOut={signOutHere} /> : null}
           <section class="frame start-frame" aria-labelledby="start-title">
             <div class="frame-label" aria-hidden="true">
               Play
@@ -323,7 +330,7 @@ export function Landing() {
             <>
               {/* one is already the Continue button */}
               {inProgress.length > 1 ? <GamesInProgress games={inProgress} /> : null}
-              <LastOnlineGame games={finished} />
+              <LastOnlineGame games={finished} onSignIn={profile && !profile.signedIn ? signIn : undefined} />
               {/* a deletion can change both */}
               <Achievements reload={deletions} />
             </>
@@ -427,6 +434,7 @@ export function Landing() {
         />
       ) : null}
       {about ? <AboutDialog onClose={() => setAbout(false)} /> : null}
+      {signingIn ? <SignInDialog profile={profile} games={gamesHere} start={signInStart} onProfile={setProfile} onClose={() => setSignInStart(null)} /> : null}
     </div>
   );
 }

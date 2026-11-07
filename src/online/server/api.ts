@@ -78,11 +78,23 @@ export const finishedGameRecording = async (game: string): Promise<string | null
 /** Whether the player is signed in, their handle, and their latest request for one. */
 export const loadProfile = async (): Promise<Profile> => (await server()).profile();
 
+export type { SignInReturn } from "./firebase";
+
+export const createAccountWithGoogle = async (): Promise<void> => (await server()).createAccountWithGoogle();
+
 export const signInWithGoogle = async (): Promise<void> => (await server()).signInWithGoogle();
 
-export const finishSignIn = async (): Promise<boolean> => (await server()).finishSignIn();
+export const finishSignIn = async () => (await server()).finishSignIn();
+
+export const createAccount = async (email: string, password: string): Promise<void> => (await server()).createAccount(email, password);
 
 export const signInWithPassword = async (email: string, password: string): Promise<void> => (await server()).signInWithPassword(email, password);
+
+export const resendVerification = async (): Promise<void> => (await server()).resendVerification();
+
+export const resetPassword = async (email: string): Promise<void> => (await server()).resetPassword(email);
+
+export const forgetAddress = async (): Promise<boolean> => (await server()).forgetAddress();
 
 export const signOut = async (): Promise<void> => (await server()).signOut();
 

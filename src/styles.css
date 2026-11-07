@@ -282,6 +282,7 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 .direction-dialog .hint, .ext-dialog .hint { font-size: 12px; }
 .dialog-title { font-weight: 600; }
 .score-wait, .score-line { margin-top: 10px; }
+.score-sign-in { margin-top: 6px; color: var(--muted); }
 .score-wait .meter-bar { margin-top: 6px; }
 .dialog-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; align-items: center; }
 .hint { color: var(--muted); }
@@ -396,9 +397,30 @@ a.landing-title { text-decoration: none; }
 .account-popup hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
 .account-popup [role="menuitem"] { width: 100%; background: none; border: none; padding: 4px 10px; text-align: left; }
 .account-popup [role="menuitem"]:hover, .account-popup [role="menuitem"]:focus-visible { background: var(--menu-hover); color: var(--on-menu-hover); }
-.handle-prompt, .password-sign-in { display: flex; flex-direction: column; gap: 8px; }
+.handle-prompt { display: flex; flex-direction: column; gap: 8px; }
 .handle-prompt small { color: var(--muted); }
-.handle-prompt button, .password-sign-in button { align-self: flex-start; }
+.handle-prompt button { align-self: flex-start; }
+.last-game-sign-in { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: baseline; margin-top: 12px; }
+.last-game-sign-in p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.sign-in-backdrop { align-items: flex-start; overflow-y: auto; padding: 12vh 16px 16px; user-select: auto; }
+.landing .sign-in-dialog { width: min(440px, 100%); box-sizing: border-box; background: var(--bg); border-color: color-mix(in srgb, var(--mode) 45%, #3a3a3e); padding: 28px 20px 20px; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7); }
+.sign-in-dialog .dialog-close { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; padding: 0; background: none; border: none; color: var(--muted); }
+.sign-in-dialog .dialog-close:hover { color: var(--bright); }
+.sign-in-tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--rule); }
+.sign-in-tabs [role="tab"] { min-height: 40px; padding: 8px 14px; margin-bottom: -1px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); font-weight: 600; }
+.sign-in-tabs [aria-selected="true"] { color: var(--bright); border-bottom-color: var(--mode); }
+.sign-in-panel { display: flex; flex-direction: column; gap: 12px; }
+.sign-in-panel p { margin: 0; }
+.sign-in-panel label { margin-bottom: -6px; color: var(--muted); font-size: 12.5px; }
+.sign-in-google { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 40px; color: var(--bright); font-weight: 600; }
+.sign-in-or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12.5px; }
+.sign-in-or span { flex: 1; height: 1px; background: var(--rule); }
+.sign-in-note { color: var(--danger); }
+.sign-in-note .link-inline { color: var(--link); }
+.sign-in-password { display: flex; gap: 8px; }
+.sign-in-password input { flex: 1; min-width: 0; }
+.sign-in-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.sign-in-aside { color: var(--muted); font-size: 12.5px; }
 .landing-main { display: grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); gap: 28px; align-items: start; max-width: 1120px; margin: 0 auto; padding: 32px 16px; }
 .landing-col { display: grid; gap: 28px; align-content: start; min-width: 0; }
 .finished-games { grid-column: 1 / -1; }
@@ -517,7 +539,7 @@ button[aria-disabled="true"] { opacity: 0.5; cursor: default; }
   .landing-main { display: flex; flex-direction: column; align-items: stretch; gap: 28px; }
   .landing-col { display: contents; }
   .landing-main > .landing-col > * { order: 2; }
-  .landing-main .handle-prompt, .landing-main .password-sign-in { order: 0; }
+  .landing-main .handle-prompt { order: 0; }
   .landing-main .start-frame { order: 0; }
   .landing-main .scene-frame { order: 1; }
   .landing-main .finished-games { order: 2; }
