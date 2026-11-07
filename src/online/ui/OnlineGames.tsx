@@ -26,7 +26,7 @@ export function OnlineGames({ onDeleted }: { onDeleted: () => void }) {
   const latest = games?.reduce<FinishedGame | null>((a, g) => (a && a.endedAt >= g.endedAt ? a : g), null);
   const gone = (deleted: FinishedGame) => {
     setGames((all) => all!.filter((g) => g.game !== deleted.game));
-    setNote(`Deleted ${described(deleted)}.`);
+    setNote(`Deleted ${described(deleted)}. You have a sad feeling for a moment, then it passes.`);
     // the row that held focus has gone
     heading.current?.focus();
     onDeleted();
@@ -34,7 +34,7 @@ export function OnlineGames({ onDeleted }: { onDeleted: () => void }) {
   return (
     <section class="frame landing-device" aria-labelledby="finished-games">
       <h2 class="frame-label" id="finished-games" ref={heading} tabIndex={-1}>
-        Your finished online games
+        Your finished games
       </h2>
       {latest?.result ? <Grave who={latest.name} points={latest.result.points} death={latest.result.death} year={new Date(latest.endedAt).getFullYear()} /> : null}
       {/* there from the start, so screen readers announce what it comes to say */}

@@ -7,7 +7,7 @@ export function GamesInProgress({ games }: { games: GameSummary[] }) {
   return (
     <section class="frame landing-device" aria-labelledby="in-progress">
       <h2 class="frame-label" id="in-progress">
-        Your online games in progress
+        Your games in progress
       </h2>
       <ol class="device-scores in-progress">
         {[...games]

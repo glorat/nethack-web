@@ -74,4 +74,39 @@ The game uses the system font, as Cocoa does, and keeps its own monospace for ke
 
 ## Voice
 
-Copy follows the game's own words where it has them, as with the greeting "Hello Kevin, welcome to NetHack!". Otherwise it's plain and classic, in the tone of the Guidebook.
+This covers all text we write, on the landing pages and in the game's interface. The core's own messages are the game's, and stay as they are.
+
+**Who it's for.** Veterans first. The words' job is to show a NetHack player that this is the real game, done well. Regulars need almost no words, and newcomers get the "New to NetHack?" frame.
+
+**The voice: Guidebook, old hand.** Plain, exact, brief and dry, and it knows the dungeon.
+- Say what the player gets and what they can do, not how the system works ("Your games stay on this device", not "Games are stored locally").
+- Say what something is, not what it isn't.
+- Claim only what's true for every player. "The keys are the ones you know from the terminal", not "every key works": browsers on Windows and Linux keep Ctrl-T, Ctrl-W and Ctrl-N.
+- No selling: no "experience", no "adventure", no exclamation marks.
+
+**The game's own lines.** Where the game has words for something, use them: the greeting, "Who are you?", the tombstone, the fortune cookies. Beyond that, a game message may add flavour:
+- Only real messages, quoted exactly from the core. Never one written in its style, as veterans can tell.
+- Only where nothing is at stake: empty states, waiting, the not-found page, and a confirmation after something is done.
+- Never in errors, delete prompts, sign-in, privacy or the terms.
+- Beside the plain sentence, never in place of it: "No one is on the high scores yet. You hear the footsteps of a guard on patrol."
+
+**The case for the site.** When there's no game to continue, the Play frame says what this is: "The real NetHack 5.0, free, with no sign-up. The keys are the ones you know from the terminal, and you can also play with the mouse and painted tiles." Then one line for the mode. Page descriptions and link previews use the same sentence. Online play works without signing in, so "no sign-up" is true of both homes.
+
+**Rules**
+- Buttons and menu items in Title Case, as Cocoa's are ("Delete Game"). Everything else, links included, in sentence case.
+- "…", never "...". Straight quotes and apostrophes. No semicolons.
+- Dates and numbers in the player's locale (`toLocaleString`).
+
+**Words**
+| Use | For | Not |
+|---|---|---|
+| nethack.app | The site, always lower case. Don't start a sentence with it | NetHack (that's the game) |
+| NetHack 5.0 | The version | NetHack 5 |
+| handle | Your public name online | username, public name |
+| name | Your character's name | |
+| high scores | The public list of online games | leaderboard |
+| games on this device | Offline games | local games |
+| sign in | The verb. "Sign In" on buttons | log in |
+| game | One run, from start to death or ascension | session, run |
+
+On a home's own page, leave out its mode: "Your finished games" on the online home, not "Your finished online games".

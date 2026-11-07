@@ -36,14 +36,14 @@ test("the production build plays offline after one visit", async ({ page, contex
 
 test("a production build has each mode's pages, and its root only sends the visitor on", async ({ page }) => {
   const titles: Record<string, string> = {
-    "online/": "NetHack Online",
-    "online/play/": "NetHack Online",
-    "online/watch/": "Watching · NetHack Online",
-    "offline/": "NetHack Offline",
-    "offline/play/": "NetHack Offline",
-    "offline/watch/": "Watching · NetHack Offline",
-    "terms/": "Terms of Use · NetHack",
-    "privacy/": "Privacy Policy · NetHack",
+    "online/": "nethack.app · Online",
+    "online/play/": "nethack.app · Online",
+    "online/watch/": "Watching · nethack.app · Online",
+    "offline/": "nethack.app · Offline",
+    "offline/play/": "nethack.app · Offline",
+    "offline/watch/": "Watching · nethack.app · Offline",
+    "terms/": "Terms of Use · nethack.app",
+    "privacy/": "Privacy Policy · nethack.app",
   };
   for (const [path, title] of Object.entries(titles)) {
     const response = await page.request.get(`${PROD}${path}`);

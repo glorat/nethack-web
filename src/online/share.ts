@@ -120,11 +120,11 @@ function page(head: Head, body: string): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>${html(head.title)} · NetHack</title>
+<title>${html(head.title)} · nethack.app</title>
 ${meta("name", "description", head.description)}
 ${meta("name", "robots", "noindex")}
 ${meta("name", "theme-color", head.themeColor)}
-${meta("property", "og:site_name", "NetHack")}
+${meta("property", "og:site_name", "nethack.app")}
 ${meta("property", "og:type", "website")}
 ${meta("property", "og:url", head.url)}
 ${meta("property", "og:title", head.title)}

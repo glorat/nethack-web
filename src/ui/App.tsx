@@ -744,7 +744,7 @@ export function App({ handedOver, onReplay }: Props) {
       entries: [
         ...GAME_MENU.slice(0, 1).map(command),
         // not over a question, whose keys the editor's text would answer
-        { title: "Game Settings...", disabled: !!pending || ownDialog, run: () => setEditingOptions(true) },
+        { title: "Game Settings…", disabled: !!pending || ownDialog, run: () => setEditingOptions(true) },
         ...GAME_MENU.slice(1).map(command),
         null,
         {
@@ -770,10 +770,10 @@ export function App({ handedOver, onReplay }: Props) {
             if (ascii) toggleAscii?.(false);
           },
         })),
-        { title: "Import Tile Set...", disabled: ascii && !toggleAscii, run: () => importInput.current?.click() },
+        { title: "Import Tile Set…", disabled: ascii && !toggleAscii, run: () => importInput.current?.click() },
         ...(tileSet.imported && !ascii ? [{ title: `Remove "${tileSet.file}"...`, run: () => void removeTileSet(tileSet) }] : []),
         {
-          title: "Choose Font...",
+          title: "Choose Font…",
           // it switches to ASCII mode, and no question should come up over it
           disabled: (!ascii && !toggleAscii) || (!commanding && state.gameOver === null) || ownDialog,
           run: () => setChoosingFont(true),

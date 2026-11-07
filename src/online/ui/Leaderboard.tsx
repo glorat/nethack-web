@@ -15,7 +15,7 @@ export function Leaderboard({ reload }: { reload: number }) {
   return (
     <section class="frame landing-device" aria-labelledby="high-scores">
       <h2 class="frame-label" id="high-scores">
-        Online high scores
+        High scores
       </h2>
       {entries.length ? (
         <>
@@ -39,7 +39,7 @@ export function Leaderboard({ reload }: { reload: number }) {
           </ol>
         </>
       ) : (
-        <p>No online games have been scored yet.</p>
+        <p>No one is on the high scores yet. You hear the footsteps of a guard on patrol.</p>
       )}
     </section>
   );

@@ -32,6 +32,7 @@ const SLOW_MS = 8000;
 const OTHER: GameMode = MODE === "online" ? "offline" : "online";
 // read before this visit is kept, so a first visit opens the help; kept at once, as the page may be left before it paints
 const RETURNING = lastMode();
+const PITCH = "The real NetHack 5.0, free, with no sign-up. The keys are the ones you know from the terminal, and you can also play with the mouse and painted tiles.";
 keepLastMode(MODE);
 
 /** This page's address without the given parameters. */
@@ -139,6 +140,7 @@ export function Landing() {
   const latestOnline = inProgress.reduce<GameSummary | null>((a, g) => (a && a.lastPlayedAt >= g.lastPlayedAt ? a : g), null);
   const offlineInProgress = !online && !changing && offlineGameUnder(remembered);
   const continueOnline = latestOnline && !changing ? () => location.assign(onlineAddress(latestOnline.name, { game: latestOnline.game })) : null;
+  const gameToContinue = offlineInProgress || continueOnline !== null;
   const playButton = useRef<HTMLButtonElement>(null);
   const backFromOnline = () => {
     setChoosingOnline(false);
@@ -265,9 +267,8 @@ export function Landing() {
             >
               <h1 id="start-title">{greeting}</h1>
               <p class="start-sub">
-                {online
-                  ? "Your games are kept for you, so you can pick them up on any device, and the ones you finish count for the high scores. Needs a connection."
-                  : "NetHack 5.0, complete. Games stay on this device and play with no connection. They aren't backed up or scored, and they're separate from your online games."}
+                {gameToContinue ? "" : `${PITCH} `}
+                {online ? "Finished games go on the public high scores. Sign in, and your games follow you to any device." : "It plays with no connection, and your games stay on this device, seen by no one else."}
               </p>
               {choosingOnline ? (
                 <OnlineChoice name={playerName(name)} onBack={backFromOnline} />
@@ -308,7 +309,7 @@ export function Landing() {
                       </button>
                     )}
                     <button type="button" ref={settingsButton} onClick={() => setEditingOptions(true)}>
-                      Game <Keyed label="Settings..." />
+                      Game <Keyed label="Settings…" />
                     </button>
                   </div>
                 </>
@@ -353,7 +354,7 @@ export function Landing() {
               <h2 class="frame-label" id="play-online">
                 Play online
               </h2>
-              <p>Online games are kept for you, so you can pick them up on any device, and the ones you finish count for the high scores. They're separate from the games on this device.</p>
+              <p>Finished online games go on the public high scores, where anyone can watch them. Sign in, and your games follow you to any device.</p>
               {goOther("Go Online")}
             </section>
           )}

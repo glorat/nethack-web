@@ -116,7 +116,7 @@ export const COMMAND_MENUS: Menu[] = [
     title: "Act",
     items: [
       c("Repeat", "repeat", "^A"),
-      c("Extended Command...", "#", "#"),
+      c("Extended Command…", "#", "#"),
       null,
       c("Fight", "fight", "F"),
       c("Fire From Quiver", "fire", "f"),
