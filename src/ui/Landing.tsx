@@ -170,7 +170,7 @@ export function Landing() {
   // each asks once, as it appears, which has to be as the signed-in player
   const accountPanels = onlinePanels && !finishing;
   const goOther = (label: string, keyed?: boolean) => (
-    <a class="mode-switch" href={homeAddress(OTHER)} ref={keyed ? otherLink : undefined}>
+    <a class={`mode-switch to-${OTHER}`} href={homeAddress(OTHER)} ref={keyed ? otherLink : undefined}>
       {keyed ? <Keyed label={label} /> : label}
     </a>
   );
