@@ -749,6 +749,97 @@ test("signing in keeps the anonymous player's games, and the name they chose", a
   await expect(page.getByText(/Until you sign in/)).toHaveCount(0);
 });
 
+/** The link in the Auth emulator's latest verification email to `email`. */
+async function verificationLink(email: string): Promise<string> {
+  let link: string | undefined;
+  await expect
+    .poll(async () => {
+      const { oobCodes } = (await (await fetch("http://127.0.0.1:9299/emulator/v1/projects/demo-nethack/oobCodes")).json()) as {
+        oobCodes: { email: string; requestType: string; oobLink: string }[];
+      };
+      link = oobCodes.filter((c) => c.email === email && c.requestType === "VERIFY_EMAIL").at(-1)?.oobLink;
+      return link;
+    })
+    .toBeTruthy();
+  return link!;
+}
+
+/** Plays a little as an anonymous player and comes home, returning the name played as. */
+async function playAnonymously(page: Page): Promise<string> {
+  await online(page);
+  const name = `Si${Date.now() % 100000}`;
+  await untilPlaying(page, name);
+  const game = await gameId(page);
+  await pass(page, 2);
+  await expect.poll(async () => (await stored(page, game)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(1200);
+  return name;
+}
+
+test("password sign-in is only offered when the address asks for it", async ({ page }) => {
+  await online(page);
+  await page.goto("/online/");
+  await expect(page.getByRole("button", { name: "Sign In with Google" })).toBeVisible();
+  await expect(page.getByLabel("Password")).toHaveCount(0);
+  await page.goto("/online/?password");
+  await expect(page.getByLabel("Password")).toBeVisible();
+});
+
+test("a password account keeps the anonymous player's games, and counts once its email is verified", async ({ page }) => {
+  const name = await playAnonymously(page);
+  const email = `${crypto.randomUUID()}@example.com`;
+  await page.goto("/online/?password");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("correct horse");
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await expect(page.getByText(`Open the link sent to ${email}, then reload this page.`)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByLabel("Handle")).toHaveCount(0);
+
+  expect((await fetch(await verificationLink(email))).ok).toBe(true);
+  await page.reload();
+  await expect(page.locator(".landing-bar .account")).toHaveText("Signed In", { timeout: 20_000 });
+  await expect(page.getByLabel("Handle")).toBeVisible();
+  await expect(page.getByRole("button", { name: `Continue Online as ${name}` })).toBeVisible();
+
+  // signing in again with the password comes back to the same account
+  await page.locator(".landing-bar .account").click();
+  await Promise.all([page.waitForEvent("load"), page.getByRole("menuitem", { name: "Sign Out" }).click()]);
+  await page.goto("/online/?password");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("correct horse");
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await expect(page.locator(".landing-bar .account")).toHaveText("Signed In", { timeout: 20_000 });
+  await expect(page.getByRole("button", { name: `Continue Online as ${name}` })).toBeVisible();
+});
+
+test("signing in with Google while a password account waits to be verified keeps its games", async ({ page }) => {
+  const name = await playAnonymously(page);
+  await page.goto("/online/?password");
+  await page.getByLabel("Email").fill(`${crypto.randomUUID()}@example.com`);
+  await page.getByLabel("Password").fill("correct horse");
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await expect(page.getByText(/^Open the link sent to/)).toBeVisible({ timeout: 20_000 });
+  await signInWithGoogle(page, `${crypto.randomUUID()}@example.com`);
+  await expect(page.locator(".landing-bar .account")).toHaveText("Signed In", { timeout: 20_000 });
+  await expect(page.getByRole("button", { name: `Continue Online as ${name}` })).toBeVisible();
+});
+
+test("a wrong password doesn't sign in", async ({ page }) => {
+  const email = `${crypto.randomUUID()}@example.com`;
+  await online(page);
+  const signIn = async (password: string) => {
+    await page.goto("/online/?password");
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(password);
+    await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  };
+  await signIn("correct horse");
+  await page.getByRole("button", { name: "Sign Out" }).click();
+  await page.waitForURL(/signedout/);
+  await signIn("wrong horse");
+  await expect(page.getByRole("alert")).toHaveText("Couldn't sign in. Check the email and password, and try again.");
+});
+
 test("a handle someone else has is refused, and another can be chosen", async ({ browser }) => {
   const handle = `Tk${crypto.randomUUID().slice(0, 8).replaceAll("-", "")}`;
   for (const outcome of ["granted", "taken"] as const) {

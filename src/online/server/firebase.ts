@@ -1,6 +1,20 @@
 import { initializeApp } from "firebase/app";
 import { CustomProvider, getToken, initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
-import { connectAuthEmulator, getAuth, getRedirectResult, GoogleAuthProvider, linkWithRedirect, signInAnonymously, signInWithCredential, signOut as authSignOut } from "firebase/auth";
+import {
+  type AuthCredential,
+  connectAuthEmulator,
+  EmailAuthProvider,
+  getAuth,
+  getRedirectResult,
+  GoogleAuthProvider,
+  linkWithCredential,
+  linkWithRedirect,
+  sendEmailVerification,
+  signInAnonymously,
+  signInWithCredential,
+  signInWithEmailAndPassword,
+  signOut as authSignOut,
+} from "firebase/auth";
 import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore/lite";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 import { appCheckRefused, type OnlineDeps, refusedAddress } from "../session";
@@ -89,13 +103,13 @@ async function publicRequest<Output>(method: string, input: object): Promise<Out
 }
 
 /**
- * Sends the player to Google to link their account to the anonymous player here, so their uid and games carry over.
+ * Sends the player to Google to link their account to the player here, so their uid and games carry over.
  * The page comes back with the answer, for `finishSignIn`.
  */
 export async function signInWithGoogle(): Promise<void> {
   await signedIn();
-  const current = auth.currentUser!;
-  if (current.isAnonymous) await linkWithRedirect(current, new GoogleAuthProvider());
+  // a player still to verify their address has games to carry over too
+  await linkWithRedirect(auth.currentUser!, new GoogleAuthProvider());
 }
 
 /**
@@ -110,18 +124,57 @@ export async function finishSignIn(): Promise<boolean> {
     if ((e as { code?: string }).code !== "auth/credential-already-in-use" || !credential) throw e;
     await signInWithCredential(auth, credential);
   }
-  // the server reads how the player signed in from the token, which has to say so now
-  await auth.currentUser?.getIdToken(true);
+  await refreshToken();
   return true;
+}
+
+/**
+ * Signs in with an email address and password, making the account if there isn't one. The server counts it only once
+ * the address is verified, by the email this sends until it is.
+ */
+export async function signInWithPassword(email: string, password: string): Promise<void> {
+  await linkOrSignIn(EmailAuthProvider.credential(email, password), () => signInWithEmailAndPassword(auth, email, password));
+  await refreshToken();
+  const user = auth.currentUser!;
+  // signed in all the same, and signing in again sends another
+  if (!user.emailVerified) await sendEmailVerification(user, { url: location.href }).catch((e) => console.warn("couldn't send the verification email", e));
+}
+
+/** Links an account to the anonymous player, so their uid and games carry over, or signs in to it if it's someone's. */
+async function linkOrSignIn(credential: AuthCredential, signIn: () => Promise<unknown>): Promise<void> {
+  await signedIn();
+  const current = auth.currentUser!;
+  if (!current.isAnonymous) {
+    await signIn();
+    return;
+  }
+  try {
+    await linkWithCredential(current, credential);
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (code !== "auth/credential-already-in-use" && code !== "auth/email-already-in-use") throw e;
+    await signIn();
+  }
+}
+
+/** The server reads how the player signed in from the token, which has to say so now. */
+async function refreshToken(): Promise<void> {
+  await auth.currentUser?.getIdToken(true);
 }
 
 /** Forgets the account in this browser, in every tab. The next request makes a new anonymous player. */
 export const signOut = () => authSignOut(auth);
 
-export const profile = async (): Promise<Profile> => ({
-  ...(await userRequest<Omit<Profile, "email">>("profile", {})),
-  email: auth.currentUser?.email ?? null,
-});
+export async function profile(): Promise<Profile> {
+  await signedIn();
+  const user = auth.currentUser!;
+  // an address verified from another tab or device is only known once asked for, and the server reads it from the token
+  if (user.email && !(await user.getIdTokenResult()).claims.email_verified) {
+    await user.reload();
+    if (user.emailVerified) await refreshToken();
+  }
+  return { ...(await userRequest<Omit<Profile, "email">>("profile", {})), email: user.email };
+}
 
 export const requestHandle = (input: { handle: string; sentAt: number }) => userRequest<{ status: "awaiting approval" }>("requestHandle", input);
 

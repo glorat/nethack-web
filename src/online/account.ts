@@ -5,7 +5,7 @@ export type Outcome = "granted" | "taken" | "refused" | "has a handle";
 export interface Profile {
   signedIn: boolean;
   handle: string | null;
-  /** The Google account's, which the browser knows and the server doesn't send. */
+  /** The account's, which the browser knows and the server doesn't send; with `signedIn` false, it's waiting to be verified. */
   email: string | null;
   request: { handle: string; outcome: Outcome } | null;
 }
