@@ -42,7 +42,7 @@ test("bot plays a game", async () => {
     name: "Bot",
     pageSeed: seed,
     seedsVary: true,
-    character: process.env.BOT_CHARACTER ?? "role:Valkyrie,race:human,gender:female,align:neutral",
+    character: process.env.BOT_CHARACTER || "role:Valkyrie,race:human,gender:female,align:neutral",
     options: OPTIONS,
   });
   const unexplored = (globalThis as { nethackGlobal?: { constants?: { GLYPH?: Record<string, number> } } }).nethackGlobal
