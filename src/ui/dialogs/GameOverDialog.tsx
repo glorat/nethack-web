@@ -49,14 +49,19 @@ function ScoreLine({ scoring }: { scoring: Scoring }) {
   if (score.kind === "later") return <div class="score-line">Your score isn't ready yet. It will appear on the home page.</div>;
   const points = score.points === undefined ? null : `You scored ${score.points.toLocaleString()} ${score.points === 1 ? "point" : "points"}. `;
   return (
-    <div class="score-line">
-      {points ?? "Your game is scored. "}
-      <a href={score.address}>See your game's page</a>
-    </div>
+    <>
+      <div class="score-line">
+        {points ?? "Your game is scored. "}
+        <a href={score.address}>See your game's page</a>
+      </div>
+      {score.signIn ? <div class="score-sign-in">It's public as Anonymous. Sign in to put your handle on it.</div> : null}
+    </>
   );
 }
 
 export function GameOverDialog({ text, onNewGame, onQuit, onReplay, scoring }: Props) {
+  const score = scoring?.score;
+  const signIn = score?.kind === "scored" ? score.signIn : undefined;
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // not a key held from closing the last window, which the player pressed before this appeared
@@ -82,6 +87,11 @@ export function GameOverDialog({ text, onNewGame, onQuit, onReplay, scoring }: P
         {/* there from the start, so what replaces the wait is announced */}
         <div role="status">{scoring ? <ScoreLine scoring={scoring} /> : null}</div>
         <div class="dialog-buttons">
+          {signIn ? (
+            <button class="dialog-left" onClick={() => location.assign(signIn)}>
+              Sign In…
+            </button>
+          ) : null}
           {onReplay ? <button onClick={onReplay}>Replay</button> : null}
           <button onClick={onQuit}>Quit</button>
           <button class="primary" onClick={onNewGame}>

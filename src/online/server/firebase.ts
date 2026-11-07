@@ -1,7 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { CustomProvider, getToken, initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import {
-  type AuthCredential,
   connectAuthEmulator,
   EmailAuthProvider,
   getAuth,
@@ -9,11 +8,15 @@ import {
   GoogleAuthProvider,
   linkWithCredential,
   linkWithRedirect,
+  type OAuthCredential,
   sendEmailVerification,
+  sendPasswordResetEmail,
   signInAnonymously,
   signInWithCredential,
   signInWithEmailAndPassword,
+  signInWithRedirect,
   signOut as authSignOut,
+  unlink,
 } from "firebase/auth";
 import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore/lite";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
@@ -103,59 +106,124 @@ async function publicRequest<Output>(method: string, input: object): Promise<Out
 }
 
 /**
- * Sends the player to Google to link their account to the player here, so their uid and games carry over.
- * The page comes back with the answer, for `finishSignIn`.
+ * What coming back from Google came to. An account that's already someone's is left alone: by its Google account,
+ * held so signing in to it needs no second trip; by its address, which then signs in with a password.
  */
-export async function signInWithGoogle(): Promise<void> {
+export type SignInReturn =
+  | { kind: "none" | "signed in" }
+  | { kind: "taken"; byGoogle: boolean; email: string | null }
+  | { kind: "password account"; email: string | null };
+
+let googleAccount: OAuthCredential | null = null;
+
+const codeOf = (e: unknown) => (e as { code?: string }).code;
+const emailOf = (e: unknown) => (e as { customData?: { email?: string } }).customData?.email ?? null;
+
+/** Sends the player to Google to make an account of the player here, keeping their games. The page comes back for `finishSignIn`. */
+export async function createAccountWithGoogle(): Promise<void> {
   await signedIn();
-  // a player still to verify their address has games to carry over too
   await linkWithRedirect(auth.currentUser!, new GoogleAuthProvider());
 }
 
 /**
- * Whether coming back from Google signed the player in. An account that's already someone's is signed in to instead,
- * leaving this browser's anonymous games with the anonymous uid.
+ * Signs in to the player's Google account, leaving the games played here behind: at once if Google has just said it's
+ * someone's, otherwise by sending the player to Google, which comes back for `finishSignIn`.
  */
-export async function finishSignIn(): Promise<boolean> {
+export async function signInWithGoogle(): Promise<void> {
+  await signedIn();
+  const held = googleAccount;
+  googleAccount = null;
+  if (!held) return signInWithRedirect(auth, new GoogleAuthProvider());
+  await signInWithCredential(auth, held);
+  await refreshToken();
+}
+
+export async function finishSignIn(): Promise<SignInReturn> {
   try {
-    if (!(await getRedirectResult(auth))) return false;
+    if (!(await getRedirectResult(auth))) return { kind: "none" };
   } catch (e) {
-    const credential = GoogleAuthProvider.credentialFromError(e as Parameters<typeof GoogleAuthProvider.credentialFromError>[0]);
-    if ((e as { code?: string }).code !== "auth/credential-already-in-use" || !credential) throw e;
-    await signInWithCredential(auth, credential);
+    const code = codeOf(e);
+    if (code === "auth/account-exists-with-different-credential") return { kind: "password account", email: emailOf(e) };
+    if (code !== "auth/credential-already-in-use" && code !== "auth/email-already-in-use") throw e;
+    const byGoogle = code === "auth/credential-already-in-use";
+    googleAccount = byGoogle ? GoogleAuthProvider.credentialFromError(e as Parameters<typeof GoogleAuthProvider.credentialFromError>[0]) : null;
+    return { kind: "taken", byGoogle, email: emailOf(e) };
   }
+  await refreshToken();
+  return { kind: "signed in" };
+}
+
+/** Makes an account of the player here, keeping their games. It counts once the address is verified, by the email this sends. */
+export async function createAccount(email: string, password: string): Promise<void> {
+  await signedIn();
+  try {
+    await linkWithCredential(auth.currentUser!, EmailAuthProvider.credential(email, password));
+  } catch (e) {
+    if (codeOf(e) === "auth/email-already-in-use" || codeOf(e) === "auth/credential-already-in-use") throw Object.assign(new Error("taken"), { code: "taken" });
+    throw e;
+  }
+  remember(MADE_HERE, auth.currentUser!.uid);
+  await refreshToken();
+  await sendVerification();
+}
+
+/** Signs in to an account, leaving the games played here behind. One still to be verified is sent another email. */
+export async function signInWithPassword(email: string, password: string): Promise<void> {
+  await signedIn();
+  await signInWithEmailAndPassword(auth, email, password);
+  await refreshToken();
+  if (!auth.currentUser!.emailVerified) await sendVerification();
+}
+
+/** Signed in or not, the player can sign in again to send another. */
+async function sendVerification(): Promise<void> {
+  await sendEmailVerification(auth.currentUser!, { url: homeHere() }).catch((e) => console.warn("couldn't send the verification email", e));
+}
+
+export const resendVerification = async (): Promise<void> => sendEmailVerification(auth.currentUser!, { url: homeHere() });
+
+/** Says nothing of whether the address has an account, as with email enumeration protection on, where it can't. */
+export async function resetPassword(email: string): Promise<void> {
+  await sendPasswordResetEmail(auth, email, { url: homeHere() }).catch((e) => {
+    if (codeOf(e) !== "auth/user-not-found") throw e;
+  });
+}
+
+/**
+ * Takes back an address still to be verified, to make the account with another: from a player who added it here,
+ * keeping them and their games, and otherwise by signing out, as the address may be all an account signed in to has.
+ * Says whether the player is still the same.
+ */
+export async function forgetAddress(): Promise<boolean> {
+  const user = auth.currentUser!;
+  if (recalled(MADE_HERE) !== user.uid) {
+    await signOut();
+    return false;
+  }
+  await unlink(user, "password");
   await refreshToken();
   return true;
 }
 
-/**
- * Signs in with an email address and password, making the account if there isn't one. The server counts it only once
- * the address is verified, by the email this sends until it is.
- */
-export async function signInWithPassword(email: string, password: string): Promise<void> {
-  await linkOrSignIn(EmailAuthProvider.credential(email, password), () => signInWithEmailAndPassword(auth, email, password));
-  await refreshToken();
-  const user = auth.currentUser!;
-  // signed in all the same, and signing in again sends another
-  if (!user.emailVerified) await sendEmailVerification(user, { url: location.href }).catch((e) => console.warn("couldn't send the verification email", e));
+const MADE_HERE = "nethack-web.accountMadeHere";
+
+function remember(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    console.warn("couldn't keep", key, e);
+  }
 }
 
-/** Links an account to the anonymous player, so their uid and games carry over, or signs in to it if it's someone's. */
-async function linkOrSignIn(credential: AuthCredential, signIn: () => Promise<unknown>): Promise<void> {
-  await signedIn();
-  const current = auth.currentUser!;
-  if (!current.isAnonymous) {
-    await signIn();
-    return;
-  }
+function recalled(key: string): string | null {
   try {
-    await linkWithCredential(current, credential);
-  } catch (e) {
-    const code = (e as { code?: string }).code;
-    if (code !== "auth/credential-already-in-use" && code !== "auth/email-already-in-use") throw e;
-    await signIn();
+    return localStorage.getItem(key);
+  } catch {
+    return null;
   }
 }
+
+const homeHere = () => `${location.origin}${location.pathname}`;
 
 /** The server reads how the player signed in from the token, which has to say so now. */
 async function refreshToken(): Promise<void> {

@@ -192,7 +192,7 @@ test("the offline home asks nothing of anywhere but this site, before or after a
   await page.reload();
   await expect(page.getByRole("button", { name: /^Play Offline as Quiet/ })).toBeVisible();
   await expect(page.locator(".mode-badge")).toHaveText("Offline");
-  await expect(page.getByRole("button", { name: "Sign In with Google" })).toHaveCount(0);
+  await expect(page.locator(".landing-bar .account")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Online/ })).toHaveCount(0);
   await page.waitForTimeout(1000);
   expect(outside).toEqual([]);
