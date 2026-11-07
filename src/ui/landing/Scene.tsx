@@ -8,7 +8,7 @@ const at = (name: TileName) => `calc(var(--square) * ${-(TILES[name] % SHEET_COL
 /** The room in the game's painted tiles, with notes for a new player on what's in it. */
 export function Scene({ notes }: { notes: boolean }) {
   return (
-    <div class="scene" role="img" aria-label="A room on the first level: you, a wizard, with your little dog, a newt, some gold, a potion and the stairs down">
+    <div class="scene" role="img" aria-label={`A room on the first level: you, a wizard, with your little dog, a newt, some gold, a potion and the stairs down.${notes ? ` ${ROOM_NOTES.map((n) => n.text).join(". ")}.` : ""}`}>
       {ROOM.flatMap((row, r) =>
         row.map((square, c) => {
           const [under, over] = Array.isArray(square) ? square : [square];
