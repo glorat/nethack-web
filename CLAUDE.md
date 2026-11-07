@@ -18,6 +18,7 @@ pnpm exec playwright test play.spec -g "<test name>"
 - Read `docs/recording.md` before changing `recorder.ts`, `replayer.ts`, `replay-runner.ts`, `shadow.ts` or `resume.ts`. A change to what gets recorded also affects how unfinished games come back.
 - The service worker only registers in a production build, so offline and update behaviour can't be checked on the dev server.
 - `docs/cocoa-parity.md` lists the Cocoa features still to port; tick items off in the commit that lands them.
+- Read `docs/design-system.md` before changing colours, fonts or the landing pages' look.
 
 ## Repos and commits
 
