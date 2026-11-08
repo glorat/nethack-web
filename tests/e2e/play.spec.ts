@@ -2244,3 +2244,33 @@ test("a game that met bones comes back after the page closes, by its replay read
   await expect(page.locator(".stats-title")).toHaveText(title);
   expect(await recording(page, name)).toMatch(/^\d+ back /m);
 });
+
+test("the game worker gives a bot driving the page #terrain's known map", async ({ page }) => {
+  await page.addInitScript(() => {
+    const Base = Worker;
+    window.Worker = class extends Base {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        (window as unknown as { gameWorker?: Worker }).gameWorker ??= this;
+      }
+    };
+  });
+  await startAs(page, "Agnes", /Valkyrie/);
+  const glyphs = await page.evaluate(
+    () =>
+      new Promise<number[] | null>((resolve) => {
+        const worker = (window as unknown as { gameWorker: Worker }).gameWorker;
+        worker.addEventListener("message", (ev: MessageEvent<{ type: string; id: number; glyphs: number[] | null }>) => {
+          if (ev.data.type === "terrain" && ev.data.id === 7) resolve(ev.data.glyphs);
+        });
+        worker.postMessage({ type: "terrain", id: 7 });
+      }),
+  );
+  expect(glyphs).toHaveLength(21 * 80);
+  // the map the hero has seen, and never-seen squares, which differ
+  expect(new Set(glyphs).size).toBeGreaterThan(1);
+  // column 0 isn't on the map
+  expect(glyphs!.filter((_, i) => i % 80 > 0).every((g) => g >= 0)).toBe(true);
+  // the page carries on playing
+  await expect(page.locator(".app[data-commanding]")).toBeAttached();
+});
