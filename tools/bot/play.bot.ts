@@ -1,41 +1,16 @@
-// Plays one game with a bot that runs as a separate process, exchanging JSON lines:
-// an Observation out each time the game waits, and one action back, either
-// {"key": <code>} when it waits for a key or {"answer": <Answer>} for any other request.
+// Plays one headless game with a bot that runs as a separate process, exchanging JSON lines as drive.ts says.
 //
 //   BOT_SEED=3 pnpm exec vitest run --config tools/bot/vitest.config.ts
 //
-// BOT_COMMAND: the bot's command line (default: AutoAscend's bridge, from ../autoascend).
+// BOT_COMMAND: the bot's command line (default: the TypeScript AutoAscend in ../autoascend-ts).
+// BOT_INTERFACE: web (default) or nle, as drive.ts says.
 // BOT_STEPS: how many actions at most. BOT_OUT: where to write the game's recording.
 // BOT_CHARACTER: NETHACKOPTIONS character fields. A finished game is replayed to check its recording.
-import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
-import { createInterface } from "node:readline";
 import { expect, test } from "vitest";
-import type { Answer } from "../../src/protocol";
 import { replayRecording, Session } from "../../tests/headless/harness";
-import { Observer } from "./observe";
-
-const OPTIONS = [
-  "autopickup",
-  "pickup_types:$?!/",
-  "pickup_burden:unencumbered",
-  "mention_walls",
-  "!cmdassist",
-  "!legacy",
-  "showexp",
-  "showscore",
-  "time",
-  "runmode:teleport",
-  // options 5.0 added or changed, set as 3.6 played: AutoAscend handles locks itself, searches beside
-  // monsters, and walks into water it means to
-  "autounlock:none",
-  "!safe_wait",
-  "paranoid_confirmation:pray",
-].join(",");
-
-type Action = { key: number } | { answer: Answer | null };
-
-const REPLY_MS = 120_000;
+import { drive, sessionGame } from "./drive";
+import { BOT_OPTIONS } from "./options";
 
 test("bot plays a game", async () => {
   const seed = Number(process.env.BOT_SEED ?? 1);
@@ -45,49 +20,17 @@ test("bot plays a game", async () => {
     pageSeed: seed,
     seedsVary: true,
     character: process.env.BOT_CHARACTER || "role:Valkyrie,race:human,gender:female,align:neutral",
-    options: OPTIONS,
+    options: BOT_OPTIONS,
   });
-  const unexplored = (globalThis as { nethackGlobal?: { constants?: { GLYPH?: Record<string, number> } } }).nethackGlobal
-    ?.constants?.GLYPH?.GLYPH_UNEXPLORED;
-  if (unexplored === undefined) throw new Error("the core's glyph constants aren't loaded");
-  const observer = new Observer(session, unexplored);
-
-  const [command, ...args] = (process.env.BOT_COMMAND ?? "uv run --project ../autoascend python -m autoascend.bridge").split(" ");
-  const bot = spawn(command, args, { stdio: ["pipe", "pipe", "inherit"] });
-  const replies = createInterface({ input: bot.stdout })[Symbol.asyncIterator]();
-
   let taken = 0;
   let stopped = false;
   try {
-    for (; taken < steps && !session.ended; taken++) {
-      bot.stdin.write(`${JSON.stringify(observer.observe())}\n`);
-      // a bot that stops answering is stuck, and the recording so far is still worth keeping
-      const reply = await Promise.race([
-        replies.next(),
-        new Promise<IteratorResult<string>>((resolve) => setTimeout(() => resolve({ done: true, value: undefined }), REPLY_MS)),
-      ]);
-      if (reply.done) {
-        stopped = true;
-        // a bot that registers SIGUSR1 (as AutoAscend's bridge does) says where it was stuck
-        bot.kill("SIGUSR1");
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        break;
-      }
-      const action = JSON.parse(reply.value) as Action;
-      if ("key" in action) {
-        if (session.prompt) throw new Error(`a key while the game asks ${JSON.stringify(session.prompt).slice(0, 200)}`);
-        await session.send(String.fromCharCode(action.key));
-      } else {
-        await session.answer(action.answer);
-      }
-    }
+    ({ taken, stopped } = await drive(sessionGame(session), steps));
   } finally {
-    bot.stdin.end();
-    bot.kill();
+    // a bot that stops answering is stuck, and the recording so far is still worth keeping
+    const out = process.env.BOT_OUT;
+    if (out) writeFileSync(out, (session.recording ?? session.recorded.join("\n")) + "\n");
   }
-
-  const out = process.env.BOT_OUT;
-  if (out) writeFileSync(out, (session.recording ?? session.recorded.join("\n")) + "\n");
   process.stderr.write(
     `seed ${seed}: ${taken} actions, turn ${session.state.status.BL_TIME?.text ?? "?"}, ` +
       `${session.ended ? `ended: ${session.state.gameOver ?? ""}` : stopped ? "the bot stopped" : "still playing"}\n`,

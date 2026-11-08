@@ -1,7 +1,13 @@
 // What the bot sees each time the game waits: what a player would see on the page.
 import type { GameRequest, MenuItem } from "../../src/protocol";
-import { COLNO, ROWNO } from "../../src/port/state";
-import type { Session } from "../../tests/headless/harness";
+import { COLNO, ROWNO, type GameState } from "../../src/port/state";
+
+/** A game as far as the bot can see it: a headless Session, or a page being played. */
+export interface Seen {
+  state: GameState;
+  /** What the game waits for, other than a key; null while it waits for a key. */
+  prompt: GameRequest | null;
+}
 
 export interface Observation {
   /** What the game waits for; "key" when it wants a command or other keystroke. */
@@ -30,7 +36,7 @@ export class Observer {
   private lastMessage = 0;
 
   constructor(
-    private session: Session,
+    private session: Seen,
     private unexplored: number,
   ) {}
 
