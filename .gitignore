@@ -7,3 +7,5 @@ test-results/
 playwright-report/
 .DS_Store
 .wrangler/
+tools/bot/nhdata.json
+tools/bot/.env
