@@ -39,6 +39,7 @@ pnpm exec playwright test play.spec -g "<test name>"
 
 - The core talks to JS through `win/shim/winshim.c`: each window call reaches `Game.callback` in `src/worker/game.ts`, which returns a Promise only if the core must wait: ASYNCIFY then unwinds the whole stack, far too slow for the hundreds of thousands of calls a long replay makes.
 - A callback that throws or rejects hangs the core for good; `callback()` catches and answers with `fallback()`. Keep it that way.
+- Every build of the core plays every recorded game the same, as builds aren't pinned and the server validates stored games on its own core. The golden games in `tests/headless/golden/` replay on every test run to show it.
 - In the shim's argument formats, `i` passes an int's value and `p` a raw pointer; a value read from the wrong one looks plausible and is wrong.
 - Before inventing UI behaviour, check what tty does in the core and what [nethack-cocoa](https://github.com/glorat/nethack-cocoa) does (if checked out, it's at `../nethack-cocoa`); this front end follows Cocoa.
 
