@@ -22,6 +22,8 @@ export interface Playable extends Seen {
   answer(answer: Answer | null): Promise<void>;
   /** Until the game asks for something it hasn't been given, or ends; `first` for the game's first question. */
   waiting(first: boolean): Promise<void>;
+  /** #terrain's known map without monsters and objects, the core's glyphs row by row; where the game can give it. */
+  terrain?(): Promise<number[]>;
 }
 
 export function sessionGame(session: Session): Playable {
@@ -38,6 +40,7 @@ export function sessionGame(session: Session): Playable {
     key: async (code) => void (await session.send(String.fromCharCode(code))),
     answer: async (answer) => void (await session.answer(answer)),
     waiting: async () => {},
+    terrain: async () => session.terrain(),
   };
 }
 
@@ -53,6 +56,11 @@ export async function drive(game: Playable, steps: number): Promise<{ taken: num
   const extras = (process.env.BOT_NLE_EXTRAS ?? "").split(",").filter(Boolean);
   for (const e of extras) if (!(EXTRAS as readonly string[]).includes(e)) throw new Error(`no NLE extra ${e}; there are ${EXTRAS.join(", ")}`);
   if (nle) for (const e of extras) nle.extras.add(e as Extra);
+  if (nle?.extras.has("terrain") && !game.terrain) throw new Error("this game can't give the terrain extra");
+  const load = async () => {
+    nle!.load(observer.observe());
+    if (nle!.extras.has("terrain")) nle!.setTerrain(await game.terrain!());
+  };
 
   if (!process.env.BOT_COMMAND) throw new Error("set BOT_COMMAND to the bot's command line");
   const [command, ...args] = process.env.BOT_COMMAND.split(" ");
@@ -78,7 +86,7 @@ export async function drive(game: Playable, steps: number): Promise<{ taken: num
       if (game.ended) {
         // ended without the questions after the end, as by saving: the bot still hears that it's over
         if (nle) {
-          nle.load(observer.observe());
+          await load();
           nle.done = true;
           bot.stdin.write(`${JSON.stringify(nle.observation())}\n`);
         }
@@ -99,7 +107,7 @@ export async function drive(game: Playable, steps: number): Promise<{ taken: num
         }
         continue;
       }
-      nle.load(observer.observe());
+      await load();
       if (nle.done) {
         bot.stdin.write(`${JSON.stringify(nle.observation())}\n`);
         await finish(game);

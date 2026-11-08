@@ -43,6 +43,9 @@ There is no reward, `program_state`, `internal` or `screen_descriptions`.
 - `peaceful`: each square showing a peaceful monster, as a list of `[y, x]` with `x` the column in `glyphs`, empty
   when there's none. It's the map's own peaceful mark: never while hallucinating, only for a monster the hero can see
   as itself and not disguised, and kept up to date when a monster is angered or pacified without moving.
+- `terrain`: 21×79 glyphs in the layout of `glyphs`, on every observation: the map as `#terrain`'s known map without
+  monsters and objects shows it, the remembered terrain with the traps the hero has seen. Never-seen squares are
+  stone. Unlike `#terrain`, a view limited by being underwater or swallowed stays limited. Headless only for now.
 
 ## Glyphs and the game's data
 
