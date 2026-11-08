@@ -1,7 +1,7 @@
 # Playing with an NLE bot
 
 A bot written for the [NetHack Learning Environment](https://github.com/facebookresearch/nle) (NLE) plays this game's
-NetHack 5.0 core through the runners here, headless or on the page, with `BOT_INTERFACE=nle`:
+NetHack 5.0 core through the headless runner here, with `BOT_INTERFACE=nle`:
 
 ```sh
 tools/bot/nhdata/build.sh        # once, and after each core change: writes tools/bot/nhdata.json

@@ -50,7 +50,8 @@ export async function drive(game: Playable, steps: number): Promise<{ taken: num
   const observer = new Observer(game, unexplored);
   const nle = process.env.BOT_INTERFACE === "nle" ? new NleTerminal(loadNhData(), { MG: core.MG, BL_MASK: core.BL_MASK }) : null;
 
-  const [command, ...args] = (process.env.BOT_COMMAND ?? "node ../autoascend-ts/src/bridge.ts").split(" ");
+  if (!process.env.BOT_COMMAND) throw new Error("set BOT_COMMAND to the bot's command line");
+  const [command, ...args] = process.env.BOT_COMMAND.split(" ");
   const bot = spawn(command, args, { stdio: ["pipe", "pipe", "inherit"] });
   const replies = createInterface({ input: bot.stdout })[Symbol.asyncIterator]();
   const reply = async (observation: unknown): Promise<Action | null> => {

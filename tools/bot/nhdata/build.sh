@@ -1,7 +1,8 @@
 #!/bin/bash
 # Usage: tools/bot/nhdata/build.sh
 # Writes tools/bot/nhdata.json from the core in nethack/: its glyph layout, map symbols, monsters and objects, for
-# the NLE interface and for bots. Run pnpm run build:wasm first, which generates nethack/src/tile.c.
+# the NLE interface and for bots. Run pnpm run build:wasm first, which generates nethack/src/tile.c and
+# nethack/include/nhlua.h.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 NH=$(cd "$HERE/../../../nethack" && pwd)

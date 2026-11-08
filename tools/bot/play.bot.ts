@@ -2,7 +2,7 @@
 //
 //   BOT_SEED=3 pnpm exec vitest run --config tools/bot/vitest.config.ts
 //
-// BOT_COMMAND: the bot's command line (default: the TypeScript AutoAscend in ../autoascend-ts).
+// BOT_COMMAND: the bot's command line.
 // BOT_INTERFACE: web (default) or nle, as drive.ts says.
 // BOT_STEPS: how many actions at most. BOT_OUT: where to write the game's recording.
 // BOT_CHARACTER: NETHACKOPTIONS character fields. A finished game is replayed to check its recording.
