@@ -4,7 +4,7 @@
 import { beforeEach, expect, test } from "vitest";
 import { Session } from "../../tests/headless/harness";
 import { sessionGame, type Playable } from "./drive";
-import { BL, COLNO, NleTerminal, loadNhData, type NleObservation } from "./nle";
+import { BL, COLNO, NleTerminal, loadNhData, screenDescription, type NleObservation } from "./nle";
 import { Observer } from "./observe";
 import { BOT_OPTIONS } from "./options";
 
@@ -128,4 +128,23 @@ test("a text window longer than the screen turns its pages before it's dismissed
   shown = screen(term.observation()).join("\n");
   expect(shown).toContain("line 40");
   expect(term.key(32)).toEqual({ answer: { kind: "text" } });
+});
+
+test("screen descriptions say what farlook would of each square with something on it", async () => {
+  const squares = term.describable();
+  term.describe(squares, await game.describe(squares));
+  const o = term.observation();
+  const at = (y: number, x: number) => o.screen_descriptions!.find(([sy, sx]) => sy === y && sx === x)?.[2];
+  expect(at(o.blstats[BL.Y], o.blstats[BL.X])).toBe("human valkyrie called Bot");
+  expect(o.screen_descriptions!.some(([, , text]) => /^tame /.test(text))).toBe(true);
+  expect(o.screen_descriptions!.every(([, , text]) => text && !/unexplored/.test(text))).toBe(true);
+  // only on request
+  term.load(observer.observe());
+  expect(term.observation().screen_descriptions).toBeUndefined();
+});
+
+test("a farlook line gives the particular thing, else what the symbol stands for", () => {
+  expect(screenDescription("G        a gnome (peaceful gnome lord)")).toBe("peaceful gnome lord");
+  expect(screenDescription(".        a doorway or the floor of a room (doorway)")).toBe("doorway");
+  expect(screenDescription("I        remembered, unseen, creature")).toBe("remembered, unseen, creature");
 });

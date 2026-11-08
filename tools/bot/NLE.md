@@ -34,7 +34,16 @@ The terminal takes keys as tty does: any key goes on past `--More--` and Escape 
 a count typed first, `,` `.` `-` to pick or clear all, `>` `<` and Space to turn pages, and Return to accept; typed
 lines build up until Return; a text window longer than the screen turns a page with each key.
 
-There is no reward, `program_state`, `internal` or `screen_descriptions`.
+There is no reward, `program_state` or `internal`.
+
+## Extras
+
+`BOT_NLE_EXTRAS`, a comma-separated list, adds keys beyond NLE's, each only when asked for:
+
+- `screen_descriptions`: what farlook (`;`) says of each square that has something on it, as a list of
+  `[y, x, text]` with `x` the column in `glyphs`, such as `"peaceful gnome lord"`, `"tame little dog"` or `"doorway"`.
+  NLE's own is a 21×80×80 byte array. Squares of stone or never seen are left out. It follows the game's rules, so a
+  hallucinating hero gets hallucinated names, and it costs no game time.
 
 ## Glyphs and the game's data
 

@@ -4,11 +4,12 @@
 // {"key": <code>} when it waits for a key or {"answer": <Answer>} for any other request.
 // BOT_INTERFACE=nle: NLE's observation (nle.ts) out, and {"key": <code>} back, one keystroke at a time, as NLE's
 // step() takes them; the last observation has "done": true, and the runner answers the questions after the end.
+// BOT_NLE_EXTRAS: a comma-separated list of extras for the NLE observation, as NLE.md says.
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import type { Answer } from "../../src/protocol";
 import type { Session } from "../../tests/headless/harness";
-import { NleTerminal, loadNhData } from "./nle";
+import { EXTRAS, NleTerminal, loadNhData, type Extra } from "./nle";
 import { Observer, type Seen } from "./observe";
 
 const REPLY_MS = 120_000;
@@ -21,6 +22,8 @@ export interface Playable extends Seen {
   answer(answer: Answer | null): Promise<void>;
   /** Until the game asks for something it hasn't been given, or ends; `first` for the game's first question. */
   waiting(first: boolean): Promise<void>;
+  /** What farlook says of each square, the core's [x, y], without changing the game. */
+  describe(squares: [number, number][]): Promise<(string | null)[]>;
 }
 
 export function sessionGame(session: Session): Playable {
@@ -37,6 +40,7 @@ export function sessionGame(session: Session): Playable {
     key: async (code) => void (await session.send(String.fromCharCode(code))),
     answer: async (answer) => void (await session.answer(answer)),
     waiting: async () => {},
+    describe: async (squares) => squares.map(([x, y]) => session.describe(x, y)),
   };
 }
 
@@ -49,6 +53,16 @@ export async function drive(game: Playable, steps: number): Promise<{ taken: num
   if (!core || unexplored === undefined) throw new Error("the core's constants aren't loaded");
   const observer = new Observer(game, unexplored);
   const nle = process.env.BOT_INTERFACE === "nle" ? new NleTerminal(loadNhData(), { MG: core.MG, BL_MASK: core.BL_MASK }) : null;
+  const extras = (process.env.BOT_NLE_EXTRAS ?? "").split(",").filter(Boolean);
+  for (const e of extras) if (!(EXTRAS as readonly string[]).includes(e)) throw new Error(`no NLE extra ${e}; there are ${EXTRAS.join(", ")}`);
+  const wanted = (e: Extra) => extras.includes(e);
+  const load = async () => {
+    nle!.load(observer.observe());
+    if (wanted("screen_descriptions")) {
+      const squares = nle!.describable();
+      nle!.describe(squares, await game.describe(squares));
+    }
+  };
 
   if (!process.env.BOT_COMMAND) throw new Error("set BOT_COMMAND to the bot's command line");
   const [command, ...args] = process.env.BOT_COMMAND.split(" ");
@@ -74,7 +88,7 @@ export async function drive(game: Playable, steps: number): Promise<{ taken: num
       if (game.ended) {
         // ended without the questions after the end, as by saving: the bot still hears that it's over
         if (nle) {
-          nle.load(observer.observe());
+          await load();
           nle.done = true;
           bot.stdin.write(`${JSON.stringify(nle.observation())}\n`);
         }
@@ -95,7 +109,7 @@ export async function drive(game: Playable, steps: number): Promise<{ taken: num
         }
         continue;
       }
-      nle.load(observer.observe());
+      await load();
       if (nle.done) {
         bot.stdin.write(`${JSON.stringify(nle.observation())}\n`);
         await finish(game);

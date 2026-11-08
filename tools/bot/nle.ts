@@ -103,6 +103,20 @@ export interface NleObservation {
   misc: number[];
   /** The episode is over: the hero has died, or the game ended otherwise. */
   done: boolean;
+  /** An extra, with BOT_NLE_EXTRAS=screen_descriptions: what farlook says of each square that has something, as
+   * [y, x, text] with x the column in glyphs, such as "peaceful gnome lord" or "doorway". */
+  screen_descriptions?: [number, number, string][];
+}
+
+/** The extras a bot can ask for, beyond NLE's observation. */
+export const EXTRAS = ["screen_descriptions"] as const;
+export type Extra = (typeof EXTRAS)[number];
+
+/** Farlook's line, such as "d        a dog or other canine (tame little dog)", as NLE gives it: the particular
+ * thing in brackets, else what the symbol stands for. */
+export function screenDescription(farlook: string): string {
+  const particular = /\(([^()]*)\)\s*$/.exec(farlook);
+  return (particular ? particular[1] : farlook.slice(1)).trim();
 }
 
 /** What the game is to be given, once the bot's keys make one. */
@@ -174,7 +188,29 @@ export class NleTerminal {
   }
 
   /** Takes what the game shows now that it waits for something new. */
+  /** The squares worth describing, as the core's [x, y]: any not unexplored, stone or nothing. */
+  describable(): [number, number][] {
+    const c = this.c;
+    const out: [number, number][] = [];
+    this.seen!.glyphs.forEach((g, i) => {
+      const blank = (g >= c.GLYPH_CMAP_STONE_OFF && g < c.GLYPH_CMAP_MAIN_OFF) || g >= c.GLYPH_UNEXPLORED_OFF;
+      if (!blank && i % COLNO > 0) out.push([i % COLNO, Math.floor(i / COLNO)]);
+    });
+    return out;
+  }
+
+  /** Farlook's lines for the squares describable() gave, null where it had nothing. */
+  describe(squares: [number, number][], farlook: (string | null)[]): void {
+    this.descriptions = [];
+    squares.forEach(([x, y], i) => {
+      const text = farlook[i] && screenDescription(farlook[i]!);
+      if (text) this.descriptions!.push([y, x - 1, text]);
+    });
+  }
+  private descriptions: [number, number, string][] | null = null;
+
   load(seen: Observation): void {
+    this.descriptions = null;
     this.seen = seen;
     this.typed = "";
     this.count = "";
@@ -392,6 +428,7 @@ export class NleTerminal {
       tty_cursor: cursor,
       misc: [!more && request.kind === "yn" ? 1 : 0, !more && request.kind === "getlin" ? 1 : 0, more || request.kind === "text" ? 1 : 0],
       done: this.done,
+      ...(this.descriptions ? { screen_descriptions: this.descriptions } : {}),
     };
   }
 
