@@ -1,6 +1,7 @@
 // Reads and writes of core structs through the Emscripten heap. Offsets are
 // for wasm32 and must track include/wintype.h.
 import type { PlayerChoices } from "../protocol";
+import { COLNO, ROWNO } from "../port/state";
 
 export interface NetHackModule {
   getValue(ptr: number, type: string): number;
@@ -183,6 +184,11 @@ export function readDataFile(m: NetHackModule, name: string): string | null {
 }
 
 /** Farlook's text for a square, or null outside play. */
+/** #terrain's known map without monsters and objects, the core's glyphs row by row; -1 outside play. */
+export function knownTerrain(m: NetHackModule): number[] {
+  return Array.from({ length: ROWNO * COLNO }, (_, i) => m._nhweb_terrain_glyph(i % COLNO, Math.floor(i / COLNO)));
+}
+
 export function describeSquare(m: NetHackModule, x: number, y: number): string | null {
   const ptr = m._nhweb_describe(x, y);
   return ptr ? m.UTF8ToString(ptr) : null;

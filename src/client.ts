@@ -42,7 +42,8 @@ export class GameClient {
         this.debugFiles.get(msg.id)?.({ files: msg.files, bones: msg.bones });
         this.debugFiles.delete(msg.id);
       } else if (msg.type === "seed_request") handlers.seedWanted?.(msg.id);
-      else if (msg.type !== "shadow_status") handlers.replay?.(msg);
+      // a terrain answer is for a bot driving the page, which listens for it itself
+      else if (msg.type !== "shadow_status" && msg.type !== "terrain") handlers.replay?.(msg);
     };
     this.worker.onerror = (ev) => handlers.events([{ type: "error", text: ev.message || "worker failed" }]);
   }

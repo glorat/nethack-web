@@ -3,13 +3,13 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Answer, GameEvent, GameRequest, MapCell } from "../../src/protocol";
-import { applyEvents, cellAt, COLNO, initialState, ROWNO, type GameState } from "../../src/port/state";
+import { applyEvents, cellAt, initialState, type GameState } from "../../src/port/state";
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
 import { BonesDb } from "../../src/offline/bones";
 import { Recorder } from "../../src/worker/recorder";
 import { type BootCore, never, replay, ReplayError, type ReplayedEvent, saveFiles, writeSaveFiles } from "../../src/worker/replayer";
 import { placeGameFiles, resumeUnseen } from "../../src/worker/resume";
-import { describeSquare, type EmscriptenFS, type NetHackModule } from "../../src/worker/memory";
+import { describeSquare, knownTerrain, type EmscriptenFS, type NetHackModule } from "../../src/worker/memory";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 
@@ -340,7 +340,7 @@ export class Session {
 
   /** What #terrain's known map without monsters and objects shows at each square, row by row; -1 outside play. */
   terrain(): number[] {
-    return Array.from({ length: ROWNO * COLNO }, (_, i) => this.m._nhweb_terrain_glyph(i % COLNO, Math.floor(i / COLNO)));
+    return knownTerrain(this.m);
   }
 
   /** The tile a glyph is drawn with; -1 past the last glyph. */

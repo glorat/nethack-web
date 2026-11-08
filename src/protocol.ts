@@ -150,6 +150,8 @@ export type WorkerMessage =
   | { type: "events"; events: GameEvent[] }
   | { type: "request"; id: number; request: GameRequest }
   | { type: "description"; id: number; text: string | null }
+  /** #terrain's known map without monsters and objects, the core's glyphs row by row, for a bot driving the page. */
+  | { type: "terrain"; id: number; glyphs: number[] | null }
   | { type: "debug_files"; id: number; files: Record<string, Uint8Array>; bones: Record<string, Uint8Array> }
   | { type: "shadow_status"; status: ShadowStatus }
   /** The core wants a seed for an online game; answered with a "seed_reply" of the same id. */
@@ -245,4 +247,6 @@ export type UiMessage =
   | { type: "answer"; id: number; answer: Answer }
   | { type: "seed_reply"; id: number; seed: number; now: number }
   /** Farlook's text for a map square; answered with a "description" message of the same id. */
-  | { type: "describe"; id: number; x: number; y: number };
+  | { type: "describe"; id: number; x: number; y: number }
+  /** #terrain's known map, for a bot driving the page; answered with a "terrain" message of the same id. */
+  | { type: "terrain"; id: number };

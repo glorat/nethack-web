@@ -11,7 +11,7 @@ import { CONFIG_FILE, Game, type Input } from "./game";
 import { BonesDb } from "../offline/bones";
 import { Recorder } from "./recorder";
 import { resumeUnseen } from "./resume";
-import { describeSquare, type NetHackModule } from "./memory";
+import { describeSquare, knownTerrain, type NetHackModule } from "./memory";
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -408,6 +408,9 @@ self.onmessage = (ev: MessageEvent<UiMessage>) => {
     case "describe":
       // messages only arrive while the core is paused in a callback, so the map is settled
       send({ type: "description", id: msg.id, text: module ? describeSquare(module, msg.x, msg.y) : null });
+      break;
+    case "terrain":
+      send({ type: "terrain", id: msg.id, glyphs: module ? knownTerrain(module) : null });
       break;
     case "seed_reply": {
       const resolve = seedWaiters.get(msg.id);
