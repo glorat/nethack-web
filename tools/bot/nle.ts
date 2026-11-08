@@ -212,6 +212,8 @@ export class NleTerminal {
         return { answer: k === ESC ? null : { kind: "yn", key: String.fromCharCode(k) } };
       }
       case "text":
+        // any key turns the page, and dismisses the window on the last
+        if (this.page < this.textPages(request).length - 1) return (this.page++, null);
         return { answer: { kind: "text" } };
       case "getlin":
         return this.type(key, (text) => ({ kind: "getlin", text }));
@@ -308,10 +310,14 @@ export class NleTerminal {
       return [...page, pages.length > 1 ? `(${this.page + 1} of ${pages.length})` : "(end)"];
     }
     if (request.kind === "text") {
-      const lines = request.lines.map((l) => expandTabs(l.text));
-      return [...lines.slice(0, ROWS - 2), "--More--"];
+      const pages = this.textPages(request);
+      return [...pages[Math.min(this.page, pages.length - 1)], "--More--"];
     }
     return [];
+  }
+
+  private textPages(request: Extract<GameRequest, { kind: "text" }>): string[][] {
+    return paginate(request.lines.map((l) => expandTabs(l.text)));
   }
 
   observation(): NleObservation {
@@ -350,10 +356,11 @@ export class NleTerminal {
     for (let y = 0; y < ROWNO; y++) for (let x = 0; x < width; x++) ttyColors[(y + 1) * COLNO + x] = colors[y * width + x];
     let cursor: [number, number] = [this.hero[0] + 1, this.hero[1]];
     if (window.length) {
-      // tty puts a window at the right if it fits, from the top, below any message
+      // tty puts a window at the right, from the top, unless it would start in the first 10 columns
       const top = message ? 1 : 0;
       const widest = Math.max(...window.map((l) => l.length));
-      const left = widest + 2 >= COLNO || window.length + top > ROWS ? 0 : COLNO - widest - 2;
+      const right = Math.max(10, COLNO - widest - 1);
+      const left = right === 10 || window.length + top > ROWS ? 0 : right;
       window.forEach((line, i) => {
         const row = top + i;
         if (row >= ROWS) return;
@@ -390,14 +397,16 @@ export class NleTerminal {
 
   private blstats(): number[] {
     const s = this.seen!.status;
-    const str = s.BL_STR ?? "";
-    const [base, extra] = str.includes("/") ? str.split("/") : [str, "0"];
-    const percent = extra.trim() === "**" ? 100 : parseInt(extra, 10) || 0;
+    // the core's raw strength, 3..125, in which 18/xx is 18 + xx and 19 is 119
+    const [base, extra] = (s.BL_STR ?? "").split("/");
+    const raw = extra === undefined ? (number(base) > 18 ? number(base) + 100 : number(base)) : 18 + (extra.trim() === "**" ? 100 : number(extra));
     const out = new Array<number>(27).fill(0);
-    out[BL.X] = this.hero[1] + 1;
+    // as NLE gives it, the hero's column in glyphs, one less than the core's
+    out[BL.X] = this.hero[1];
     out[BL.Y] = this.hero[0];
-    out[BL.STR25] = percent;
-    out[BL.STR125] = number(base);
+    // ACURRSTR: up to 18 as it is, 18/01 to 18/** as 19 to 21, then 22 to 25
+    out[BL.STR25] = raw <= 18 ? raw : raw <= 121 ? 19 + Math.floor(raw / 50) : raw - 100;
+    out[BL.STR125] = raw;
     out[BL.DEX] = number(s.BL_DX);
     out[BL.CON] = number(s.BL_CO);
     out[BL.INT] = number(s.BL_IN);
@@ -482,8 +491,8 @@ function lines(messages: string[], width = COLNO - "--More--".length): string[] 
   return out;
 }
 
-/** A window's lines in pages that leave room for the message line and the marker. */
-function paginate(lines: string[], rows = ROWS - 2): string[][] {
+/** A window's lines in pages that leave the last row for the marker. */
+function paginate(lines: string[], rows = ROWS - 1): string[][] {
   const pages: string[][] = [];
   for (let i = 0; i < lines.length; i += rows) pages.push(lines.slice(i, i + rows));
   return pages.length ? pages : [[]];

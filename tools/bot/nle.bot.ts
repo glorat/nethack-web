@@ -44,13 +44,14 @@ const text = (bytes: number[]) => new TextDecoder().decode(new Uint8Array(bytes.
 
 test("the hero is where blstats says, as NetHack 3.6 shows a Valkyrie, on the map and the terminal", async () => {
   const o = term.observation();
+  // as NLE bots index the map: glyphs[y][x]
   const x = o.blstats[BL.X];
   const y = o.blstats[BL.Y];
-  const glyph = o.glyphs[y * WIDTH + x - 1];
+  const glyph = o.glyphs[y * WIDTH + x];
   const valkyrie = (data as unknown as { monsters: { names: string[] }[] }).monsters.findIndex((m) => m.names.includes("valkyrie"));
   expect(glyph).toBe(valkyrie);
-  expect(String.fromCharCode(o.chars[y * WIDTH + x - 1])).toBe("@");
-  expect(screen(o)[y + 1][x - 1]).toBe("@");
+  expect(String.fromCharCode(o.chars[y * WIDTH + x])).toBe("@");
+  expect(screen(o)[y + 1][x]).toBe("@");
   expect(o.blstats[BL.HP]).toBeGreaterThan(0);
   expect(o.blstats[BL.TIME]).toBe(1);
   expect(o.blstats[BL.ALIGN]).toBe(0);
@@ -98,4 +99,33 @@ test("quitting ends the episode once the game asks about what's left", async () 
   while (!o.done && game.prompt?.kind !== "yn") o = await press(" ");
   expect(term.done).toBe(true);
   expect(term.observation().done).toBe(true);
+});
+
+test("strength comes as NLE has it: condensed 3 to 25, and raw 3 to 125", () => {
+  const seen = observer.observe();
+  const strength = (text: string) => {
+    term.load({ ...seen, status: { ...seen.status, BL_STR: text } });
+    const o = term.observation();
+    return [o.blstats[BL.STR25], o.blstats[BL.STR125]];
+  };
+  expect(strength("16")).toEqual([16, 16]);
+  expect(strength("18/31")).toEqual([19, 49]);
+  expect(strength("18/50")).toEqual([20, 68]);
+  expect(strength("18/**")).toEqual([21, 118]);
+  expect(strength("19")).toEqual([21, 119]);
+  expect(strength("25")).toEqual([25, 125]);
+});
+
+test("a text window longer than the screen turns its pages before it's dismissed", () => {
+  const seen = observer.observe();
+  const lines = Array.from({ length: 40 }, (_, i) => ({ attr: 0, text: `line ${i + 1}` }));
+  term.load({ ...seen, messages: [], request: { kind: "text", lines } });
+  let shown = screen(term.observation()).join("\n");
+  expect(shown).toContain("line 23");
+  expect(shown).not.toContain("line 24");
+  expect(shown).toContain("--More--");
+  expect(term.key(32)).toBeNull();
+  shown = screen(term.observation()).join("\n");
+  expect(shown).toContain("line 40");
+  expect(term.key(32)).toEqual({ answer: { kind: "text" } });
 });
