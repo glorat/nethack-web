@@ -36,6 +36,14 @@ lines build up until Return; a text window longer than the screen turns a page w
 
 There is no reward, `program_state`, `internal` or `screen_descriptions`.
 
+## Extras
+
+`BOT_NLE_EXTRAS`, a comma-separated list, adds keys beyond NLE's, each only when asked for:
+
+- `peaceful`: each square showing a peaceful monster, as a list of `[y, x]` with `x` the column in `glyphs`, empty
+  when there's none. It's the map's own peaceful mark: never while hallucinating, only for a monster the hero can see
+  as itself and not disguised, and kept up to date when a monster is angered or pacified without moving.
+
 ## Glyphs and the game's data
 
 Glyph numbers keep NetHack 3.6's layout (monsters, pets, invisible, detected, bodies, ridden, objects, map symbols,

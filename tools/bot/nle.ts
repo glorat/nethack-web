@@ -8,6 +8,7 @@
 // the object its tile shows, its appearance, on the map and in the inventory alike, as the inventory has only tiles.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { MARK_PEACEFUL } from "../../src/port/marks";
 import type { Answer, GameRequest } from "../../src/protocol";
 import type { Observation } from "./observe";
 
@@ -103,7 +104,14 @@ export interface NleObservation {
   misc: number[];
   /** The episode is over: the hero has died, or the game ended otherwise. */
   done: boolean;
+  /** An extra, with BOT_NLE_EXTRAS=peaceful: each square showing a peaceful monster, as [y, x] with x the column in
+   * glyphs, by the rules the map's peaceful mark follows. */
+  peaceful?: [number, number][];
 }
+
+/** The extras a bot can ask for, beyond NLE's observation. */
+export const EXTRAS = ["peaceful"] as const;
+export type Extra = (typeof EXTRAS)[number];
 
 /** What the game is to be given, once the bot's keys make one. */
 export type GameAction = { key: number } | { answer: Answer | null };
@@ -174,6 +182,17 @@ export class NleTerminal {
   }
 
   /** Takes what the game shows now that it waits for something new. */
+  /** The extras observation() adds. */
+  readonly extras = new Set<Extra>();
+
+  private peaceful(): [number, number][] {
+    const out: [number, number][] = [];
+    this.seen!.marks.forEach((m, i) => {
+      if (m & MARK_PEACEFUL && i % COLNO > 0) out.push([Math.floor(i / COLNO), (i % COLNO) - 1]);
+    });
+    return out;
+  }
+
   load(seen: Observation): void {
     this.seen = seen;
     this.typed = "";
@@ -392,6 +411,7 @@ export class NleTerminal {
       tty_cursor: cursor,
       misc: [!more && request.kind === "yn" ? 1 : 0, !more && request.kind === "getlin" ? 1 : 0, more || request.kind === "text" ? 1 : 0],
       done: this.done,
+      ...(this.extras.has("peaceful") ? { peaceful: this.peaceful() } : {}),
     };
   }
 
