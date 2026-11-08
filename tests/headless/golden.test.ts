@@ -1,7 +1,6 @@
-// Long recorded games that must replay exactly on every build: a change that
-// alters how the game plays fails here. GOLDEN=write pnpm test golden
-// records them afresh.
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+// Long recorded games that replay exactly on every build. GOLDEN=write pnpm test golden
+// records each game in GAMES that has no file yet.
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test } from "vitest";
 import { replayRecording, Session, type SessionOptions } from "./harness";
@@ -90,8 +89,11 @@ const GAMES: { file: string; options: SessionOptions; seed: number }[] = [
 ];
 
 if (process.env.GOLDEN === "write")
-  test("record the golden games", async () => {
-    for (const game of GAMES) writeFileSync(resolve(DIR, game.file), await record(game.options, game.seed));
+  test("record the new golden games", async () => {
+    for (const game of GAMES) {
+      const file = resolve(DIR, game.file);
+      if (!existsSync(file)) writeFileSync(file, await record(game.options, game.seed));
+    }
   }, 120000);
 
 for (const file of readdirSync(DIR).filter((f) => f.endsWith(".txt")))
