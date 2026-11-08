@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Answer, GameEvent, GameRequest, MapCell } from "../../src/protocol";
-import { applyEvents, cellAt, initialState, type GameState } from "../../src/port/state";
+import { applyEvents, cellAt, COLNO, initialState, ROWNO, type GameState } from "../../src/port/state";
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
 import { BonesDb } from "../../src/offline/bones";
 import { Recorder } from "../../src/worker/recorder";
@@ -336,6 +336,11 @@ export class Session {
   /** What hovering over a square says, as the map's tooltip asks while the core waits. */
   describe(x: number, y: number): string | null {
     return describeSquare(this.m, x, y);
+  }
+
+  /** What #terrain's known map without monsters and objects shows at each square, row by row; -1 outside play. */
+  terrain(): number[] {
+    return Array.from({ length: ROWNO * COLNO }, (_, i) => this.m._nhweb_terrain_glyph(i % COLNO, Math.floor(i / COLNO)));
   }
 
   /** The tile a glyph is drawn with; -1 past the last glyph. */

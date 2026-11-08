@@ -33,6 +33,8 @@ export interface NetHackModule {
   _nhweb_chosen(facet: number): number;
   _nhweb_choose(role: number, race: number, gender: number, align: number): void;
   _nhweb_describe(x: number, y: number): number;
+  /** #terrain's known map without monsters and objects at a square; -1 outside play. */
+  _nhweb_terrain_glyph(x: number, y: number): number;
   _nhweb_map_marks(x: number, y: number, glyph: number, glyphFlags: number): number;
   _nhweb_in_play(): number;
   _nhweb_game_over(): number;

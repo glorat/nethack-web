@@ -153,3 +153,35 @@ test("peaceful lists the squares whose monster the map marks peaceful", async ()
   // the hero's kitten is tame, not peaceful
   expect(o.peaceful!.some(([py, px]) => py === o.blstats[BL.Y] && px === o.blstats[BL.X])).toBe(false);
 });
+
+test("terrain shows the known map without monsters or objects, and never-seen squares as stone", async () => {
+  term.extras.add("terrain");
+  const look = async () => {
+    term.load(observer.observe());
+    term.setTerrain(await game.terrain!());
+    return term.observation();
+  };
+  const CMAP = data.consts.GLYPH_CMAP_OFF36;
+  const isTerrain = (g: number) => g >= CMAP && g < data.consts.GLYPH_EXPLODE_OFF36;
+  let o = await look();
+  const [y, x] = [o.blstats[BL.Y], o.blstats[BL.X]];
+  expect(o.glyphs[y * WIDTH + x]).toBeLessThan(data.consts.GLYPH_PET_OFF36);
+  expect(isTerrain(o.terrain![y * WIDTH + x])).toBe(true);
+  expect(o.terrain![0]).toBe(CMAP + (data as unknown as { cmap: Record<string, number> }).cmap.S_stone);
+
+  // a dagger left behind is on the map, and not in the terrain
+  await press("db");
+  for (const step of "hjklyubn") {
+    o = await look();
+    if (o.blstats[BL.Y] !== y || o.blstats[BL.X] !== x) break;
+    await press(step);
+    while (term.observation().misc[2]) await press(" ");
+  }
+  o = await look();
+  expect([o.blstats[BL.Y], o.blstats[BL.X]]).not.toEqual([y, x]);
+  const left = o.glyphs[y * WIDTH + x];
+  expect(left).toBeGreaterThanOrEqual(data.consts.GLYPH_OBJ_OFF36);
+  expect(left).toBeLessThan(CMAP);
+  expect(isTerrain(o.terrain![y * WIDTH + x])).toBe(true);
+  expect(o.terrain).toHaveLength(o.glyphs.length);
+});

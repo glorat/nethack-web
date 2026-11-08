@@ -107,10 +107,13 @@ export interface NleObservation {
   /** An extra, with BOT_NLE_EXTRAS=peaceful: each square showing a peaceful monster, as [y, x] with x the column in
    * glyphs, by the rules the map's peaceful mark follows. */
   peaceful?: [number, number][];
+  /** An extra, with BOT_NLE_EXTRAS=terrain: 21×79, the map as #terrain's known map without monsters and objects
+   * shows it, in the layout of glyphs; never-seen squares are stone. */
+  terrain?: number[];
 }
 
 /** The extras a bot can ask for, beyond NLE's observation. */
-export const EXTRAS = ["peaceful"] as const;
+export const EXTRAS = ["peaceful", "terrain"] as const;
 export type Extra = (typeof EXTRAS)[number];
 
 /** What the game is to be given, once the bot's keys make one. */
@@ -184,6 +187,16 @@ export class NleTerminal {
   /** Takes what the game shows now that it waits for something new. */
   /** The extras observation() adds. */
   readonly extras = new Set<Extra>();
+
+  /** For the terrain extra: the core's glyphs for the known map, row by row, as the game has them now. */
+  setTerrain(core: number[]): void {
+    this.terrain = core;
+  }
+  private terrain: number[] | null = null;
+
+  private get stone(): number {
+    return this.c.GLYPH_CMAP_OFF36 + this.data.cmap.S_stone;
+  }
 
   private peaceful(): [number, number][] {
     const out: [number, number][] = [];
@@ -412,6 +425,7 @@ export class NleTerminal {
       misc: [!more && request.kind === "yn" ? 1 : 0, !more && request.kind === "getlin" ? 1 : 0, more || request.kind === "text" ? 1 : 0],
       done: this.done,
       ...(this.extras.has("peaceful") ? { peaceful: this.peaceful() } : {}),
+      ...(this.extras.has("terrain") && this.terrain ? { terrain: map(this.terrain, (g) => (g < 0 ? this.stone : this.translation[g])) } : {}),
     };
   }
 
