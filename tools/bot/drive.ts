@@ -56,10 +56,12 @@ export async function drive(game: Playable, steps: number): Promise<{ taken: num
   const replies = createInterface({ input: bot.stdout })[Symbol.asyncIterator]();
   const reply = async (observation: unknown): Promise<Action | null> => {
     bot.stdin.write(`${JSON.stringify(observation)}\n`);
+    let timer: NodeJS.Timeout | undefined;
     const line = await Promise.race([
       replies.next(),
-      new Promise<IteratorResult<string>>((resolve) => setTimeout(() => resolve({ done: true, value: undefined }), REPLY_MS)),
+      new Promise<IteratorResult<string>>((resolve) => (timer = setTimeout(() => resolve({ done: true, value: undefined }), REPLY_MS))),
     ]);
+    clearTimeout(timer);
     return line.done ? null : (JSON.parse(line.value) as Action);
   };
 
@@ -69,7 +71,15 @@ export async function drive(game: Playable, steps: number): Promise<{ taken: num
     play: while (taken < steps) {
       // an online game's first question waits on the server, which may be starting up
       await game.waiting(taken === 0);
-      if (game.ended) break;
+      if (game.ended) {
+        // ended without the questions after the end, as by saving: the bot still hears that it's over
+        if (nle) {
+          nle.load(observer.observe());
+          nle.done = true;
+          bot.stdin.write(`${JSON.stringify(nle.observation())}\n`);
+        }
+        break;
+      }
       if (!nle) {
         const action = await reply(observer.observe());
         taken++;

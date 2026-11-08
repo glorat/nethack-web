@@ -32,7 +32,7 @@ Each key holds a flat array, row by row; reshape it to NLE's shape.
 
 The terminal takes keys as tty does: any key goes on past `--More--` and Escape past them all; a menu takes letters,
 a count typed first, `,` `.` `-` to pick or clear all, `>` `<` and Space to turn pages, and Return to accept; typed
-lines build up until Return.
+lines build up until Return; a text window longer than the screen turns a page with each key.
 
 There is no reward, `program_state`, `internal` or `screen_descriptions`.
 
@@ -44,7 +44,7 @@ objects than 3.6. The core's finer glyphs fold into it: male and female monsters
 piles. Take the monster and object tables, map symbols and sizes from `tools/bot/nhdata.json`, made from the core the
 game runs, not from NLE's own: a monster's glyph is its index in `monsters`, an object's its index in `objects`, a map
 symbol's its value in `cmap`, each offset by its range. The ranges follow one another, from 0, with these sizes from
-`consts`:
+`consts`. The core's own `GLYPH_*_OFF` values in `consts` are its 5.0 layout, not this one.
 
 | Range | Size |
 |---|---|
@@ -52,7 +52,7 @@ symbol's its value in `cmap`, each offset by its range. The ranges follow one an
 | invisible | 1 |
 | detected, bodies, ridden | `NUMMONS` each |
 | objects | `NUM_OBJECTS` |
-| map symbols | `MAXPCHARS` |
+| map symbols | `MAXPCHARS`, which here counts the explosion symbols too (3.6's layout has `MAXPCHARS - MAXEXPCHARS`) |
 | explosions | `MAXEXPCHARS × EXPL_MAX` |
 | zaps | `NUM_ZAP × 4` |
 | swallowing | `NUMMONS × 8` |
