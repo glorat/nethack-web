@@ -20,6 +20,8 @@ export interface Observation {
   colors: number[];
   /** The core's MG_* flags for each square. */
   flags: number[];
+  /** The page's MARK_* bits (src/port/marks.ts) for each square, as its map draws them: pet, peaceful and so on. */
+  marks: number[];
   cursor: { x: number; y: number } | null;
   /** Status fields as the status panel shows them, by the core's BL_* names and the panel's own. */
   status: Record<string, string>;
@@ -57,6 +59,7 @@ export class Observer {
     const chars = new Array<number>(COLNO * ROWNO).fill(32);
     const colors = new Array<number>(COLNO * ROWNO).fill(0);
     const flags = new Array<number>(COLNO * ROWNO).fill(0);
+    const marks = new Array<number>(COLNO * ROWNO).fill(0);
     state.map.forEach((cell, i) => {
       if (!cell) return;
       glyphs[i] = cell.glyph;
@@ -64,6 +67,7 @@ export class Observer {
       chars[i] = cell.ch;
       colors[i] = cell.color;
       flags[i] = cell.glyphFlags;
+      marks[i] = cell.marks;
     });
     const messages = state.messages.filter((m) => m.id > this.lastMessage && !m.separator).map((m) => m.text);
     this.lastMessage = state.messages.at(-1)?.id ?? this.lastMessage;
@@ -75,6 +79,7 @@ export class Observer {
       chars,
       colors,
       flags,
+      marks,
       cursor: state.cursor,
       status,
       conditions: state.status.BL_CONDITION?.mask ?? 0,

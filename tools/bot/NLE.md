@@ -44,6 +44,9 @@ There is no reward, `program_state` or `internal`.
   `[y, x, text]` with `x` the column in `glyphs`, such as `"peaceful gnome lord"`, `"tame little dog"` or `"doorway"`.
   NLE's own is a 21×80×80 byte array. Squares of stone or never seen are left out. It follows the game's rules, so a
   hallucinating hero gets hallucinated names, and it costs no game time.
+- `peaceful`: each square showing a peaceful monster, as a list of `[y, x]`, empty when there's none. It's the map's
+  own peaceful mark: never while hallucinating, only for a monster the hero can see as itself and not disguised, and
+  kept up to date when a monster is angered or pacified without moving.
 
 ## Glyphs and the game's data
 

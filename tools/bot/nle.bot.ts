@@ -148,3 +148,27 @@ test("a farlook line gives the particular thing, else what the symbol stands for
   expect(screenDescription(".        a doorway or the floor of a room (doorway)")).toBe("doorway");
   expect(screenDescription("I        remembered, unseen, creature")).toBe("remembered, unseen, creature");
 });
+
+test("peaceful lists the squares whose monster the map marks peaceful", async () => {
+  const session = await (
+    await Session.start({ name: "Bot", seed: 7, wizard: true, character: "role:Valkyrie,race:human,gender:female,align:neutral", options: BOT_OPTIONS })
+  ).skipText();
+  const core = (globalThis as unknown as { nethackGlobal: { constants: Record<string, Record<string, number>> } }).nethackGlobal.constants;
+  const peek = new Observer(session, core.GLYPH.GLYPH_UNEXPLORED);
+  const t = new NleTerminal(data, { MG: core.MG, BL_MASK: core.BL_MASK });
+  t.extras.add("peaceful");
+  t.load(peek.observe());
+  expect(t.observation().peaceful).toEqual([]);
+
+  await session.send("\x07");
+  await session.getlin("peaceful gnome lord");
+  while (session.prompt) await session.dismiss();
+  t.load(peek.observe());
+  const o = t.observation();
+  expect(o.peaceful).toHaveLength(1);
+  const [y, x] = o.peaceful![0];
+  const gnomeLord = (data as unknown as { monsters: { names: string[] }[] }).monsters.findIndex((m) => m.names.includes("gnome lord"));
+  expect(o.glyphs[y * WIDTH + x]).toBe(gnomeLord);
+  // the hero's kitten is tame, not peaceful
+  expect(o.peaceful!.some(([py, px]) => py === o.blstats[BL.Y] && px === o.blstats[BL.X])).toBe(false);
+});

@@ -56,6 +56,7 @@ export async function drive(game: Playable, steps: number): Promise<{ taken: num
   const extras = (process.env.BOT_NLE_EXTRAS ?? "").split(",").filter(Boolean);
   for (const e of extras) if (!(EXTRAS as readonly string[]).includes(e)) throw new Error(`no NLE extra ${e}; there are ${EXTRAS.join(", ")}`);
   const wanted = (e: Extra) => extras.includes(e);
+  if (nle && wanted("peaceful")) nle.extras.add("peaceful");
   const load = async () => {
     nle!.load(observer.observe());
     if (wanted("screen_descriptions")) {

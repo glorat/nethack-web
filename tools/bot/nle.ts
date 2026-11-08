@@ -8,6 +8,7 @@
 // the object its tile shows, its appearance, on the map and in the inventory alike, as the inventory has only tiles.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { MARK_PEACEFUL } from "../../src/port/marks";
 import type { Answer, GameRequest } from "../../src/protocol";
 import type { Observation } from "./observe";
 
@@ -106,10 +107,13 @@ export interface NleObservation {
   /** An extra, with BOT_NLE_EXTRAS=screen_descriptions: what farlook says of each square that has something, as
    * [y, x, text] with x the column in glyphs, such as "peaceful gnome lord" or "doorway". */
   screen_descriptions?: [number, number, string][];
+  /** An extra, with BOT_NLE_EXTRAS=peaceful: each square showing a peaceful monster, as [y, x] with x the column in
+   * glyphs, by the rules the map's peaceful mark follows. */
+  peaceful?: [number, number][];
 }
 
 /** The extras a bot can ask for, beyond NLE's observation. */
-export const EXTRAS = ["screen_descriptions"] as const;
+export const EXTRAS = ["screen_descriptions", "peaceful"] as const;
 export type Extra = (typeof EXTRAS)[number];
 
 /** Farlook's line, such as "d        a dog or other canine (tame little dog)", as NLE gives it: the particular
@@ -208,6 +212,17 @@ export class NleTerminal {
     });
   }
   private descriptions: [number, number, string][] | null = null;
+
+  /** The extras that come without asking the game, which observation() adds. */
+  readonly extras = new Set<Extra>();
+
+  private peaceful(): [number, number][] {
+    const out: [number, number][] = [];
+    this.seen!.marks.forEach((m, i) => {
+      if (m & MARK_PEACEFUL && i % COLNO > 0) out.push([Math.floor(i / COLNO), (i % COLNO) - 1]);
+    });
+    return out;
+  }
 
   load(seen: Observation): void {
     this.descriptions = null;
@@ -429,6 +444,7 @@ export class NleTerminal {
       misc: [!more && request.kind === "yn" ? 1 : 0, !more && request.kind === "getlin" ? 1 : 0, more || request.kind === "text" ? 1 : 0],
       done: this.done,
       ...(this.descriptions ? { screen_descriptions: this.descriptions } : {}),
+      ...(this.extras.has("peaceful") ? { peaceful: this.peaceful() } : {}),
     };
   }
 
