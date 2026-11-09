@@ -9,7 +9,7 @@ const inFlight = (recording: string, game = "old"): OnlineGame => ({ game, utcOf
 let starts: number;
 let resumes: { game?: string; name: string }[];
 let found: OnlineGame | null;
-let asks: { game: string; turn: number; sentAt: number }[];
+let asks: { game: string; turn: number; inject?: boolean; sentAt: number }[];
 let down: number;
 let refuse: string | null;
 let waits: boolean[];
@@ -36,7 +36,7 @@ const deps = (): OnlineDeps => ({
   async seed(input) {
     fail();
     asks.push(input);
-    return { seed: input.turn * 1000, now: 5000 + asks.length, validTurns: 100 };
+    return { seed: input.turn * 1000, now: 5000 + asks.length, validTurns: 100, askAheadTurns: 5 };
   },
 });
 
@@ -88,8 +88,8 @@ test("a new game always starts one, whatever's in flight", async () => {
 test("one ask serves a turn: each further seed is one more, and the time stays that answer's", async () => {
   const session = await opened();
   session.recorded("1 T 7 abcd");
-  expect(await session.seed()).toEqual({ seed: 7000, now: 5001 });
-  expect(await session.seed()).toEqual({ seed: 7001, now: 5001 });
+  expect(await session.seed()).toEqual({ seed: 7000, now: 5001, validTurns: 100, askAheadTurns: 5 });
+  expect(await session.seed()).toEqual({ seed: 7001, now: 5001, validTurns: 100, askAheadTurns: 5 });
   expect(asks).toEqual([{ game: "game-1", turn: 7, sentAt: 1000 }]);
 });
 
@@ -97,7 +97,7 @@ test("a turn with no seeds asks nothing; a new turn that wants one asks and coun
   const session = await opened();
   await session.seed();
   session.recorded("1 k 106\n1 T 1 abcd\n1 k 106\n1 T 2 abcd");
-  expect(await session.seed()).toEqual({ seed: 2000, now: 5002 });
+  expect(await session.seed()).toEqual({ seed: 2000, now: 5002, validTurns: 100, askAheadTurns: 5 });
   expect(asks.map((a) => a.turn)).toEqual([0, 2]);
 });
 
@@ -120,6 +120,16 @@ test("a recording cut back goes back to its turn", async () => {
   expect((await session.seed()).seed).toBe(40000);
 });
 
+test("a seed to inject asks for its own key and turn, and leaves that turn's count to the core's seeds", async () => {
+  const session = await opened();
+  session.recorded("1 T 24 abcd");
+  expect(await session.seed(25)).toEqual({ seed: 25000, now: 5001, validTurns: 100, askAheadTurns: 5 });
+  session.recorded("1 T 25 abcd");
+  expect((await session.seed()).seed).toBe(25000);
+  expect((await session.seed()).seed).toBe(25001);
+  expect(asks.map(({ turn, inject }) => ({ turn, inject }))).toEqual([{ turn: 25, inject: true }, { turn: 25, inject: undefined }]);
+});
+
 test("no answer means waiting, however long, and saying so", async () => {
   const session = await opened();
   down = 2;
@@ -131,7 +141,7 @@ test("no answer means waiting, however long, and saying so", async () => {
   await vi.advanceTimersByTimeAsync(5000);
   expect(reply).toBeNull();
   await vi.advanceTimersByTimeAsync(5000);
-  expect(reply).toEqual({ seed: 0, now: 5001 });
+  expect(reply).toEqual({ seed: 0, now: 5001, validTurns: 100, askAheadTurns: 5 });
   expect(waits).toEqual([true, false]);
 });
 

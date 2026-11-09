@@ -24,7 +24,7 @@ Each line is `<time> <tag> [args]`. `time` is the player's clock when the line w
 | `rc` | JSON | The `.nethackrc`, likewise |
 | `alone` | `0` or `1` | No other tab was playing in the same mode |
 | `seed` | n | A random seed the core asked for |
-| `reseed` | n | A seed the authority put in the core's main random generator as the turn moved on, after that turn's checks and before its first command; a replay puts it in at the same point |
+| `reseed` | n [schedule] | A seed the authority put in the core's main random generator as the turn moved on, after that turn's checks and before its first command; a replay puts it in at the same point. Online, the schedule is the turn the next goes in and how many turns before it to ask |
 | `now` | n | The time the core asked for, in seconds since 1970 |
 | `uuid` | uuid | The new game's id |
 | `bones` | name hash | What the host answered when the core looked for bones for a level: the SHA-256 of the file, or `-` for none |
@@ -49,6 +49,8 @@ Older recordings may number their lines, hold `ckpt` lines and a time on `T`, an
 The core's reads of the clock take the `now` lines in order: a read after the last line gets the last time, and a line no read takes is skipped.
 
 An online game's `seed`, `now` and `uuid` lines hold what the server gave. When the core first wants a seed in a session, the page asks the server for the seed for the turn of the last `T` line (0 before the first), and each further seed is one more than the last, so the recording replays like any other. A validator reads each `seed` line as a logged answer for the game plus a count.
+
+Seeds to inject follow the server's timetable, which the recording holds. The first goes in at turn 1, and each `reseed` line says where the next goes and how many turns before it to ask. The page asks then and plays on. The seed goes in at the first `T` at or after its point and after the `reseed` before it, so one command passing several points puts in the seeds it passed at the next few `T` lines, one each. Play waits there only if the seed hasn't come. So a validator knows where each belongs and a client can't choose. A game that comes back, or is cut back, reads the timetable from its last `reseed` line. The server keys seeds to inject apart from the core's, so the two never share a value.
 
 ## Replaying
 

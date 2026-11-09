@@ -146,6 +146,14 @@ export type Answer =
   | { kind: "ext_cmd"; index: number }
   | ({ kind: "player" } & PlayerPick);
 
+/** A seed from the server; for an injected seed, how many turns after its point the next goes in, and how many turns before that to ask for it. */
+export interface SeedReply {
+  seed: number;
+  now: number;
+  validTurns: number;
+  askAheadTurns: number;
+}
+
 export type WorkerMessage =
   | { type: "events"; events: GameEvent[] }
   | { type: "request"; id: number; request: GameRequest }
@@ -154,8 +162,8 @@ export type WorkerMessage =
   | { type: "terrain"; id: number; glyphs: number[] | null }
   | { type: "debug_files"; id: number; files: Record<string, Uint8Array>; bones: Record<string, Uint8Array> }
   | { type: "shadow_status"; status: ShadowStatus }
-  /** The core wants a seed for an online game; answered with a "seed_reply" of the same id. */
-  | { type: "seed_request"; id: number }
+  /** The core wants a seed for an online game, or with `turn`, one to inject; answered with a "seed_reply" of the same id. */
+  | { type: "seed_request"; id: number; turn?: number }
   | ReplayMessage;
 
 /** How a second core following the game by its recording is getting on. */
@@ -245,7 +253,7 @@ export type UiMessage =
   | { type: "click"; x: number; y: number; button: number }
   | { type: "ascii_map"; on: boolean }
   | { type: "answer"; id: number; answer: Answer }
-  | { type: "seed_reply"; id: number; seed: number; now: number }
+  | ({ type: "seed_reply"; id: number } & SeedReply)
   /** Farlook's text for a map square; answered with a "description" message of the same id. */
   | { type: "describe"; id: number; x: number; y: number }
   /** #terrain's known map, for a bot driving the page; answered with a "terrain" message of the same id. */

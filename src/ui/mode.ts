@@ -1,5 +1,5 @@
 // What the game page leaves to the mode being played. A replay has none.
-import type { GameEvent, StartOptions } from "../protocol";
+import type { GameEvent, SeedReply, StartOptions } from "../protocol";
 
 /** The core's farewell after Save & Quit, the one ending with nothing left to read. */
 export const SAVED_FAREWELL = "Be seeing you...";
@@ -23,8 +23,8 @@ export interface PageMode {
   finished(text: string): void;
   /** The address of the finished game's replay, which a reload of it comes back to if the mode can still find the recording. */
   replayAddress(): string;
-  /** A seed for the core, or null if there won't be one, which the mode has shown. */
-  seed(): Promise<{ seed: number; now: number } | null>;
+  /** A seed for the core, or with `turn` one to inject, or null if there won't be one, which the mode has shown. */
+  seed(turn?: number): Promise<SeedReply | null>;
   /** Whatever has to happen before Save & Quit leaves the page. */
   leaving(): Promise<void>;
   /** The page is going, with no time to wait for anything. */

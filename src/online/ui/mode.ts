@@ -128,9 +128,9 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
     replayAddress() {
       return gameWatchAddress(new URLSearchParams(location.search).get("game") ?? "");
     },
-    async seed() {
+    async seed(turn) {
       if (!session) return null;
-      return session.seed().catch((e) => {
+      return session.seed(turn).catch((e) => {
         console.warn("the server refused a seed", e);
         refuse();
         return null;

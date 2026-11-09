@@ -4,6 +4,7 @@ import type {
   GameRequest,
   ReplayControl,
   ReplayMessage,
+  SeedReply,
   ShadowStatus,
   StartOptions,
   UiMessage,
@@ -19,7 +20,7 @@ export interface ClientHandlers {
   events(events: GameEvent[]): void;
   request(id: number, request: GameRequest): void;
   replay?(message: ReplayMessage): void;
-  seedWanted?(id: number): void;
+  seedWanted?(id: number, turn?: number): void;
 }
 
 /** Main-thread handle on the game worker. */
@@ -41,7 +42,7 @@ export class GameClient {
       } else if (msg.type === "debug_files") {
         this.debugFiles.get(msg.id)?.({ files: msg.files, bones: msg.bones });
         this.debugFiles.delete(msg.id);
-      } else if (msg.type === "seed_request") handlers.seedWanted?.(msg.id);
+      } else if (msg.type === "seed_request") handlers.seedWanted?.(msg.id, msg.turn);
       // a terrain answer is for a bot driving the page, which listens for it itself
       else if (msg.type !== "shadow_status" && msg.type !== "terrain") handlers.replay?.(msg);
     };
@@ -82,8 +83,8 @@ export class GameClient {
     this.send({ type: "answer", id, answer });
   }
 
-  seedReply(id: number, seed: number, now: number): void {
-    this.send({ type: "seed_reply", id, seed, now });
+  seedReply(id: number, reply: SeedReply): void {
+    this.send({ type: "seed_reply", id, ...reply });
   }
 
   /** What farlook would say about a map square; null outside play. */

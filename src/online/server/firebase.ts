@@ -270,8 +270,8 @@ export const achievements = () => userRequest<{ achievements: Achievement[] }>("
 /** Anyone may ask; the player gets their own game as soon as it ends, and others once it has been scored. */
 export const watchGame = (input: { game: string; sentAt: number }) => publicRequest<{ recording: string } | null>("watchGame", input);
 
-export const seed = (input: { game: string; turn: number; sentAt: number }) =>
-  userRequest<{ seed: number; now: number; validTurns: number }>("seed", input);
+export const seed = (input: { game: string; turn: number; inject?: boolean; sentAt: number }) =>
+  userRequest<{ seed: number; now: number; validTurns: number; askAheadTurns: number }>("seed", input);
 
 export async function writeBatch(game: string, id: string, lines: string, sentAt: number): Promise<WriteResult> {
   const uid = await signedIn();

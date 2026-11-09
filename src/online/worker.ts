@@ -6,7 +6,7 @@ import { onlineAuthority } from "./authority";
 
 export function onlineWorker(choice: Extract<AuthorityChoice, { kind: "online" }>): WorkerMode {
   return {
-    authority: (_files, askSeed) => onlineAuthority(choice.game, choice.utcOffset, choice.now, askSeed),
+    authority: (_files, askSeed) => onlineAuthority(choice.game, choice.utcOffset, choice.now, choice.recording, askSeed),
     keptHere: false,
     recording: choice.recording,
     wantsRecordingSoFar: true,

@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Answer, GameEvent, GameRequest, MapCell } from "../../src/protocol";
 import { applyEvents, cellAt, initialState, type GameState } from "../../src/port/state";
+import type { Authority } from "../../src/worker/authority";
 import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
 import { BonesDb } from "../../src/offline/bones";
 import { Recorder } from "../../src/worker/recorder";
@@ -58,6 +59,8 @@ export interface SessionOptions {
   keepWizardBones?: boolean;
   /** The authority's seed to inject as each turn moves on, or null for none. */
   injectSeed?: (turn: number) => number | null;
+  /** The core's seeds and the seeds to inject, from somewhere else, such as an online game's. */
+  seeds?: Pick<Authority, "randomSeed" | "injectedSeed">;
 }
 
 type Module = NetHackModule & {
@@ -173,7 +176,7 @@ export class Session {
         (mod: Module) => {
           mod.ENV.USER = "player";
           mod.ENV.NETHACKOPTIONS = nethackOptions;
-          if (options.pageSeed === undefined) mod.ENV.NETHACK_SEED = String(options.seed ?? 1);
+          if (options.pageSeed === undefined && !options.seeds) mod.ENV.NETHACK_SEED = String(options.seed ?? 1);
           // Emscripten's HOME, which it creates
           mod.FS.writeFile(CONFIG_FILE, new TextEncoder().encode(config ?? ""));
           mod.FS.mkdir("/save");
@@ -422,9 +425,15 @@ export class Session {
       alone: !options.otherTab,
       now: () => now,
       utcOffset: () => options.utcOffset ?? 0,
-      randomSeed: () => (options.pageSeed ?? 0) + (options.seedsVary ? seeds++ : 0),
+      randomSeed: options.seeds?.randomSeed ?? (() => (options.pageSeed ?? 0) + (options.seedsVary ? seeds++ : 0)),
       uuid: () => PAGE_UUID,
-      injectedSeed: options.injectSeed,
+      injectedSeed:
+        options.seeds?.injectedSeed ??
+        (options.injectSeed &&
+          ((turn: number) => {
+            const seed = options.injectSeed!(turn);
+            return seed === null ? null : { seed };
+          })),
       bonesWanted: async (name: string) => new BonesDb(this.m.FS).take(name),
       bonesLeft: (name: string, data: Uint8Array, wizard: boolean) => {
         if (!wizard || options.keepWizardBones) new BonesDb(this.m.FS).keep(name, data);

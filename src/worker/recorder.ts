@@ -4,6 +4,8 @@ import type { Answer, GameEvent, GameRequest, MenuSelection, PlayerPick } from "
 import { CANT_REPLAY, type GameHost, type Input, OLD_GAME } from "./game";
 import type { NetHackModule } from "./memory";
 import { sha256 } from "./sha256";
+import { lastInjectionIn } from "../port/recording";
+import type { Injection } from "./authority";
 
 export const RECORDING_DIR = "/save/replay";
 // what nhweb_resumed() says of a game restored from its save
@@ -155,6 +157,8 @@ export class Recorder implements GameHost {
   private lastTurn = -1;
   private lastCheck = -Infinity;
   private lastFiles = -Infinity;
+  /** What the last `reseed` line holds after its seed, for the authority. */
+  private lastInjection: string | null = null;
   private status: Record<string, string> = {};
   private ended = false;
 
@@ -261,6 +265,7 @@ export class Recorder implements GameHost {
     this.status = { ...status };
     this.lastTurn = this.m._nhweb_moves();
     this.lastCheck = Number([...text.matchAll(/^\d+ = (\d+) /gm)].at(-1)?.[1] ?? -Infinity);
+    this.lastInjection = lastInjectionIn(text);
     this.offset = zoneSeconds(/^\d+ session new \S+ tz=(\S+)/m.exec(text)?.[1] ?? "") ?? this.inner.utcOffset();
     this.start.before?.(text);
     this.append(this.stamped(`back ${new Date(this.wallClock()).toISOString()}`));
@@ -347,13 +352,16 @@ export class Recorder implements GameHost {
       const last = chunks[chunks.length - 1];
       this.chunk = Number(last);
       this.chunkText = this.fs.readFile(`${dir}/${last}`, { encoding: "utf8" });
-      this.start.before?.(readRecording(this.fs, dir));
+      const text = readRecording(this.fs, dir);
+      this.lastInjection = lastInjectionIn(text);
+      this.start.before?.(text);
       lines.push(`session restore ${time}`);
     } else {
       this.early = this.early.filter((_, i) => !this.oldGame.has(i));
       // left by a game that was given up on, or never recorded
       for (const f of chunks) this.fs.unlink(`${dir}/${f}`);
       if (!this.fs.analyzePath(dir).exists) this.fs.mkdir(dir);
+      this.lastInjection = null;
       lines.push(
         `nhrec ${FORMAT}`,
         `session ${resumed ? "unrecorded" : "new"} ${time} tz=${zoneText(this.utcOffset())}`,
@@ -387,19 +395,22 @@ export class Recorder implements GameHost {
 
   /** Reseeds the core if the authority gives a seed now, after the turn's checks so they hold what came before it. */
   private async inject(turn: number): Promise<void> {
-    let seed: number | null;
+    let injection: Injection | null;
     try {
-      seed = await this.inner.injectedSeed!(turn);
+      injection = await this.inner.injectedSeed!(turn, this.lastInjection);
     } catch (e) {
       console.warn("no seed to inject, so the core keeps its own", e);
       return;
     }
-    if (seed === null) return;
-    if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) {
-      console.warn("not a 32-bit seed, so the core keeps its own", seed);
+    if (injection === null) return;
+    const { seed, schedule = "" } = injection;
+    if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff || /\n/.test(schedule)) {
+      console.warn("not a 32-bit seed, so the core keeps its own", injection);
       return;
     }
-    if (this.m._nhweb_reseed(seed)) this.write(`reseed ${seed}`);
+    if (!this.m._nhweb_reseed(seed)) return;
+    this.write(`reseed ${seed}${schedule && ` ${schedule}`}`);
+    this.lastInjection = schedule;
   }
 
   private write(line: string): void {
