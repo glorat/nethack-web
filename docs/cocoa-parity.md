@@ -106,7 +106,7 @@ Map:
 To decide, by trying both:
 
 - [x] Every prompt gets a dialog, where Cocoa asks one with fewer than two or more than nine answers in the message window (`YesNoInput` `canAskWithChoices`), as a dialog can be answered by touch; see `docs/tablet-support.md`.
-- [x] Roles a chosen race can't play are disabled in the character picker, as races a chosen role can't be are (`PlayerSelectionWindowController.m` `selectRace`).
+- [x] Every role can be picked in the character picker: one the race can't play takes the first race that can, where Cocoa disables it (`PlayerSelectionWindowController.m` `selectRace`). A random race could otherwise leave most roles greyed out with no reason given. Races a chosen role can't be are still disabled.
 - [x] Menus as wide as their contents, up to 90% of the window. Unlike Cocoa, text still wraps and a row too long for that scrolls sideways, so nothing is cut off on a narrow screen.
 - [x] Map tooltips kept as they are: shown after a short wait on a square and cleared each turn, where Cocoa waits for the pointer to rest and keeps them across turns (`MainView.m` `mouseMoved:`).
 

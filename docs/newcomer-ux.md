@@ -44,6 +44,7 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
   - A third choice, `d`, in the fork's core (web build only), recorded by its text like the others; `y` and `n` keep their text, so old recordings replay. The note under the choices says it can be changed in Game Settings rather than how to edit the file.
   - Choosing it has the core tell the page (`NHWEB_EVENT_OPTION`), which keeps `OPTIONS=!tutorial` in the options file, where Game Settings shows Never. Not in replays.
   - The tutorial plays through on the site (checked by hand); a headless test enters it and leaves by its first portal. A recording of a full playthrough could become a replay fixture later.
+- [x] **Something to choose a character by.** Effort S, benefit medium. Decided: the character picker shows the Guidebook's own paragraph on the chosen role and race (`src/port/guidebook.ts`, checked against `doc/Guidebook.mn`), beside the lists or below them on a narrow screen, with the role's tile at 96px above it where it sits beside them. No beginner's recommendation, as that's advice on playing well. Every role can be picked; see `docs/cocoa-parity.md`.
 - [ ] **A count before a command by touch** (`n20s`). Effort M, benefit low. "Search 20" and rest buttons on the toolbar cover the common cases.
 - [ ] **The `number_pad` default.** Effort S, benefit low. Arrow keys already move.
 

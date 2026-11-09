@@ -24,7 +24,7 @@ async function enterGame(page: Page, name: string) {
 
 /** Chooses the role, and the first of what's allowed for the rest, over the picker's random default. */
 async function pickCharacter(picker: Locator, role: RegExp) {
-  // a human can be any role, and roles the race can\'t play are disabled
+  // a human can be any role
   await picker.getByRole("listbox", { name: "Race" }).getByRole("option", { name: "human" }).click();
   await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: role }).click();
   await picker.getByRole("listbox", { name: "Race" }).locator("button:not([disabled])").first().click();
@@ -365,7 +365,14 @@ test("the character picker starts the chosen role", async ({ page }) => {
   await picker.getByRole("option", { name: "human" }).click();
   await picker.getByRole("option", { name: "Wizard" }).click();
   await picker.getByRole("option", { name: "elf" }).click();
-  await expect(picker.getByRole("option", { name: "Valkyrie" })).toBeDisabled();
+  await expect(picker.locator(".player-about")).toContainText("Wizards start out with a knowledge of magic");
+  await expect(picker.locator(".player-about")).toContainText("Elves are agile, quick, and perceptive");
+  // every role can be picked: one the race can't play takes a race that can
+  await picker.getByRole("option", { name: "Valkyrie" }).click();
+  await expect(picker.getByRole("option", { name: "human" })).toHaveAttribute("aria-selected", "true");
+  await expect(picker.locator(".player-about")).toContainText("Valkyries are hardy warrior women");
+  await picker.getByRole("option", { name: "Wizard" }).click();
+  await picker.getByRole("option", { name: "elf" }).click();
   // elves are only chaotic
   await expect(picker.getByRole("radio", { name: "Lawful" })).toBeDisabled();
   await expect(picker.getByRole("radio", { name: "Chaotic" })).toHaveAttribute("aria-checked", "true");
