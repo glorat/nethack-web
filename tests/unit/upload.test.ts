@@ -53,6 +53,15 @@ test("lines are sent in one batch a second after the first of them", async () =>
   expect(server.batches.get(batchId(1, 1))!.sentAt).toBe(1000);
 });
 
+test("lines from a game that's over go at once, not a second later", async () => {
+  const up = uploader();
+  up.add(numbered(2), true);
+  up.add(numbered(1, 3), true, true);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(server.writes).toEqual([batchId(1, 1)]);
+  expect(server.rebuilt()).toBe(text(numbered(3)));
+});
+
 test("steady play still sends", async () => {
   const up = uploader();
   for (let i = 1; i <= 10; i++) {

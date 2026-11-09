@@ -115,7 +115,7 @@ export class Session {
   /** The recording's lines, as the recorder streamed them out. */
   recorded: string[] = [];
   /** Those lines as they came, a batch at a time. */
-  batches: { lines: string[]; atPrompt: boolean }[] = [];
+  batches: { lines: string[]; atPrompt: boolean; over: boolean }[] = [];
   /** What the recording held before those lines, for a game that came back. */
   before: string | null = null;
   /** The whole recording, once the game has ended. */
@@ -207,9 +207,9 @@ export class Session {
     return new Recorder(this.liveHost ??= this.host(options), m, {
       options: nethackOptions,
       config,
-      stream: (lines, atPrompt) => {
+      stream: (lines, atPrompt, over) => {
         this.recorded.push(...lines);
-        this.batches.push({ lines, atPrompt });
+        this.batches.push({ lines, atPrompt, over });
       },
       before: (text) => (this.before = text),
       shadowed: options.shadowed,

@@ -93,7 +93,7 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
       for (const e of events) {
         if (e.type === "recorded") {
           session?.recorded(e.lines.join("\n"));
-          uploader?.add(e.lines, e.atPrompt);
+          uploader?.add(e.lines, e.atPrompt, e.over);
         }
         if (e.type === "scores" && e.last) ownPoints = pointsIn(e.last);
         if (e.type === "recorded_before") {

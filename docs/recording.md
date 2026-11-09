@@ -5,7 +5,7 @@ A recording holds everything a game took from the page: what the player typed, c
 ## Where it's kept
 
 - **During the game:** under `/save/replay/<game>/`, in numbered chunks (`000001`, `000002`, …) of about 64 KB, so IndexedDB rewrites only the last chunk.
-- **As it's written:** each new line goes to the page as a `recorded` event, for sending on. `atPrompt` marks the core stopping to wait, when everything it did since the last wait is there.
+- **As it's written:** each new line goes to the page as a `recorded` event, for sending on. `atPrompt` marks the core stopping to wait, when everything it did since the last wait is there. `over` marks a wait with the game over, as at the questions after a death, and an online game sends those lines at once rather than a second later, so closing the page then doesn't lose the death.
 - **When the game ends:** the whole text goes to the page as a `recording` event, and the chunks are deleted. The end screen's Replay plays it on the same page. An offline game also keeps it in localStorage (`nethack.lastGame`) when it fits.
 - **Online:** the server holds the only copy, sent one batch at a time, each ending where the core waits.
 

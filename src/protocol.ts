@@ -78,7 +78,7 @@ export type GameEvent =
   | { type: "ascii_map"; on: boolean }
   | { type: "game_over"; text: string }
   /** Lines added to the game's recording, as they're written; `atPrompt` once the core is waiting and all it did is there. */
-  | { type: "recorded"; lines: string[]; atPrompt: boolean }
+  | { type: "recorded"; lines: string[]; atPrompt: boolean; over: boolean }
   /** What the recording of a game that has come back already held. */
   | { type: "recorded_before"; text: string }
   /** The whole recording of a game that has ended. */

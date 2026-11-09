@@ -68,13 +68,14 @@ export class LogUploader {
     this.wait(0);
   }
 
-  add(lines: string[], atPrompt: boolean): void {
+  /** `over`: the game is over, so these go at once, before a player could close the page on a death. */
+  add(lines: string[], atPrompt: boolean, over = false): void {
     this.held.push(...lines);
     if (!atPrompt || !this.held.length) return;
     this.lines.push(...this.held);
     this.held = [];
     // a session's last lines, with the page about to go
-    if (/^\d+ end /.test(this.lines.at(-1)!)) this.wait(0);
+    if (over || /^\d+ end /.test(this.lines.at(-1)!)) this.wait(0);
     // left running if it is, or steady play would never send
     else if (!this.timer) this.wait(DEBOUNCE_MS);
   }
