@@ -1,9 +1,11 @@
 import { useLayoutEffect, useState } from "preact/hooks";
+import { RACE_TEXT, ROLE_TEXT } from "../../port/guidebook";
 import { ALIGNS, GENDERS, randomPick, withRace, withRole } from "../../port/player";
 import type { PlayerChoices, PlayerPick } from "../../protocol";
 import { tileStyle, type TileSheet } from "../../tiles";
 
 const ICON = 32;
+const PORTRAIT = 96;
 const FEMALE = 1;
 
 interface Props {
@@ -15,6 +17,7 @@ interface Props {
 export function PlayerDialog({ choices, sheet, onDone }: Props) {
   const [pick, setPick] = useState(() => randomPick(choices));
   const female = pick.gender === FEMALE;
+  const role = choices.roles[pick.role];
 
   // layout effect: listen before the dialog is painted, or a fast key press is lost
   useLayoutEffect(() => {
@@ -39,7 +42,6 @@ export function PlayerDialog({ choices, sheet, onDone }: Props) {
                 role="option"
                 aria-selected={ro === pick.role}
                 class={ro === pick.role ? "player-item selected" : "player-item"}
-                disabled={!choices.validRace[ro][pick.race]}
                 onClick={() => setPick(withRole(choices, pick, ro))}
               >
                 <span class="player-icon" style={tileStyle(sheet, female ? r.femaleTile : r.tile, ICON)} />
@@ -60,6 +62,11 @@ export function PlayerDialog({ choices, sheet, onDone }: Props) {
                 {r.name}
               </button>
             ))}
+          </div>
+          <div class="player-about" aria-live="polite">
+            {role ? <span class="player-portrait" aria-hidden="true" style={tileStyle(sheet, female ? role.femaleTile : role.tile, PORTRAIT)} /> : null}
+            <p>{ROLE_TEXT[role?.name ?? ""]}</p>
+            <p>{RACE_TEXT[choices.races[pick.race]?.name ?? ""]}</p>
           </div>
         </div>
         <Choice

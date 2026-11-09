@@ -357,9 +357,10 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 .ext-desc { color: var(--muted); }
 
 /* character picker */
-.player-dialog { width: 520px; }
-.player-lists { display: flex; gap: 10px; min-height: 0; }
-.player-list { flex: 1; display: flex; flex-direction: column; overflow-y: auto; max-height: 52vh; border: 1px solid var(--border); border-radius: 6px; }
+.player-dialog { width: min(720px, 92vw); }
+/* the lists stay side by side, and scroll with the text when it wraps below them on a small screen */
+.player-lists { display: flex; flex-wrap: wrap; gap: 10px; min-height: 0; overflow-y: auto; container-type: inline-size; }
+.player-list { flex: 1 1 0; min-width: 140px; display: flex; flex-direction: column; overflow-y: auto; max-height: 52vh; border: 1px solid var(--border); border-radius: 6px; }
 .player-item {
   display: flex; align-items: center; gap: 8px; width: 100%;
   border: 0; border-radius: 0; background: none; padding: 2px 8px; text-align: left;
@@ -367,6 +368,11 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 .player-item:hover:not(:disabled) { background: var(--hover); }
 .player-item.selected, .player-item.selected:hover { background: var(--selected); }
 .player-item:disabled { opacity: 0.35; }
+.player-about { flex: 1 1 240px; max-height: 52vh; overflow-y: auto; color: var(--muted); line-height: 1.45; }
+.player-about p { margin: 0 0 10px; }
+.player-portrait { display: block; width: 96px; height: 96px; margin-bottom: 8px; background-repeat: no-repeat; }
+/* where the text has wrapped below the lists, the portrait would only push the buttons down */
+@container (max-width: 539px) { .player-portrait { display: none; } }
 .player-icon { width: 32px; height: 32px; flex: none; background-repeat: no-repeat; }
 .player-choice { display: flex; align-items: center; gap: 6px; }
 .player-choice-label { width: 80px; color: var(--muted); }
