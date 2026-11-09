@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState } from "preact/hooks";
-import { RACE_TEXT, ROLE_TEXT } from "../../port/guidebook";
+import { guidebookText } from "../../port/guidebook";
 import { ALIGNS, GENDERS, randomPick, withRace, withRole } from "../../port/player";
 import type { PlayerChoices, PlayerPick } from "../../protocol";
 import { tileStyle, type TileSheet } from "../../tiles";
@@ -18,6 +18,7 @@ export function PlayerDialog({ choices, sheet, onDone }: Props) {
   const [pick, setPick] = useState(() => randomPick(choices));
   const female = pick.gender === FEMALE;
   const role = choices.roles[pick.role];
+  const race = choices.races[pick.race];
 
   // layout effect: listen before the dialog is painted, or a fast key press is lost
   useLayoutEffect(() => {
@@ -65,8 +66,8 @@ export function PlayerDialog({ choices, sheet, onDone }: Props) {
           </div>
           <div class="player-about" aria-live="polite">
             {role ? <span class="player-portrait" aria-hidden="true" style={tileStyle(sheet, female ? role.femaleTile : role.tile, PORTRAIT)} /> : null}
-            <p>{ROLE_TEXT[role?.name ?? ""]}</p>
-            <p>{RACE_TEXT[choices.races[pick.race]?.name ?? ""]}</p>
+            <p>{role ? guidebookText(role.name) : null}</p>
+            <p>{race ? guidebookText(race.name) : null}</p>
           </div>
         </div>
         <Choice

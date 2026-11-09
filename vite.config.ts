@@ -56,6 +56,17 @@ function nethackVersion(): string {
   return [level("VERSION_MAJOR"), level("VERSION_MINOR"), level("PATCHLEVEL")].join(".");
 }
 
+/** The Guidebook's paragraph on each role and race, by the name it opens with ("Valkyries"), from "What is going on here?". */
+function guidebookCharacters(): [string, string][] {
+  const guidebook = readFileSync(new URL("./nethack/doc/Guidebook.mn", import.meta.url), "utf8");
+  const section = guidebook.split(/^\.hn 1$/m).find((s) => s.startsWith("\nWhat is going on here?"));
+  if (!section) throw new Error("the Guidebook has no \"What is going on here?\" section");
+  return section.split(/^\.pg.*$/m).flatMap((paragraph): [string, string][] => {
+    const name = paragraph.match(/^\s*\\fI([^\\]+)\\fP/)?.[1];
+    return name ? [[name, paragraph.replace(/\\f[IPB]/g, "").replace(/\s+/g, " ").trim()]] : [];
+  });
+}
+
 function coreCommit(): string {
   try {
     return execSync("git -C nethack rev-parse --short HEAD", { cwd: new URL(".", import.meta.url), encoding: "utf8" }).trim();
@@ -65,7 +76,11 @@ function coreCommit(): string {
 }
 
 export default defineConfig({
-  define: { __NETHACK_VERSION__: JSON.stringify(nethackVersion()), __CORE_COMMIT__: JSON.stringify(coreCommit()) },
+  define: {
+    __NETHACK_VERSION__: JSON.stringify(nethackVersion()),
+    __CORE_COMMIT__: JSON.stringify(coreCommit()),
+    __GUIDEBOOK_CHARACTERS__: JSON.stringify(guidebookCharacters()),
+  },
   plugins: [preact(), serviceWorker()],
   worker: { format: "es" },
   // in production the site's Pages Functions put the server's public data here; in development, the emulator's

@@ -1,21 +1,23 @@
 import { expect, test } from "vitest";
-import guidebook from "../../nethack/doc/Guidebook.mn?raw";
 import roleC from "../../nethack/src/role.c?raw";
-import { RACE_TEXT, ROLE_TEXT } from "../../src/port/guidebook";
+import { guidebookMatches, guidebookText } from "../../src/port/guidebook";
 
-const paragraphs = guidebook
-  .split(/^\.(?:pg|hn).*$/m)
-  .map((p) => p.replace(/\\f[IPB]/g, "").replace(/\s+/g, " ").trim());
+const roles = [...roleC.matchAll(/^ {4}\{ \{ "([A-Za-z]+)", (?:0|"[A-Za-z]+") \},/gm)].map((m) => m[1]!);
+const races = [...roleC.slice(roleC.indexOf("const struct Race races[")).matchAll(/^ {8}"([a-z]+)",\n {8}"[a-z]+",\n {8}"[a-z]+",\n {8}"[A-Z][a-z]{2}",/gm)].map((m) => m[1]!);
 
-test("each role's and race's text is a paragraph of the Guidebook, word for word", () => {
-  for (const text of [...Object.values(ROLE_TEXT), ...Object.values(RACE_TEXT)]) expect(paragraphs).toContain(text);
-});
-
-test("every role and race the core offers has its text", () => {
-  const roles = [...roleC.matchAll(/^ {4}\{ \{ "([A-Za-z]+)", (?:0|"[A-Za-z]+") \},/gm)].map((m) => m[1]);
-  const races = [...roleC.slice(roleC.indexOf("const struct Race races[")).matchAll(/^ {8}"([a-z]+)",\n {8}"[a-z]+",\n {8}"[a-z]+",\n {8}"[A-Z][a-z]{2}",/gm)].map((m) => m[1]);
+test("the build reads a paragraph for each role and race from the Guidebook, and nothing else", () => {
   expect(roles).toHaveLength(13);
   expect(races).toHaveLength(5);
-  expect(Object.keys(ROLE_TEXT).sort()).toEqual([...roles].sort());
-  expect(Object.keys(RACE_TEXT).sort()).toEqual([...races].sort());
+  expect(__GUIDEBOOK_CHARACTERS__).toHaveLength(roles.length + races.length);
+  for (const [, text] of __GUIDEBOOK_CHARACTERS__) expect(text).not.toMatch(/\\/);
+});
+
+test("every role and race the core offers finds its own paragraph, and only that one", () => {
+  for (const name of [...roles, ...races]) expect(guidebookMatches(name), name).toHaveLength(1);
+  expect(new Set([...roles, ...races].map(guidebookText)).size).toBe(roles.length + races.length);
+  expect(guidebookText("Valkyrie")).toMatch(/^Valkyries are hardy warrior women\./);
+  expect(guidebookText("Cavewoman")).toMatch(/^Cavemen and Cavewomen/);
+  expect(guidebookText("Caveman")).toMatch(/^Cavemen and Cavewomen start with exceptional strength/);
+  expect(guidebookText("dwarf")).toMatch(/^Dwarves are smaller than humans or elves/);
+  expect(guidebookText("elf")).toMatch(/^Elves are agile, quick, and perceptive;/);
 });
