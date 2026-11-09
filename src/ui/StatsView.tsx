@@ -1,9 +1,11 @@
 import { useEffect, useRef } from "preact/hooks";
 import { quietBadges, STAT_TIPS, STAT_WIKI, type StatName, statusBadges } from "../port/badges";
 import { meterLevel } from "../port/meter";
+import { dungeonHint } from "../port/hints";
 import { heroText, levelText } from "../port/status-header";
 import type { StatusValue } from "../protocol";
 import { nhColor } from "./colors";
+import type { HintMarker } from "./hints";
 import { Described, type ToggletipProps, useToggletip } from "./tooltip";
 
 // the gold field is "<encoded gold glyph>:<amount>"; the glyph is "\G" plus 8 hex digits
@@ -31,7 +33,7 @@ function Meter({ label, cur, max, kind, tip, on }: { label: string; cur: string;
   );
 }
 
-export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
+export function StatsView({ fields, hint }: { fields: Record<string, StatusValue>; hint: HintMarker }) {
   const toggletip = useToggletip();
   // what was clicked may have changed or gone
   useEffect(toggletip.sync, [fields]);
@@ -72,7 +74,10 @@ export function StatsView({ fields }: { fields: Record<string, StatusValue> }) {
     <div class="stats">
       <div class="stats-title">{value(fields, "BL_TITLE")}</div>
       <div class="stats-sub">{heroText(value(fields, "BL_ALIGN"), value(fields, "hero_kind"))}</div>
-      <div class="stats-sub">{levelText(value(fields, "BL_LEVELDESC"), value(fields, "dungeon_name"), Number(value(fields, "dungeon_level")))}</div>
+      <div class="stats-sub stats-level">
+        <span>{levelText(value(fields, "BL_LEVELDESC"), value(fields, "dungeon_name"), Number(value(fields, "dungeon_level")))}</span>
+        {hint(dungeonHint(value(fields, "dungeon_name"), Number(value(fields, "dungeon_level"))))}
+      </div>
       <Meter label="HP" cur={value(fields, "BL_HP")} max={value(fields, "BL_HPMAX")} kind="hp" tip={STAT_TIPS.BL_HP} on={toggletip.on(STAT_TIPS.BL_HP, STAT_WIKI.BL_HP)} />
       <Meter label="Pw" cur={value(fields, "BL_ENE")} max={value(fields, "BL_ENEMAX")} kind="pw" tip={STAT_TIPS.BL_ENE} on={toggletip.on(STAT_TIPS.BL_ENE, STAT_WIKI.BL_ENE)} />
       <div class="stat-grid">

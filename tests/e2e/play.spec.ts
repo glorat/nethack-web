@@ -493,15 +493,47 @@ test("clicking a stat explains it, with a link to the wiki, until a click elsewh
 test("the toolbar offers what you can do where you stand, and runs it", async ({ page }) => {
   await startGame(page, `Tool${Date.now() % 100000}`);
   const toolbar = page.getByRole("group", { name: "What you can do here" });
-  // the game starts on the up stairs
-  await expect(toolbar.getByRole("button")).toHaveText(["Go up<", "Searchs", "Rest."]);
+  // the game starts on the up stairs, which would leave the dungeon, so Go up isn't offered
+  await expect(toolbar.getByRole("button")).toHaveText(["Searchs", "Rest."]);
   // the key is for the eye, not part of the button's name
   await expect(toolbar.getByRole("button", { name: "Search", exact: true })).toBeVisible();
   const turn = await stat(page, "T").innerText();
   await toolbar.getByRole("button", { name: /^Search/ }).click();
   await expect(stat(page, "T")).not.toHaveText(turn);
   await untilCommand(page);
-  await expect(toolbar.getByRole("button")).toHaveCount(3);
+  await expect(toolbar.getByRole("button")).toHaveCount(2);
+});
+
+test("a hint shows until it's read, stays read on this device, and can be hidden or shown again", async ({ page }) => {
+  await startGame(page, `Hint${Date.now() % 100000}`);
+  const marker = page.locator(".stats-level").getByRole("button", { name: /^Hint: Your goal/ });
+  const popover = page.getByRole("dialog", { name: "What this means" });
+  await expect(marker).toBeVisible();
+  await marker.click();
+  await expect(popover).toContainText("Find the stairs down");
+  await expect(popover.locator("kbd")).toHaveText(">");
+  // a resize closes it unread
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await expect(popover).toBeHidden();
+  await expect(marker).toBeVisible();
+  await marker.click();
+  await page.keyboard.press("Escape");
+  await expect(marker).toBeHidden();
+  await page.reload();
+  await untilPlaying(page);
+  await expect(page.locator(".stats-level")).toBeVisible();
+  await expect(marker).toBeHidden();
+  const view = page.getByRole("menubar").getByRole("menuitem", { name: "View" });
+  await view.click();
+  await page.getByRole("menuitem", { name: "Reset Hints" }).click();
+  await expect(marker).toBeVisible();
+  await view.click();
+  await page.getByRole("menuitem", { name: "Hide Hints" }).click();
+  await expect(marker).toBeHidden();
+  await page.reload();
+  await untilPlaying(page);
+  await expect(page.locator(".stats-level")).toBeVisible();
+  await expect(marker).toBeHidden();
 });
 
 test("the toolbar can be hidden from the View menu, and stays hidden", async ({ page }) => {
@@ -1015,7 +1047,7 @@ test("the status panel gives the hero's alignment, race and role, and the dungeo
   await startAs(page, `Head${Date.now() % 100000}`, /Priest/);
   const lines = page.locator(".stats .stats-sub");
   await expect(lines.nth(0)).toHaveText(/^(Lawful|Neutral|Chaotic) (human|elven) priest(ess)?$/);
-  await expect(lines.nth(1)).toHaveText("The Dungeons of Doom: level 1");
+  await expect(lines.nth(1).locator("span")).toHaveText("The Dungeons of Doom: level 1");
 });
 
 test("in a menu of several picks, . or , picks everything, - or \\ nothing, and Select All everything", async ({ page }) => {
