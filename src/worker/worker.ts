@@ -156,9 +156,10 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
       shadowed,
       before: shadowed || mode.wantsRecordingSoFar ? (text) => send({ type: "events", events: [{ type: "recorded_before", text }] }) : undefined,
       finished: (text) => {
-        send({ type: "events", events: [{ type: "recording", text }] });
+        // first, so the page has the game's own score when the recording starts its scoring
         const scores = mode.scores(m);
         if (scores !== null) send({ type: "events", events: [{ type: "scores", text: scores.record, last: scores.last ?? undefined }] });
+        send({ type: "events", events: [{ type: "recording", text }] });
       },
       resume: replayFailed || !mode.keptHere ? undefined : resume,
       recording: mode.recording || undefined,

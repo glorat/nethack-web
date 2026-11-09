@@ -13,6 +13,13 @@ export function onlineWorker(choice: Extract<AuthorityChoice, { kind: "online" }
     // until the server has its own, so none cross over from offline games
     bones: () => () => undefined,
     place: (m, _name, files) => writeSaveFiles(m, files),
-    scores: () => null,
+    scores(m) {
+      try {
+        const log = m.FS.readFile("/save/xlogfile", { encoding: "utf8" }) as string;
+        return { record: "", last: log.trimEnd().split("\n").pop() || null };
+      } catch {
+        return null;
+      }
+    },
   };
 }

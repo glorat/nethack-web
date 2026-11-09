@@ -513,15 +513,18 @@ test("seeds are injected from the server on the timetable the recording holds, a
   expect(validation).toMatchObject({ replayed: true, matches: ALL_MATCH });
 });
 
-test("a game just ended is scored at once, with a link to its page", async ({ page }) => {
+test("a game just ended shows its own score at once, then the server's, with a link to its page", async ({ page }) => {
   await online(page);
   await untilPlaying(page, `Sc${Date.now() % 100000}`);
   await pass(page, 3);
   const over = await endGame(page);
-  await expect(over.getByRole("progressbar", { name: "Working out your score" }).or(over.getByText(/You scored/))).toBeVisible();
-  await expect(over.getByText(/You scored \d+ points?\./)).toBeVisible({ timeout: 60_000 });
-  await expect(over.getByRole("status")).toContainText("You scored");
+  // the game's own count, while the server confirms it
+  await expect(over.getByRole("progressbar", { name: "Confirming your score" })).toBeVisible();
+  const own = await over.getByText(/You scored [\d,]+ points?\./).textContent();
   const link = over.getByRole("link", { name: "See your game's page" });
+  await expect(link).toBeVisible({ timeout: 60_000 });
+  await expect(over.getByRole("progressbar")).toHaveCount(0);
+  await expect(over.getByRole("status")).toContainText(own!.trim());
   await expect(link).toHaveAttribute("href", /\/g\/[A-Za-z0-9_-]{22}$/);
   // Enter on the link follows it, rather than starting a new game
   await link.focus();
@@ -708,7 +711,8 @@ test("a finished online game is listed on the landing page, scored as it ended, 
   const game = await gameId(page);
   await pass(page, 2);
   const over = await endGame(page);
-  await expect(over.getByText(/You scored/)).toBeVisible({ timeout: 60_000 });
+  // confirmed by the server, not just the game's own count
+  await expect(over.getByRole("link", { name: "See your game's page" })).toBeVisible({ timeout: 60_000 });
   await expect.poll(async () => (await stored(page, game)).map((b) => b.lines).join("\n"), { timeout: 10_000 }).toMatch(/\d+ end over/);
 
   await page.goto("/online/");
