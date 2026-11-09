@@ -113,6 +113,8 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 /* left of the zoom buttons, which take about 160px */
 .quick-actions { position: absolute; left: 12px; bottom: 12px; right: 180px; display: flex; flex-wrap: wrap-reverse; gap: 4px; pointer-events: none; }
 .quick-actions button { pointer-events: auto; opacity: 0.9; padding: 2px 8px; }
+.quick-action { position: relative; display: inline-flex; }
+.quick-action .hint-marker { position: absolute; top: -7px; right: -7px; margin: 0; padding: 0; opacity: 1; }
 .quick-key { margin-left: 6px; font-family: var(--mono); font-size: 0.85em; color: var(--muted); }
 .map-zoom button { width: 28px; padding: 2px 0; opacity: 0.8; }
 .map-zoom .ascii-toggle { width: auto; padding: 2px 8px; }
@@ -142,6 +144,24 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 .tip-popover p { margin: 0 0 6px; }
 .tip-popover p:last-child { margin: 0; }
 .stats [data-tip] { cursor: pointer; }
+/* a hint the player hasn't opened yet: light, apart from the blue of messages and controls, and pulsing every few seconds until opened */
+.hint-marker {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
+  width: 16px; height: 16px; margin-left: 6px; padding: 0; border: none; border-radius: 50%;
+  background: var(--text); color: var(--bg); font-size: 11px; font-weight: 700; line-height: 1; cursor: pointer;
+  animation: hint-pulse 4s ease-out infinite;
+}
+/* a bigger target than it looks, for a finger */
+.hint-marker::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; }
+@keyframes hint-pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+  6% { transform: scale(1.2); }
+  15%, 100% { transform: scale(1); box-shadow: 0 0 0 8px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hint-marker { animation: none; outline: 2px solid rgba(255, 255, 255, 0.7); outline-offset: 1px; }
+}
+.tip-popover kbd { font-family: var(--mono); padding: 0 4px; border: 1px solid var(--border-hover); border-radius: 3px; }
 .screen-reader-only {
   position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
@@ -153,6 +173,10 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 .stats-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stats-sub { color: var(--muted); font-size: calc(12px * var(--text-scale)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stats-sub + .meter { margin-top: 6px; }
+/* the level line clips its text, not the hint beside it */
+.stats-level { display: flex; align-items: center; overflow: visible; }
+.stats-level span { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.stats-level .hint-marker { flex-shrink: 0; }
 .meter { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
 .meter-label { width: calc(20px * var(--text-scale)); color: var(--muted); font-size: calc(11px * var(--text-scale)); }
 .meter-bar { position: relative; flex: 1; height: calc(14px * var(--text-scale)); background: var(--field); border-radius: 3px; overflow: hidden; }
@@ -529,7 +553,7 @@ button[aria-disabled="true"] { opacity: 0.5; cursor: default; }
 
 /* a finger needs bigger targets than a mouse: Apple's 44pt minimum */
 @media (pointer: coarse) {
-  button:not(.equip-slot), .mode-switch, .menu-items:not(.readonly) .menu-item { min-height: 44px; }
+  button:not(.equip-slot):not(.hint-marker), .mode-switch, .menu-items:not(.readonly) .menu-item { min-height: 44px; }
   .menu-items.tabbed > .menu-item { align-items: center; }
   .menubar-list { max-height: calc(100vh - 56px); }
 }

@@ -31,9 +31,12 @@ const FIXED: Record<string, Omit<HereAction, "name">> = {
   cast: { label: "Cast", key: "Z" },
 };
 
-/** The toolbar's buttons for the names the core gave, separated by spaces: this square's actions in the core's order, then the fixed ones. */
-export function toolbarActions(names: string): HereAction[] {
-  const given = names.split(" ").filter(Boolean);
+/**
+ * The toolbar's buttons for the names the core gave, separated by spaces: this square's actions in the core's order, then the fixed ones.
+ * Without Go up where it would leave the dungeon, which ends the game: the menus and `<` still offer it.
+ */
+export function toolbarActions(names: string, leavesDungeon = false): HereAction[] {
+  const given = names.split(" ").filter((n) => n && !(leavesDungeon && n === "up"));
   const here = given.filter((n) => ACTIONS[n]).map((name) => ({ name, ...ACTIONS[name] }));
   const fixed = Object.keys(FIXED).filter((n) => given.includes(n)).map((name) => ({ name, ...FIXED[name] }));
   return [...here, ...fixed];

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { wikiUrl } from "../port/describe";
+import { tipParts } from "../port/hints";
 
 /** How long the pointer rests before a tooltip shows, for every tooltip the page draws. */
 export const TOOLTIP_DELAY = 300;
@@ -49,6 +50,7 @@ interface Open extends Shown {
   el: HTMLElement;
   /** The top of the element it explains, to show above it if there's no room below. */
   above: number;
+  onDismissed?: () => void;
 }
 
 const MODIFIERS = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock", "AltGraph"]);
@@ -64,8 +66,15 @@ export function useToggletip() {
   const popover = useRef<HTMLDivElement>(null);
 
   const close = () => setOpen(null);
+  const current = useRef(open);
+  current.current = open;
+  /** Closed by the player, having read it, as against by a resize or the element going. */
+  const dismiss = () => {
+    current.current?.onDismissed?.();
+    close();
+  };
 
-  const on = (tip: string | undefined, wiki?: string) =>
+  const on = (tip: string | undefined, wiki?: string, onDismissed?: () => void) =>
     tip
       ? {
           "data-tip": tip,
@@ -73,7 +82,7 @@ export function useToggletip() {
           onClick: (e: MouseEvent) => {
             const el = e.currentTarget as HTMLElement;
             const r = el.getBoundingClientRect();
-            setOpen({ text: tip, wiki: wiki ?? null, left: r.left, top: r.bottom + 4, above: r.top - 4, el });
+            setOpen({ text: tip, wiki: wiki ?? null, left: r.left, top: r.bottom + 4, above: r.top - 4, el, onDismissed });
           },
         }
       : {};
@@ -100,7 +109,7 @@ export function useToggletip() {
         // a dialog that opened under the popover listens on window too
         e.stopImmediatePropagation();
       }
-      close();
+      dismiss();
     };
     window.addEventListener("keydown", onKey, true);
     window.addEventListener("blur", close);
@@ -124,11 +133,11 @@ export function useToggletip() {
   }, [open]);
 
   const element = open ? (
-    <div class="tip-backdrop" onMouseDown={close} onContextMenu={(e) => e.preventDefault()}>
+    <div class="tip-backdrop" onMouseDown={dismiss} onContextMenu={(e) => e.preventDefault()}>
       <div class="tip-popover" role="dialog" aria-label="What this means" ref={popover} onMouseDown={(e) => e.stopPropagation()}>
-        <p>{open.text}</p>
+        <p>{tipParts(open.text).map((p) => (p.key ? <kbd>{p.text}</kbd> : p.text))}</p>
         {open.wiki ? (
-          <a href={wikiUrl(open.wiki)} target="_blank" rel="noopener" onClick={close}>
+          <a href={wikiUrl(open.wiki)} target="_blank" rel="noopener" onClick={dismiss}>
             Search the NetHack Wiki for ‘{open.wiki}’
           </a>
         ) : null}

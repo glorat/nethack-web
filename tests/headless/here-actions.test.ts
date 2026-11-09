@@ -15,6 +15,8 @@ async function hereAction(g: Session, name: string) {
 test("on the stairs the game starts on, the toolbar offers going up, then Search and Rest", async () => {
   const g = await (await Session.start({ options: "time" })).skipText();
   expect(labels(g)).toEqual(["Go up", "Search", "Rest"]);
+  // there, going up leaves the dungeon and ends the game
+  expect(toolbarActions(g.hereActions, true).map((a) => a.label)).toEqual(["Search", "Rest"]);
 });
 
 test("an action runs as picking it from the here-menu does, and is replayed", async () => {

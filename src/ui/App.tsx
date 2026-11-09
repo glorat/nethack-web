@@ -42,6 +42,8 @@ import { type FinishedScore, type PageMode, SAVED_FAREWELL } from "./mode";
 import { MapView } from "./MapView";
 import { type BarMenu, MenuBar, type MenuEntry } from "./MenuBar";
 import { COMMAND_MENUS, type CommandItem, GAME_MENU, HELP_MENU, WIZARD_MENU } from "./commands";
+import { leavesDungeon } from "../port/hints";
+import { useHints } from "./hints";
 import { MessageView } from "./MessageView";
 import { ReplayBar, REPLAY_SPEEDS } from "./ReplayBar";
 import { ShadowBar } from "./ShadowBar";
@@ -321,6 +323,9 @@ export function App({ handedOver, onReplay }: Props) {
   };
   // what the hero can do where they stand, as of the last command prompt
   const [hereActions, setHereActions] = useState("");
+  const hints = useHints(!replay && state.gameOver === null, state.status.hero_kind?.text ?? "");
+  // what a hint was opened on may have gone
+  useEffect(hints.sync, [state, hereActions, showToolbar]);
   const setShowInventory = (show: boolean) => {
     shownInventory.current = show;
     setShowInventoryState(show);
@@ -806,6 +811,8 @@ export function App({ handedOver, onReplay }: Props) {
         null,
         { title: showInventory ? "Hide Inventory" : "Show Inventory", key: "⌃⌘S", run: () => setShowInventory(!showInventory) },
         { title: showToolbar ? "Hide Toolbar" : "Show Toolbar", run: () => setShowToolbar(!showToolbar) },
+        { title: hints.show ? "Hide Hints" : "Show Hints", run: () => hints.setShow(!hints.show) },
+        { title: "Reset Hints", disabled: !hints.anySeen, run: hints.reset },
       ],
     },
     // only in a debug-mode game, as Cocoa shows it
@@ -867,9 +874,9 @@ export function App({ handedOver, onReplay }: Props) {
       <div class="game">
         <div class="main-area">
           <header class="top">
-            <StatsView fields={state.status} />
+            <StatsView fields={state.status} hint={hints.marker} />
             <EquipmentView equipment={state.equipment} inventory={state.inventory} sheet={sheet} onChoose={chooseItem} />
-            <MessageView messages={state.messages} batch={state.batch} />
+            <MessageView messages={state.messages} batch={state.batch} hint={hints.marker} />
           </header>
           <MapView
             state={state}
@@ -883,7 +890,12 @@ export function App({ handedOver, onReplay }: Props) {
             onZoom={zoom}
             onShowInventory={showInventory ? undefined : () => setShowInventory(true)}
             toolbar={
-              showToolbar && !replay && state.gameOver === null ? <QuickActions names={hereActions} onRun={runHereAction} /> : null
+              showToolbar && !replay && state.gameOver === null ? <QuickActions
+                  names={hereActions}
+                  leavesDungeon={leavesDungeon(state.status.dungeon_name?.text ?? "", Number(state.status.dungeon_level?.text))}
+                  onRun={runHereAction}
+                  hint={hints.marker}
+                /> : null
             }
             onClick={(x, y, button) => {
               if (pending || state.gameOver !== null || replay) return;
@@ -914,6 +926,7 @@ export function App({ handedOver, onReplay }: Props) {
             scoring={scoring ?? undefined}
           />
         ) : null}
+        {hints.element}
         {optionsDialog}
         {about ? <AboutDialog onClose={() => setAbout(false)} /> : null}
         {choosingFont ? (

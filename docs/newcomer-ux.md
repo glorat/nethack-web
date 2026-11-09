@@ -34,8 +34,11 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
   - Needs the core to tell the front end; batch with the next item into one core update.
 - [ ] **Remembered squares drawn differently from what's in view,** such as dimmed. Effort M, benefit medium.
   - Probably needs a "seen now" flag per glyph from the core.
-- [ ] **Contextual hints,** dismissible, the first time something comes up: entering a shop, a fountain or altar, first Burdened or Hungry. Effort M–L, benefit high.
-  - Triggered from messages, status and room type. A cheaper route to much of what a tutorial would teach.
+- [x] **Hints the first time a place comes up.** Effort M, benefit high. Decided:
+  - A "?" beside what the hint is about, pulsing every few seconds until opened, opens it in the badges' popover: on the level line at the top of the dungeon (the goal: go down) and in the Gnomish Mines and Sokoban, on the toolbar's Sacrifice (altar) and Dip (fountain), and on a shopkeeper's welcome in the messages. Chosen over a card by the messages, a dialog or a hints log, as the badges already pulse rather than interrupt. A card is the fallback if testers miss the pulses.
+  - It stays until opened once, remembered per device. View > Hide Hints and Reset Hints. None in a replay or after the game ends.
+  - Hungry and Burdened need none: their badges already explain them. The texts and triggers are in `src/port/hints.ts`.
+  - The toolbar leaves out Go up where it would leave the dungeon and end the game. The menus and `<` still offer it.
 - [ ] **Explain cryptic messages on hover.** Effort M, benefit low to medium. After the alerts, reusing their patterns.
 - [x] **"No, and don't ask again" for the tutorial.** The core asks about its tutorial at every new game unless the options file sets `tutorial`. Effort S–M, benefit medium. Decided:
   - A third choice, `d`, in the fork's core (web build only), recorded by its text like the others; `y` and `n` keep their text, so old recordings replay. The note under the choices says it can be changed in Game Settings rather than how to edit the file.
