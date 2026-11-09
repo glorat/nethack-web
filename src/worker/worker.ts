@@ -152,7 +152,7 @@ async function start({ assetBase, options, config, shadowed, authority }: StartO
     new Recorder(host, m, {
       options: coreOptions,
       config: coreConfig,
-      stream: (lines, atPrompt) => send({ type: "events", events: [{ type: "recorded", lines, atPrompt }] }),
+      stream: (lines, atPrompt, over) => send({ type: "events", events: [{ type: "recorded", lines, atPrompt, over }] }),
       shadowed,
       before: shadowed || mode.wantsRecordingSoFar ? (text) => send({ type: "events", events: [{ type: "recorded_before", text }] }) : undefined,
       finished: (text) => {

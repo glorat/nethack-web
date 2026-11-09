@@ -116,8 +116,11 @@ export interface RecorderStart {
   options: string;
   /** The .nethackrc. */
   config: string;
-  /** Gets each line as it's written, to send on as the game is played; `atPrompt` once the core is waiting and all it did is there. */
-  stream(lines: string[], atPrompt: boolean): void;
+  /**
+   * Gets each line as it's written, to send on as the game is played; `atPrompt` once the core is waiting and all it did
+   * is there, and `over` if it waits with the game over, as at the questions after a death, so the lines shouldn't wait.
+   */
+  stream(lines: string[], atPrompt: boolean, over: boolean): void;
   /** A shadow is following on this same build, so can check more than a later replay could. */
   shadowed?: boolean;
   /** Gets what the recording already held, for a game that has come back. */
@@ -436,7 +439,7 @@ export class Recorder implements GameHost {
     const lines = this.unsent;
     this.unsent = [];
     this.midway = !atPrompt;
-    this.start.stream(lines, atPrompt);
+    this.start.stream(lines, atPrompt, atPrompt && !!this.m._nhweb_game_over());
   }
 
   /** Writes the chunk being added to into the file system, for the next persist to keep. */
