@@ -35,7 +35,7 @@ async function fakeServer(page: Page): Promise<Map<string, string | undefined>> 
       profile: { signedIn: false, handle: null, request: null },
       leaderboard: { entries: [] },
       startGame: { game: "game", utcOffset: 0, options: input?.options, config: input?.config, now },
-      seed: { seed: 1, now, validTurns: 1000 },
+      seed: { seed: 1, now, validTurns: 1000, askAheadTurns: 5 },
     };
     return { result: answers[method!] };
   });

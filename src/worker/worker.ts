@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import type { Answer, GameEvent, GameRequest, ReplayControl, StartOptions, UiMessage, WorkerMessage } from "../protocol";
+import type { Answer, GameEvent, GameRequest, ReplayControl, SeedReply, StartOptions, UiMessage, WorkerMessage } from "../protocol";
 import type { AuthorityChoice } from "../protocol";
 import { offlineWorker } from "../offline/worker";
 import { onlineWorker } from "../online/worker";
@@ -20,7 +20,7 @@ const SAVE_DIR = "/save";
 const inputs: Input[] = [];
 let inputWaiter: ((input: Input) => void) | null = null;
 const answerWaiters = new Map<number, (answer: Answer | null) => void>();
-const seedWaiters = new Map<number, (reply: { seed: number; now: number }) => void>();
+const seedWaiters = new Map<number, (reply: SeedReply) => void>();
 let nextRequestId = 1;
 let module: NetHackModule | null = null;
 let game: Game | null = null;
@@ -92,9 +92,9 @@ async function loadCore(assetBase: string): Promise<CreateModule> {
 
 const workerMode = (choice: AuthorityChoice): WorkerMode => (choice.kind === "online" ? onlineWorker(choice) : offlineWorker(choice));
 
-function askSeed(): Promise<{ seed: number; now: number }> {
+function askSeed(turn?: number): Promise<SeedReply> {
   const id = nextRequestId++;
-  send({ type: "seed_request", id });
+  send({ type: "seed_request", id, ...(turn === undefined ? {} : { turn }) });
   return new Promise((resolve) => seedWaiters.set(id, resolve));
 }
 

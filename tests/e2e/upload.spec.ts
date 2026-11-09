@@ -104,9 +104,11 @@ async function stored(page: Page, game: string): Promise<Stored[]> {
 interface Logged {
   method: string;
   turn?: number;
+  inject?: boolean;
   seed?: number;
   now?: number;
   validTurns?: number;
+  askAheadTurns?: number;
   utcOffset?: number;
 }
 
@@ -116,7 +118,7 @@ async function requests(page: Page, game: string): Promise<Logged[]> {
     headers: { Authorization: "Bearer owner" },
     data: { structuredQuery: { from: [{ collectionId: "requests", allDescendants: true }], orderBy: [{ field: { fieldPath: "receivedAt" } }] } },
   });
-  type Fields = Record<string, { stringValue?: string; integerValue?: string; mapValue?: { fields: Record<string, { integerValue?: string }> } }>;
+  type Fields = Record<string, { stringValue?: string; integerValue?: string; mapValue?: { fields: Record<string, { integerValue?: string; booleanValue?: boolean }> } }>;
   const rows = (await response.json()) as { document?: { name: string; fields: Fields } }[];
   return rows
     .filter((r) => r.document?.name.includes(`/games/${game}/`))
@@ -126,9 +128,11 @@ async function requests(page: Page, game: string): Promise<Logged[]> {
       return {
         method: method.stringValue!,
         turn: number(input.mapValue?.fields.turn),
+        inject: input.mapValue?.fields.inject?.booleanValue,
         seed: number(output.mapValue?.fields.seed),
         now: number(output.mapValue?.fields.now),
         validTurns: number(output.mapValue?.fields.validTurns),
+        askAheadTurns: number(output.mapValue?.fields.askAheadTurns),
         utcOffset: number(input.mapValue?.fields.utcOffset),
       };
     });
@@ -253,13 +257,13 @@ test("a game's seeds, time and id are the server's, and every ask is in its log"
   expect(text).toContain(` uuid ${game}\n`);
   const log = await requests(page, game);
   expect(log[0].method).toBe("startGame");
-  const asked = log.filter((r) => r.method === "seed");
-  expect(asked[0]).toMatchObject({ turn: 0, validTurns: 100 });
+  const asked = log.filter((r) => r.method === "seed" && !r.inject);
+  expect(asked[0]).toMatchObject({ turn: 0, validTurns: expect.any(Number) });
   const seeds = [...text.matchAll(/^\d+ seed (\d+)$/gm)].map((m) => Number(m[1]));
   // a new game asks once at its start: the core's seeds count up from that one answer
   expect(seeds.length).toBeGreaterThan(1);
   expect(seeds).toEqual(seeds.map((_, i) => (asked[0].seed! + i) >>> 0));
-  const times = new Set(asked.map((r) => r.now));
+  const times = new Set(log.filter((r) => r.method === "seed").map((r) => r.now));
   for (const [, now] of text.matchAll(/^\d+ now (\d+)$/gm)) expect(times).toContain(Number(now));
 });
 
@@ -280,7 +284,7 @@ test("a game saved and restored carries on as the same game", async ({ page }) =
   await page.locator(".stats-title").waitFor({ timeout: 15_000 });
   await afterPrompts(page);
   expect(await gameId(page)).toBe(game);
-  expect((await requests(page, game)).filter((r) => r.method === "seed").some((r) => r.turn! > 0)).toBe(true);
+  expect((await requests(page, game)).filter((r) => r.method === "seed" && !r.inject).some((r) => r.turn! > 0)).toBe(true);
   await pass(page, 2);
   const text = await quit(page);
   expect(text).toMatch(/ session restore /);
@@ -478,6 +482,35 @@ test("a real game, reloaded, saved and restored, validates on the server's core 
   expect(xlog).toContain(`name=${name}\t`);
   expect(result).toMatchObject({ name, death: "quit", role: "Val", player: expect.any(String), endedAt: expect.stringMatching(/Z$/) });
   expect(validation!.resumes).toBeGreaterThanOrEqual(2);
+});
+
+test("seeds are injected from the server on the timetable the recording holds, and the game still validates", async ({ page }) => {
+  await online(page);
+  await untilPlaying(page, `In${Date.now() % 100000}`);
+  const game = await gameId(page);
+  await pass(page, 35);
+  const text = await quit(page);
+  await expectUploaded(page, game, text);
+
+  let turn = 0;
+  const turns: number[] = [];
+  const injected: { turn: number; seed: number; next: number; ahead: number }[] = [];
+  for (const [, tag, rest] of text.matchAll(/^\d+ (T|reseed) (.*)$/gm)) {
+    const [first, next, ahead] = rest.split(" ").map(Number);
+    if (tag === "T") turns.push((turn = first));
+    else injected.push({ turn, seed: first, next, ahead });
+  }
+  const answers = (await requests(page, game)).filter((r) => r.method === "seed" && r.inject);
+  expect(injected.length).toBeGreaterThan(1);
+  // from turn 1, each at the first turn at or past the point the one before set, and the server's for that point
+  let point = 1;
+  for (const r of injected) {
+    const answer = answers.find((a) => a.turn === point)!;
+    expect(r).toEqual({ turn: turns.find((t) => t >= point), seed: answer.seed, next: point + answer.validTurns!, ahead: answer.askAheadTurns });
+    point = r.next;
+  }
+  const { validation } = sweepAndRead(game);
+  expect(validation).toMatchObject({ replayed: true, matches: ALL_MATCH });
 });
 
 test("a game just ended is scored at once, with a link to its page", async ({ page }) => {

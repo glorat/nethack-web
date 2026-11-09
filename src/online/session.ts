@@ -3,6 +3,7 @@
 
 import { homeAddress, playAddress } from "../port/modes";
 import { lastTurnIn } from "../port/recording";
+import type { SeedReply } from "../protocol";
 
 const RETRY_MS = 5000;
 /** The server has answered, and asking again won't change that. */
@@ -45,7 +46,7 @@ export interface OnlineDeps {
   startGame(input: GameStart & { sentAt: number }): Promise<{ game: string; utcOffset: number; options: string; config: string; now: number }>;
   /** The game named, or the player's latest unfinished one under this name; null if there isn't one. */
   resumeGame(input: { game?: string; name: string; build: Build; sentAt: number }): Promise<OnlineGame | null>;
-  seed(input: { game: string; turn: number; sentAt: number }): Promise<{ seed: number; now: number; validTurns: number }>;
+  seed(input: { game: string; turn: number; inject?: boolean; sentAt: number }): Promise<{ seed: number; now: number; validTurns: number; askAheadTurns: number }>;
   now(): number;
   /** Whether play is held up waiting for the server. */
   waiting(on: boolean): void;
@@ -56,7 +57,7 @@ export class OnlineSession {
   /** The last turn in the recording, or 0 before the first: what a seed is asked for. */
   private turn = 0;
   /** The answer for the turn, which the rest of the turn's seeds count up from. */
-  private base: { turn: number; seed: number; now: number; used: number } | null = null;
+  private base: { turn: number; seed: number; now: number; validTurns: number; askAheadTurns: number; used: number } | null = null;
 
   constructor(private readonly deps: OnlineDeps) {}
 
@@ -70,13 +71,17 @@ export class OnlineSession {
     return game;
   }
 
-  async seed(): Promise<{ seed: number; now: number }> {
-    const { game, turn } = this;
+  /** The core's next seed for the turn the recording is on, or the answer for `inject`, to inject. */
+  async seed(inject?: number): Promise<SeedReply> {
+    const { game } = this;
+    if (inject !== undefined) return this.untilAnswered(() => this.deps.seed({ game, turn: inject, inject: true, sentAt: this.deps.now() }));
+    const { turn } = this;
     if (this.base?.turn !== turn) {
-      const { seed, now } = await this.untilAnswered(() => this.deps.seed({ game, turn, sentAt: this.deps.now() }));
-      this.base = { turn, seed, now, used: 0 };
+      const answer = await this.untilAnswered(() => this.deps.seed({ game, turn, sentAt: this.deps.now() }));
+      this.base = { turn, ...answer, used: 0 };
     }
-    return { seed: (this.base.seed + this.base.used++) >>> 0, now: this.base.now };
+    const { seed, now, validTurns, askAheadTurns } = this.base;
+    return { seed: (seed + this.base.used++) >>> 0, now, validTurns, askAheadTurns };
   }
 
   /** More of the recording, or all of it when it was cut back, which says what turn it is. */

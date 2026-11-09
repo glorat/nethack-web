@@ -1,8 +1,10 @@
 // What the worker leaves to the mode being played: where answers and files come from, and where the game is kept.
+import type { SeedReply } from "../protocol";
 import type { Authority, Files } from "./authority";
 import type { NetHackModule } from "./memory";
 
-export type AskSeed = () => Promise<{ seed: number; now: number }>;
+/** Asks for the core's next seed, or with `turn`, for one to inject at that turn. */
+export type AskSeed = (turn?: number) => Promise<SeedReply>;
 
 export interface WorkerMode {
   authority(files: Files, askSeed: AskSeed): Promise<Authority>;

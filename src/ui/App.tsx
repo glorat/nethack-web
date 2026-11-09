@@ -423,8 +423,8 @@ export function App({ handedOver, onReplay }: Props) {
             }
           }
         },
-        seedWanted: (id) => {
-          void mode?.seed().then((answer) => answer && client.seedReply(id, answer.seed, answer.now));
+        seedWanted: (id, turn) => {
+          void mode?.seed(turn).then((answer) => answer && client.seedReply(id, answer));
         },
         request: (id, request) => {
           if (unseen.current) {

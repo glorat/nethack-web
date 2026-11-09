@@ -13,15 +13,22 @@ export interface Authority {
   randomSeed(): number | Promise<number>;
   /**
    * A 32-bit seed to put in the core's main generator as the turn moves on, before the next command, or null to leave it.
-   * It's recorded, so a replay reseeds at the same point. No mode gives one yet.
+   * It's recorded, so a replay reseeds at the same point, with `schedule` after it; `last` is the schedule the recording
+   * holds from the last one, or null before the first.
    */
-  injectedSeed?(turn: number): number | null | Promise<number | null>;
+  injectedSeed?(turn: number, last: string | null): Injection | null | Promise<Injection | null>;
   /** A new game's id, kept in its save and in any bones it leaves. */
   uuid(): string;
   /** The bones the core may load for a level it's making, if any; `name` says which level. */
   bonesWanted(name: string): Promise<Uint8Array | null>;
   /** Bones the core has left for a level, for the host to keep or not. */
   bonesLeft(name: string, data: Uint8Array, wizard: boolean): void;
+}
+
+export interface Injection {
+  seed: number;
+  /** Recorded with the seed, for the authority to read back as `last`. */
+  schedule?: string;
 }
 
 export type Files = () => NetHackModule["FS"];

@@ -7,6 +7,13 @@ export function lastTurnIn(text: string): number | null {
   return last === undefined ? null : Number(last);
 }
 
+/** What the last `reseed` line holds after its seed, or null if there's none. */
+export function lastInjectionIn(text: string): string | null {
+  let last: string | undefined;
+  for (const found of text.matchAll(/(?:^|\n)\d+ reseed \d+ ?([^\n]*)/g)) last = found[1];
+  return last ?? null;
+}
+
 /** False for a game whose start wasn't recorded, or one continued from a checkpoint, which never replay. */
 export function replayable(text: string): boolean {
   return !/^\d+ session (?:unrecorded|recover) /m.test(text);
