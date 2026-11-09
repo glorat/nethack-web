@@ -1,6 +1,7 @@
 // An online game, from the page's side: the server holds it, so the page opens it there and sends it on as it's played.
 import type { PageMode } from "../../ui/mode";
 import { linesIn } from "../../port/recording";
+import { pointsIn } from "../../port/xlog";
 import { expectedScoringMs, scoreGame } from "../score";
 import { createOnlineSession, createUploader, loadProfile, scoreFinishedGame } from "../server/api";
 import { homeAddress } from "../../port/modes";
@@ -25,6 +26,8 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
   let refused = false;
   let gameId: string | null = null;
   let ended: string | null = null;
+  /** The points the game itself counted as it ended. */
+  let ownPoints: number | undefined;
   const show = () =>
     notice(
       refused
@@ -92,6 +95,7 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
           session?.recorded(e.lines.join("\n"));
           uploader?.add(e.lines, e.atPrompt);
         }
+        if (e.type === "scores" && e.last) ownPoints = pointsIn(e.last);
         if (e.type === "recorded_before") {
           session?.recorded(e.text);
           uploader?.before(e.text);
@@ -123,7 +127,7 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
         ]);
         return scored.kind === "scored" && profile && !profile.signedIn ? { ...scored, signIn: `${homeAddress("online")}?signin` } : scored;
       })();
-      return { expectedMs, score };
+      return { expectedMs, ...(ownPoints === undefined ? {} : { preview: ownPoints }), score };
     },
     replayAddress() {
       return gameWatchAddress(new URLSearchParams(location.search).get("game") ?? "");

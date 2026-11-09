@@ -235,7 +235,7 @@ export function App({ handedOver, onReplay }: Props) {
   /** The game's recording, once it has ended. */
   const [recorded, setRecorded] = useState<string | null>(null);
   /** A finished game's score, on its way from when it was asked for, as long as it's expected to take. */
-  const [scoring, setScoring] = useState<{ startedAt: number; expectedMs: number; score: FinishedScore | null } | null>(null);
+  const [scoring, setScoring] = useState<{ startedAt: number; expectedMs: number; preview?: number; score: FinishedScore | null } | null>(null);
   // a developer's option: a second core follows the game by its recording, to catch one that would replay differently
   const shadow = useRef<ShadowClient | null>(null);
   const shadowRecording = useRef("");
@@ -409,7 +409,7 @@ export function App({ handedOver, onReplay }: Props) {
               setRecorded(e.text);
               const pending = replay ? null : mode?.score?.();
               if (pending) {
-                setScoring({ startedAt: Date.now(), expectedMs: pending.expectedMs, score: null });
+                setScoring({ startedAt: Date.now(), expectedMs: pending.expectedMs, ...(pending.preview === undefined ? {} : { preview: pending.preview }), score: null });
                 void pending.score.then((score) => setScoring((s) => s && { ...s, score }));
               }
             }

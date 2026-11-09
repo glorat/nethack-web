@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { alignmentName, ascended, characterName } from "../../src/port/xlog";
+import { alignmentName, ascended, characterName, pointsIn } from "../../src/port/xlog";
 
 test("an ascension is the core's own word for it", () => {
   expect(ascended({ death: "ascended" })).toBe(true);
@@ -16,4 +16,11 @@ test("the core's abbreviations are spelt out, with what's missing left out and w
   expect(characterName({})).toBe("");
   expect(alignmentName({ align: "Neu" })).toBe("Neutral");
   expect(alignmentName({})).toBe("");
+});
+
+test("an xlogfile line's points are read from its own field, not one that ends in the same name", () => {
+  expect(pointsIn("version=5.0.0\tpoints=3288\tdeathdnum=0")).toBe(3288);
+  expect(pointsIn("points=7\tturns=12")).toBe(7);
+  expect(pointsIn("maxpoints=99\tturns=12")).toBeUndefined();
+  expect(pointsIn("turns=12")).toBeUndefined();
 });

@@ -10,6 +10,12 @@ export interface Entry {
   death?: string | undefined;
 }
 
+/** The points an xlogfile line gives, if it has them. */
+export function pointsIn(line: string): number | undefined {
+  const points = /(?:^|\t)points=(\d+)(?:\t|$)/.exec(line)?.[1];
+  return points === undefined ? undefined : Number(points);
+}
+
 /** The core's own word for an ascension. */
 export const ascended = (entry: Entry | undefined): boolean => entry?.death === "ascended";
 

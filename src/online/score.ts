@@ -4,10 +4,10 @@ import type { GameResult } from "./results";
 import { shareAddress } from "./share";
 
 /**
- * How long the server takes to score a game of this many recording lines, from its replays: about a second, 0.8 ms a
- * line, and a few seconds more if it has to start up.
+ * How long the server takes to score a game of this many recording lines, as measured on 2026-11-09: about 3 s to start
+ * the scoring, which starts afresh each time, then about 0.2 ms a line, with a little to spare.
  */
-export const expectedScoringMs = (lines: number) => 5000 + 0.8 * lines;
+export const expectedScoringMs = (lines: number) => 3000 + 0.25 * lines;
 
 const RETRY_MS = 2000;
 

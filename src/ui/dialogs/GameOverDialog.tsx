@@ -4,6 +4,8 @@ import type { FinishedScore } from "../mode";
 interface Scoring {
   startedAt: number;
   expectedMs: number;
+  /** The points the game itself counted, shown until the score comes. */
+  preview?: number;
   /** Null until it comes. */
   score: FinishedScore | null;
 }
@@ -25,7 +27,9 @@ export function waitShown(elapsedMs: number, expectedMs: number): number {
   return 0.9 + 0.09 * (1 - Math.exp(-(elapsedMs - expectedMs) / expectedMs));
 }
 
-function ScoreWait({ startedAt, expectedMs }: { startedAt: number; expectedMs: number }) {
+const pointsText = (points: number) => `You scored ${points.toLocaleString()} ${points === 1 ? "point" : "points"}. `;
+
+function ScoreWait({ startedAt, expectedMs, label }: { startedAt: number; expectedMs: number; label: string }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 100);
@@ -34,7 +38,7 @@ function ScoreWait({ startedAt, expectedMs }: { startedAt: number; expectedMs: n
   const shown = Math.round(100 * waitShown(now - startedAt, expectedMs));
   return (
     <div class="score-wait">
-      <div id="score-wait-label">Working out your score…</div>
+      <div id="score-wait-label">{label}</div>
       <div class="meter-bar" role="progressbar" aria-labelledby="score-wait-label" aria-valuemin={0} aria-valuemax={100} aria-valuenow={shown}>
         <div class="meter-fill" style={{ width: `${shown}%` }} />
       </div>
@@ -43,11 +47,18 @@ function ScoreWait({ startedAt, expectedMs }: { startedAt: number; expectedMs: n
 }
 
 function ScoreLine({ scoring }: { scoring: Scoring }) {
-  const { score } = scoring;
-  if (!score) return <ScoreWait startedAt={scoring.startedAt} expectedMs={scoring.expectedMs} />;
+  const { score, preview } = scoring;
+  if (!score)
+    return (
+      <>
+        {preview === undefined ? null : <div class="score-line">{pointsText(preview)}</div>}
+        <ScoreWait startedAt={scoring.startedAt} expectedMs={scoring.expectedMs} label={preview === undefined ? "Working out your score…" : "Confirming your score…"} />
+      </>
+    );
   if (score.kind === "unscored") return <div class="score-line">This game couldn't be scored.</div>;
-  if (score.kind === "later") return <div class="score-line">Your score isn't ready yet. It will appear on the home page.</div>;
-  const points = score.points === undefined ? null : `You scored ${score.points.toLocaleString()} ${score.points === 1 ? "point" : "points"}. `;
+  if (score.kind === "later")
+    return <div class="score-line">{preview === undefined ? "" : pointsText(preview)}Your score isn't confirmed yet. It will appear on the home page.</div>;
+  const points = score.points === undefined ? null : pointsText(score.points);
   return (
     <>
       <div class="score-line">

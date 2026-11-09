@@ -32,7 +32,8 @@ export interface PageMode {
   /** Where a game that can't come back can start again instead. */
   newGameAddress(): string;
   /** For a game that has just ended, its score as it comes, and how long that's expected to take; absent if it has none. */
-  score?(): { expectedMs: number; score: Promise<FinishedScore> } | null;
+  /** `preview`: the points the game itself counted, to show until the server's come. */
+  score?(): { expectedMs: number; preview?: number; score: Promise<FinishedScore> } | null;
 }
 
 /**
