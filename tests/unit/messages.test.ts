@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { isPinned, messageLook, referencesHero } from "../../src/port/messages";
+import { messageLook, pinnedMessage, referencesHero } from "../../src/port/messages";
 
 test("a message mentions the hero when its first 'you' is the word you or your", () => {
   expect(referencesHero("You see here a dagger.")).toBe(true);
@@ -29,13 +29,15 @@ test("a message's attribute picks its look, and a plain one about the hero stand
   expect(messageLook("x", 1 | 32)).toBe("bold");
 });
 
-test("an urgent message is kept in view until the player has acted twice since, or lets it go", () => {
-  const urgent = { id: 7, attr: 16, batch: 3 };
-  expect(isPinned(urgent, 3, -1)).toBe(true);
-  expect(isPinned(urgent, 4, -1)).toBe(true);
-  expect(isPinned(urgent, 5, -1)).toBe(false);
-  expect(isPinned(urgent, 3, 7)).toBe(false);
-  // a later urgent message is still kept after an earlier one is let go
-  expect(isPinned({ ...urgent, id: 9 }, 3, 7)).toBe(true);
-  expect(isPinned({ ...urgent, attr: 0 }, 3, -1)).toBe(false);
+test("the newest urgent message is kept in view until two later turns' messages follow it, or it's let go", () => {
+  const urgent = (id: number) => ({ id, attr: 16 });
+  const plain = (id: number) => ({ id, attr: 0 });
+  const turn = (id: number) => ({ id, attr: 0, separator: true });
+  expect(pinnedMessage([plain(1), urgent(2), plain(3)], 0)).toBe(2);
+  expect(pinnedMessage([urgent(1), turn(2), plain(3)], 0)).toBe(1);
+  expect(pinnedMessage([urgent(1), turn(2), plain(3), turn(4), plain(5)], 0)).toBeNull();
+  // only the newest, so they never stack
+  expect(pinnedMessage([urgent(1), urgent(2)], 0)).toBe(2);
+  expect(pinnedMessage([urgent(1), urgent(2)], 2)).toBeNull();
+  expect(pinnedMessage([plain(1)], 0)).toBeNull();
 });

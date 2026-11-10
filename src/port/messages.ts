@@ -19,11 +19,18 @@ export function isUrgent(attr: number): boolean {
 }
 
 /**
- * Whether an urgent message is kept in view as newer ones scroll past: until the player has acted twice since it
- * came, the first time perhaps before reading it, or until they let it go.
+ * The id of the urgent message kept in view, if any: the newest, until two later turns' messages have followed it,
+ * the first perhaps before it was read, or until the player lets it go.
  */
-export function isPinned(message: { attr: number; batch: number; id: number }, batch: number, letGo: number): boolean {
-  return isUrgent(message.attr) && message.batch >= batch - 1 && message.id > letGo;
+export function pinnedMessage(messages: { id: number; attr: number; separator?: boolean }[], letGo: number): number | null {
+  let turns = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!;
+    if (m.separator) {
+      if (++turns > 1) return null;
+    } else if (isUrgent(m.attr)) return m.id > letGo ? m.id : null;
+  }
+  return null;
 }
 
 /** Whether the first "you" in the text is the word "you" or "your", as Cocoa checks. */
