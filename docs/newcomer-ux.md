@@ -29,10 +29,6 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
   - The site's own settings, such as text size and tiles, stay on the View menu.
 - [ ] **Alerts for dangerous messages,** such as stoning, sliming, illness and lycanthropy ("You feel feverish"): coloured, and kept in view until dealt with. Effort M, benefit high.
   - Most of the work is a curated list of message patterns. Hallucination changes some wording.
-- [ ] **A sign that the game is waiting for a map position.** Effort M, benefit medium.
-  - The Cancel button already shows then, but for any key the core waits for outside a command; telling a map position apart needs the core's `program_state.input_state` (`getposInp`). Batch with the next item into one core update.
-- [ ] **Remembered squares drawn differently from what's in view,** such as dimmed. Effort M, benefit medium.
-  - Probably needs a "seen now" flag per glyph from the core.
 - [x] **Hints the first time a place comes up.** Effort M, benefit high. Decided:
   - A "?" beside what the hint is about, pulsing every few seconds until opened, opens it in the badges' popover: on the level line at the top of the dungeon (the goal: go down) and in the Gnomish Mines and Sokoban, on the toolbar's Sacrifice (altar) and Dip (fountain), and on a shopkeeper's welcome in the messages. Chosen over a card by the messages, a dialog or a hints log, as the badges already pulse rather than interrupt. A card is the fallback if testers miss the pulses.
   - It stays until opened once, remembered per device. View > Hide Hints and Reset Hints. None in a replay or after the game ends.
@@ -52,5 +48,6 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
 
 Found while drawing up this list:
 
+- **Remembered room floors are drawn dimmer than ones in view,** by the core's `dark_room` option, on by default. Dimming other remembered squares was dropped as not worth a core change; `lit_corridor` shows no visible difference in ASCII or the painted tiles.
 - **Autopickup is off by default.** The core's default is `Off` (`nethack/include/optlist.h`), and the options file only suggests turning it on.
 - **Actions from an item.** Clicking an inventory item at the command prompt sends `i` and its letter, which opens the core's `itemactions()` menu of what can be done with it.
