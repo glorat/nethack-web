@@ -12,8 +12,7 @@ export interface KeyLike {
   metaKey: boolean;
 }
 
-// vi-keys; with number_pad on the core reads digits instead, which the
-// numeric keypad already produces.
+// vi-keys, where the core's own direction keys aren't known
 const ARROWS: Record<string, string> = {
   ArrowLeft: "h",
   ArrowDown: "j",
@@ -107,7 +106,7 @@ export class ArrowChords {
     this.held = null;
     if (held) {
       const both = diagonal(held.key, k.key);
-      if (both && bareArrow(k)) return [{ ...k, key: both }];
+      if (both && bareArrow(k)) return [{ ...k, key: both, code: undefined }];
       return [held, k];
     }
     if (bareArrow(k)) {
@@ -134,8 +133,8 @@ const KEYPAD_INDEX: Record<string, number> = {
 };
 
 /**
- * A key at a direction prompt: arrows and the keypad go the way they point whatever number_pad says,
- * keypad 5 is self and keypad Enter is Return; others as keyCode.
+ * A key where the core reads its direction keys, for a command or at a direction prompt: arrows and the keypad
+ * go the way they point whatever number_pad says, keypad 5 is self or rest and keypad Enter is Return; others as keyCode.
  */
 export function directionKey(e: KeyLike, directions: string): number | null {
   if (e.metaKey) return null;

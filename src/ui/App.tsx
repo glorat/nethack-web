@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/ho
 import { GameClient, ShadowClient } from "../client";
 import { WIKI_URL } from "../port/describe";
 import { commandToRun, listCommands } from "../port/extcmd";
-import { ArrowChords, keyCode, takeLine, type KeyLike } from "../port/keys";
+import { ArrowChords, directionKey, keyCode, takeLine, type KeyLike } from "../port/keys";
 import { playerName, savedName } from "../port/name";
 import { BASE_OPTIONS, configFile, keptOption, OPTIONS_KEY, savedOptions, savedOptionsFile, saveOptions as keepOptions } from "../port/options";
 import { applyEvents, initialState, nextBatch } from "../port/state";
@@ -342,6 +342,8 @@ export function App({ handedOver, onReplay }: Props) {
   const typeAhead = useRef<KeyLike[]>([]);
   const chords = useRef(new ArrowChords());
   const waitingForKey = useRef(false);
+  // the core's direction keys while it waits for a key, which arrows and the keypad type
+  const directions = useRef("");
   // read by the key handler, which can run before a new dialog has rendered
   const pendingRef = useRef<Pending | null>(null);
   const answered = useRef(0);
@@ -389,7 +391,7 @@ export function App({ handedOver, onReplay }: Props) {
   };
 
   const sendKey = (k: KeyLike) => {
-    const code = keyCode(k);
+    const code = directions.current ? directionKey(k, directions.current) : keyCode(k);
     if (code !== null) sendCode(code);
   };
 
@@ -443,6 +445,7 @@ export function App({ handedOver, onReplay }: Props) {
           const command = pendingCommand.current;
           pendingCommand.current = null;
           if (request.kind === "key" || request.kind === "poskey") {
+            directions.current = request.kind === "poskey" ? request.directions : "";
             const next = typeAhead.current.shift();
             if (next) return sendKey(next);
             waitingForKey.current = true;
@@ -602,7 +605,7 @@ export function App({ handedOver, onReplay }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (!playing || pendingRef.current || replay) return;
       const k = keyLike(e);
-      if (keyCode(k) === null) return;
+      if (keyCode(k) === null && k.code !== "Numpad5") return;
       e.preventDefault();
       type(chords.current.down(k));
     };

@@ -359,6 +359,24 @@ test("arrow keys answer a direction prompt", async ({ page }) => {
   await expect(page.locator(".messages")).toContainText(/In what direction\? h/);
 });
 
+for (const [option, keys] of [
+  ["!number_pad", "k k"],
+  ["number_pad:1", "8 8"],
+] as const)
+  test(`with ${option} the arrows and the keypad move the hero the way they point`, async ({ page }) => {
+    await page.addInitScript((option) => localStorage.setItem("nethack.options", `OPTIONS=${option}\n`), option);
+    const name = `Pad${Date.now() % 100000}`;
+    await startGame(page, name);
+    await page.keyboard.press("ArrowUp");
+    // keypad 8 with Num Lock on, which Playwright's Numpad8 isn't
+    await page.evaluate(() => {
+      for (const type of ["keydown", "keyup"]) window.dispatchEvent(new KeyboardEvent(type, { key: "8", code: "Numpad8" }));
+    });
+    await untilCommand(page);
+    const typed = (await recording(page, name)).match(/^\d+ k (\d+)$/gm)!.map((l) => String.fromCharCode(Number(l.split(" ")[2])));
+    expect(typed.slice(-2).join(" ")).toBe(keys);
+  });
+
 test("the character picker starts the chosen role", async ({ page }) => {
   await enterGame(page, `Pick${Date.now() % 100000}`);
   const picker = page.getByRole("dialog", { name: "Choose your character" });

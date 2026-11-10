@@ -187,6 +187,7 @@ export class Game {
       repeatKey: this.m._nhweb_repeat_key(),
       hereActions: this.m.UTF8ToString(this.m._nhweb_here_actions()),
       wizard: !!this.m._nhweb_wizard(),
+      directions: this.m.UTF8ToString(this.m._nhweb_dirchars()),
     });
   }
 
