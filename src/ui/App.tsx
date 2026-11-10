@@ -36,7 +36,7 @@ import { TextDialog } from "./dialogs/TextDialog";
 import { YesNoDialog } from "./dialogs/YesNoDialog";
 import { EquipmentView } from "./EquipmentView";
 import { InventoryView } from "./InventoryView";
-import { QuickActions } from "./QuickActions";
+import { CancelAction, QuickActions } from "./QuickActions";
 import { keyLike } from "./keyevent";
 import { type FinishedScore, type PageMode, SAVED_FAREWELL } from "./mode";
 import { MapView } from "./MapView";
@@ -342,6 +342,11 @@ export function App({ handedOver, onReplay }: Props) {
   const typeAhead = useRef<KeyLike[]>([]);
   const chords = useRef(new ArrowChords());
   const waitingForKey = useRef(false);
+  const [waiting, setWaiting] = useState(false);
+  const waitForKey = (on: boolean) => {
+    waitingForKey.current = on;
+    setWaiting(on);
+  };
   // the core's direction keys while it waits for a key, which arrows and the keypad type
   const directions = useRef("");
   // read by the key handler, which can run before a new dialog has rendered
@@ -383,7 +388,7 @@ export function App({ handedOver, onReplay }: Props) {
   };
 
   const sendCode = (code: number) => {
-    waitingForKey.current = false;
+    waitForKey(false);
     setInventoryKey(0);
     setCommandKey(0);
     setState(nextBatch);
@@ -448,7 +453,7 @@ export function App({ handedOver, onReplay }: Props) {
             directions.current = request.kind === "poskey" ? request.directions : "";
             const next = typeAhead.current.shift();
             if (next) return sendKey(next);
-            waitingForKey.current = true;
+            waitForKey(true);
             setInventoryKey(request.kind === "poskey" ? request.inventoryKey : 0);
             setCommandKey(request.kind === "poskey" ? request.commandKey : 0);
             repeatKey.current = request.kind === "poskey" ? request.repeatKey : 0;
@@ -456,7 +461,7 @@ export function App({ handedOver, onReplay }: Props) {
             if (request.kind === "poskey") setWizard(request.wizard);
             return;
           }
-          waitingForKey.current = false;
+          waitForKey(false);
           setInventoryKey(0);
           setCommandKey(0);
           // an arrow held as a dialog opens is its first key, as it was before chords
@@ -684,7 +689,7 @@ export function App({ handedOver, onReplay }: Props) {
     if (!key || pendingRef.current) return beep();
     setInventoryKey(0);
     setCommandKey(0);
-    waitingForKey.current = false;
+    waitForKey(false);
     pendingPick.current = letter;
     setState(nextBatch);
     client.key(key);
@@ -893,7 +898,10 @@ export function App({ handedOver, onReplay }: Props) {
             onZoom={zoom}
             onShowInventory={showInventory ? undefined : () => setShowInventory(true)}
             toolbar={
-              showToolbar && !replay && state.gameOver === null ? <QuickActions
+              // the core waits for a key, but not a command: a map position, say
+              waiting && !commanding && !pending && !replay && state.gameOver === null ? (
+                <CancelAction onCancel={() => sendCode(27)} />
+              ) : showToolbar && !replay && state.gameOver === null ? <QuickActions
                   names={hereActions}
                   leavesDungeon={leavesDungeon(state.status.dungeon_name?.text ?? "", Number(state.status.dungeon_level?.text))}
                   onRun={runHereAction}
@@ -902,6 +910,7 @@ export function App({ handedOver, onReplay }: Props) {
             }
             onClick={(x, y, button) => {
               if (pending || state.gameOver !== null || replay) return;
+              waitForKey(false);
               setInventoryKey(0);
               setCommandKey(0);
               setState(nextBatch);

@@ -348,6 +348,23 @@ test("an inventory click inside a prompt is ignored", async ({ page }) => {
   await expect(page.getByRole("dialog")).toContainText(/Do what with/i);
 });
 
+test("a Cancel button stands in for the toolbar while the game waits for a map position, and cancels it as Esc", async ({ page }) => {
+  const name = `Esc${Date.now() % 100000}`;
+  await startGame(page, name);
+  const cancel = page.getByRole("group", { name: "Cancel" }).getByRole("button", { name: /Cancel/ });
+  await expect(cancel).toHaveCount(0);
+  await page.keyboard.press("_");
+  // the game's own tip, the first time
+  await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+  await expect(page.locator(".messages")).toContainText(/where do you want to travel/i);
+  await expect(page.getByRole("group", { name: "What you can do here" })).toHaveCount(0);
+  await cancel.click();
+  await untilCommand(page);
+  await expect(cancel).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "What you can do here" })).toBeVisible();
+  expect((await recording(page, name)).match(/^\d+ k (\d+)$/gm)!.slice(-2).map((l) => l.split(" ")[2])).toEqual(["95", "27"]);
+});
+
 test("arrow keys answer a direction prompt", async ({ page }) => {
   await startGame(page, `Dir${Date.now() % 100000}`);
   await page.keyboard.press("Control+d");

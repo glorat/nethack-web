@@ -14,8 +14,7 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
   - Chosen over a one-shot help mode (press ?, then click anything), which is kept for later in case players can't find this; it would open the same popover.
   - Click only, with no hover tooltip: a toggletip, as accessibility guidance has it for tips that hold a link. A hover tooltip showing the same text before the popover read as a duplicate. A hover card that can be moved into, like Wikipedia's link previews, is the alternative if testers want hover back.
 - [x] **A badge pulses as it appears,** each time its status starts, to draw the eye and invite a click. Stronger for worse badges; a still highlight with reduced motion. Effort S, benefit medium. Decided: do it, in place of opening the popover the first time a badge appears, which would interrupt.
-- [ ] **An on-screen Esc button** for dialogs and prompts waiting for a key. Effort S, benefit medium.
-  - Also an open item in `docs/tablet-support.md`. Map position prompts wait on the item below.
+- [x] **An on-screen Esc button.** Effort S, benefit medium. Decided as in `docs/tablet-support.md`.
 - [x] **Quick-action toolbar** of what you can do where you stand. Effort M, benefit high. Decided, as designed below.
   - **Where:** a floating group at the map's bottom-left, mirroring the zoom buttons at the bottom-right, so on a tablet actions are under the left thumb and zoom under the right.
   - **What:** the actions the core's here-menu (`there_cmd_menu_self`, clicking your own square) finds for your square, such as go up or down, drink, sit, sacrifice, pick up, loot, tip, eat, dismount and disarm, plus Search, Rest and Cast (when you know a spell) always. Not the here-menu's Inventory, Drop and Look Here, which the sidebar and right-click already cover, nor actions on the squares next to you, which need a direction.
@@ -30,8 +29,8 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
   - The site's own settings, such as text size and tiles, stay on the View menu.
 - [ ] **Alerts for dangerous messages,** such as stoning, sliming, illness and lycanthropy ("You feel feverish"): coloured, and kept in view until dealt with. Effort M, benefit high.
   - Most of the work is a curated list of message patterns. Hallucination changes some wording.
-- [ ] **A sign that the game is waiting for a map position,** and Esc there. Effort M, benefit medium.
-  - Needs the core to tell the front end; batch with the next item into one core update.
+- [ ] **A sign that the game is waiting for a map position.** Effort M, benefit medium.
+  - The Cancel button already shows then, but for any key the core waits for outside a command; telling a map position apart needs the core's `program_state.input_state` (`getposInp`). Batch with the next item into one core update.
 - [ ] **Remembered squares drawn differently from what's in view,** such as dimmed. Effort M, benefit medium.
   - Probably needs a "seen now" flag per glyph from the core.
 - [x] **Hints the first time a place comes up.** Effort M, benefit high. Decided:
