@@ -22,4 +22,5 @@ What was decided to help a new player command the hero and follow what's happeni
 - **Remembered squares drawn differently:** the core's `dark_room`, on by default, already dims remembered room floors, and `lit_corridor` makes no visible difference in ASCII or the painted tiles; more wasn't worth a core change.
 - **A sign that the game wants a map position:** the Cancel button already shows then.
 - **A count before a command by touch** (`n20s`): the toolbar's Search and Rest cover the common cases.
+- **Explaining cryptic messages on hover:** it was to reuse the alerts' list of message patterns, which the core's urgent mark made unnecessary.
 - **Changing the `number_pad` default:** the arrows and numeric keypad move either way, through the core's own direction keys.
