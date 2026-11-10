@@ -52,6 +52,13 @@ test("two arrows pressed together move diagonally", () => {
   expect(typed(chords.down(event("ArrowRight")))).toBe("n");
 });
 
+test("two keypad arrows pressed together, with Num Lock off, move diagonally", () => {
+  const chords = new ArrowChords();
+  chords.down(event("ArrowUp", { code: "Numpad8" }));
+  const [both] = chords.down(event("ArrowRight", { code: "Numpad6" }));
+  expect(String.fromCharCode(directionKey(both!, "47896321><")!)).toBe("9");
+});
+
 test("an arrow alone moves when released", () => {
   const chords = new ArrowChords();
   expect(chords.down(event("ArrowRight"))).toEqual([]);

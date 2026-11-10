@@ -46,7 +46,7 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
   - The tutorial plays through on the site (checked by hand); a headless test enters it and leaves by its first portal. A recording of a full playthrough could become a replay fixture later.
 - [x] **Something to choose a character by.** Effort S, benefit medium. Decided: the character picker shows the Guidebook's own paragraph on the chosen role and race (read from the core's `doc/Guidebook.mn` as the page is built, in `vite.config.ts`), beside the lists or below them on a narrow screen, with the role's tile at 96px above it where it sits beside them. No beginner's recommendation, as that's advice on playing well. Every role can be picked; see `docs/cocoa-parity.md`.
 - [ ] **A count before a command by touch** (`n20s`). Effort M, benefit low. "Search 20" and rest buttons on the toolbar cover the common cases.
-- [ ] **The `number_pad` default.** Effort S, benefit low. Arrow keys already move.
+- [ ] **The `number_pad` default.** Effort S, benefit low. The arrows and the numeric keypad already move whichever way it is set, through the core's own direction keys, as in Cocoa.
 
 ## Already done
 
