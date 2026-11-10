@@ -357,6 +357,7 @@ test("a Cancel button stands in for the toolbar while the game waits for a map p
   // the game's own tip, the first time
   await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
   await expect(page.locator(".messages")).toContainText(/where do you want to travel/i);
+  await expect(cancel).toBeVisible();
   await expect(page.getByRole("group", { name: "What you can do here" })).toHaveCount(0);
   await cancel.click();
   await untilCommand(page);
