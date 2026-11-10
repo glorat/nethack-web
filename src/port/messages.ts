@@ -13,6 +13,19 @@ export type MessageLook = "hero" | "bold" | "underline" | "inverse" | null;
 
 const alnum = (c: string | undefined) => c !== undefined && /[A-Za-z0-9]/.test(c);
 
+/** Whether the core marked a message urgent: a warning it never lets the player skip, such as a countdown to death. */
+export function isUrgent(attr: number): boolean {
+  return (attr & ATR_URGENT) !== 0;
+}
+
+/**
+ * Whether an urgent message is kept in view as newer ones scroll past: until the player has acted twice since it
+ * came, the first time perhaps before reading it, or until they let it go.
+ */
+export function isPinned(message: { attr: number; batch: number; id: number }, batch: number, letGo: number): boolean {
+  return isUrgent(message.attr) && message.batch >= batch - 1 && message.id > letGo;
+}
+
 /** Whether the first "you" in the text is the word "you" or "your", as Cocoa checks. */
 export function referencesHero(text: string): boolean {
   const at = text.toLowerCase().indexOf("you");
