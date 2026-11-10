@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { messageLook, referencesHero } from "../../src/port/messages";
+import { isPinned, messageLook, referencesHero } from "../../src/port/messages";
 
 test("a message mentions the hero when its first 'you' is the word you or your", () => {
   expect(referencesHero("You see here a dagger.")).toBe(true);
@@ -27,4 +27,15 @@ test("a message's attribute picks its look, and a plain one about the hero stand
   // the urgent and no-history flags don't change it
   expect(messageLook("You die...", 16)).toBe("hero");
   expect(messageLook("x", 1 | 32)).toBe("bold");
+});
+
+test("an urgent message is kept in view until the player has acted twice since, or lets it go", () => {
+  const urgent = { id: 7, attr: 16, batch: 3 };
+  expect(isPinned(urgent, 3, -1)).toBe(true);
+  expect(isPinned(urgent, 4, -1)).toBe(true);
+  expect(isPinned(urgent, 5, -1)).toBe(false);
+  expect(isPinned(urgent, 3, 7)).toBe(false);
+  // a later urgent message is still kept after an earlier one is let go
+  expect(isPinned({ ...urgent, id: 9 }, 3, 7)).toBe(true);
+  expect(isPinned({ ...urgent, attr: 0 }, 3, -1)).toBe(false);
 });

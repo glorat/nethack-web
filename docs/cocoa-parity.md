@@ -42,6 +42,7 @@ Decided for the web:
 - [x] Count line for yn prompts that allow one (`YesNoWindowController.m`, `YesNoInput`).
 - [x] Vertical answer buttons when labels are long (`isHorizontal`).
 - [x] A non-dismiss key closes a text window and goes to the game (`MessageWindowController.m` `keyDown`).
+- [x] Unlike Cocoa, which ignores the core's urgent mark, an urgent message stands out and is kept in view for a while; see `docs/newcomer-ux.md`.
 
 ## Sidebar and layout
 

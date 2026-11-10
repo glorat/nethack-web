@@ -245,6 +245,9 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 .message.bold { font-weight: 700; }
 .message.underline { text-decoration: underline; }
 .message.inverse { color: #ff453a; background: #0a84ff; }
+/* the badges' caution yellow: urgent isn't always bad news */
+.message.urgent { box-shadow: inset 3px 0 #f5c518; padding-left: 8px; }
+.message.pinned { position: sticky; top: -6px; z-index: 1; background: var(--panel); color: var(--text); cursor: pointer; }
 
 /* inventory sidebar */
 .inventory {
