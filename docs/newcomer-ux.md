@@ -27,9 +27,9 @@ Effort: S under a day, M a few days, L a week or more. Benefit is to a new playe
   - Tutorial and Move with (`number_pad`) only, for now; more can be added to `src/port/game-settings.ts`.
   - OK has a core of its own, loaded on the page and then dropped, read the file as a new game would (`nhweb_check_config`, a call that returns the problems), and the file isn't kept while it finds anything wrong, listed by line.
   - The site's own settings, such as text size and tiles, stay on the View menu.
-- [ ] **Alerts for dangerous messages,** such as stoning, sliming, illness and lycanthropy ("You feel feverish"): coloured, and kept in view until dealt with. Effort M, benefit high. Decided:
-  - [x] The badges already keep most of these dangers in view. Messages the core marks urgent (`urgent_pline`, which tty and curses never let a player skip) have a yellow edge, and the newest stays at the top of the message panel as newer ones scroll past, until two later turns' messages have followed it or the player clicks it. It's counted by the turn lines in the log, so a replay or a restored game shows the same. The core chooses them, so there's no list of patterns to keep, and hallucination doesn't matter.
-  - [ ] A Lycanthropy badge, from the core, as nothing else shows it after "You feel feverish".
+- [x] **Alerts for dangerous messages,** such as stoning, sliming, illness and lycanthropy ("You feel feverish"): coloured, and kept in view until dealt with. Effort M, benefit high. Decided:
+  - The badges already keep most of these dangers in view. Messages the core marks urgent (`urgent_pline`, which tty and curses never let a player skip) have a yellow edge, and the newest stays at the top of the message panel as newer ones scroll past, until two later turns' messages have followed it or the player clicks it. It's counted by the turn lines in the log, so a replay or a restored game shows the same. The core chooses them, so there's no list of patterns to keep, and hallucination doesn't matter.
+  - No badge for lycanthropy: the core's status line doesn't keep it in view, and the badges show only what that does.
 - [ ] **A sign that the game is waiting for a map position.** Effort M, benefit medium.
   - The Cancel button already shows then, but for any key the core waits for outside a command; telling a map position apart needs the core's `program_state.input_state` (`getposInp`). Batch with the next item into one core update.
 - [ ] **Remembered squares drawn differently from what's in view,** such as dimmed. Effort M, benefit medium.
