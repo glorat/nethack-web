@@ -32,3 +32,19 @@ export function QuickActions({
     </div>
   );
 }
+
+/** Esc as a button, in the toolbar's place, while the core waits for a key that isn't a command. */
+export function CancelAction({ onCancel }: { onCancel(): void }) {
+  return (
+    <div class="quick-actions" role="group" aria-label="Cancel">
+      <span class="quick-action">
+        <button onClick={onCancel}>
+          Cancel
+          <span class="quick-key" aria-hidden="true">
+            Esc
+          </span>
+        </button>
+      </span>
+    </div>
+  );
+}
