@@ -6,7 +6,8 @@ export const OPTIONS_TEMPLATE = `# NetHack options. Lines starting with # are ig
 # which also lists every option and its current value.
 #
 # The game already shows the turn count and experience points, colors
-# menus, and marks your pet and item piles, so those needn't be set here.
+# menus, marks your pet and item piles, and offers to force a locked box
+# open with your weapon (autounlock), so those needn't be set here.
 #
 # Some options players often change; remove the # to use one:
 #OPTIONS=autodig
@@ -18,7 +19,7 @@ export const OPTIONS_TEMPLATE = `# NetHack options. Lines starting with # are ig
 `;
 
 /** The options the game sets, after the player's file. */
-export const BASE_OPTIONS = "perm_invent,!autopickup,menucolors,time,showexp,hilite_pet,hilite_pile,force_invmenu";
+export const BASE_OPTIONS = "perm_invent,!autopickup,menucolors,time,showexp,hilite_pet,hilite_pile,force_invmenu,autounlock:apply-key+force";
 
 // the menu colors the core adds for the web front end, which #saveoptions writes out with the player's
 const DEFAULT_MENU_COLORS = [
