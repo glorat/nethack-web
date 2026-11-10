@@ -40,6 +40,8 @@ export interface GameState {
   nextMessageId: number;
   /** The message window was cleared since the last message, so the next one starts a new turn. */
   messagesCleared: boolean;
+  /** Urgent messages up to this id are no longer kept in view. */
+  letGo: number;
 }
 
 export function initialState(): GameState {
@@ -60,6 +62,7 @@ export function initialState(): GameState {
     batch: 0,
     nextMessageId: 1,
     messagesCleared: false,
+    letGo: 0,
   };
 }
 

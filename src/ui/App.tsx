@@ -884,7 +884,13 @@ export function App({ handedOver, onReplay }: Props) {
           <header class="top">
             <StatsView fields={state.status} hint={hints.marker} />
             <EquipmentView equipment={state.equipment} inventory={state.inventory} sheet={sheet} onChoose={chooseItem} />
-            <MessageView messages={state.messages} batch={state.batch} hint={hints.marker} />
+            <MessageView
+              messages={state.messages}
+              batch={state.batch}
+              letGo={state.letGo}
+              onLetGo={(id) => setState((s) => ({ ...s, letGo: id }))}
+              hint={hints.marker}
+            />
           </header>
           <MapView
             state={state}
