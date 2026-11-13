@@ -9,6 +9,9 @@ import { CONFIG_FILE, Game, type Input } from "../../src/worker/game";
 import { BonesDb } from "../../src/offline/bones";
 import { Recorder } from "../../src/worker/recorder";
 import { type BootCore, never, replay, ReplayError, type ReplayedEvent, saveFiles, writeSaveFiles } from "../../src/worker/replayer";
+import { replayWatched as watchReplay, type Watched } from "../../src/worker/watch";
+
+export type { Watched };
 import { placeGameFiles, resumeUnseen } from "../../src/worker/resume";
 import { describeSquare, knownTerrain, type EmscriptenFS, type NetHackModule } from "../../src/worker/memory";
 
@@ -476,6 +479,11 @@ export interface Replayed {
   error: ReplayError | null;
   /** What the core reported along the way. */
   events: ReplayedEvent[];
+}
+
+/** Plays a recording again on the real core, stopping before each answer for `watch` to see the game. */
+export async function replayWatched(text: string, watch: (seen: Watched) => Promise<void> | void): Promise<ReplayError | null> {
+  return watchReplay(text, (await headlessBoot())(() => true), watch);
 }
 
 /** Boots a fresh real core for each session of a replay, in Node. */
