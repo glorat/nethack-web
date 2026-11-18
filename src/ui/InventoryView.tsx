@@ -1,9 +1,10 @@
 import type { MenuItem } from "../protocol";
-import { tileStyle, type TileSheet } from "../tiles";
+import { tileBox, tileStyle, type TileSheet } from "../tiles";
 import { textStyle } from "./colors";
 import { headingStyle } from "./dialogs/MenuDialog";
 
 const ICON = 24;
+const ICON_HEIGHT = 40;
 
 interface Props {
   items: MenuItem[];
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function InventoryView({ items, sheet, width, onChoose, onHide, onResize }: Props) {
+  const icon = tileBox(sheet, ICON, ICON_HEIGHT);
   const drag = (e: PointerEvent) => {
     if (e.button !== 0) return;
     const handle = e.currentTarget as HTMLElement;
@@ -51,7 +53,10 @@ export function InventoryView({ items, sheet, width, onChoose, onHide, onResize 
             </h3>
           ) : (
             <button class="inv-item" onClick={() => onChoose(item.accelerator)} title={item.text}>
-              <span class="inv-icon" style={tileStyle(sheet, item.tile, ICON)} />
+              <span
+                class="inv-icon"
+                style={{ width: `${icon.width}px`, height: `${icon.height}px`, ...tileStyle(sheet, item.tile, icon.width, icon.height) }}
+              />
               <span class="inv-letter">{item.accelerator}</span>
               <span class="inv-text" style={textStyle(item.color, item.attr)}>
                 {item.text}

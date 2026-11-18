@@ -1,6 +1,6 @@
 import type { EquipmentSlot, MenuItem } from "../protocol";
 import { equipmentTip } from "../port/equipment";
-import { tileStyle, type TileSheet } from "../tiles";
+import { tileBox, tileStyle, type TileSheet } from "../tiles";
 
 // slot order matches nhweb_equip_obj() in sys/libnh/libnhmain.c
 const SLOT_NAMES = [
@@ -11,6 +11,7 @@ const SLOT_NAMES = [
 ];
 
 const CELL = 32;
+const CELL_HEIGHT = 40;
 
 interface Props {
   equipment: EquipmentSlot[];
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function EquipmentView({ equipment, inventory, sheet, onChoose }: Props) {
+  const icon = tileBox(sheet, CELL, CELL_HEIGHT);
   return (
     <div class="equipment">
       {SLOT_NAMES.map((name, slot) => {
@@ -31,7 +33,7 @@ export function EquipmentView({ equipment, inventory, sheet, onChoose }: Props) 
             class="equip-slot"
             title={equipmentTip(name, letter, text)}
             disabled={!letter}
-            style={item ? tileStyle(sheet, item.tile, CELL) : undefined}
+            style={{ width: `${icon.width}px`, height: `${icon.height}px`, ...(item ? tileStyle(sheet, item.tile, icon.width, icon.height) : {}) }}
             onClick={() => letter && onChoose(letter)}
           />
         );

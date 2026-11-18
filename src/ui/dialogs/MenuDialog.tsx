@@ -4,10 +4,11 @@ import type { MenuHow, MenuItem, MenuSelection } from "../../protocol";
 import { isHeading, isQuestion, splitFields } from "../../port/question";
 import { sortedOrder } from "../../port/sort";
 import { listsStack } from "../../port/stack";
-import { tileStyle, type TileSheet } from "../../tiles";
+import { tileBox, tileStyle, type TileSheet } from "../../tiles";
 import { textStyle } from "../colors";
 
 const ICON = 24;
+const ICON_HEIGHT = 40;
 const CHECK = 14;
 const LETTER = 12;
 const GAP = 6;
@@ -194,9 +195,10 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
       </span>
     ));
   // a tile or letter column only if some item has one
+  const icon = tileBox(sheet, ICON, ICON_HEIGHT);
   const hasTiles = items.some((item) => item.identifier !== 0 && item.tile >= 0);
   const hasLetters = items.some((item) => item.identifier !== 0 && item.accelerator.trim() !== "");
-  const lead = [how === "any" && CHECK, hasTiles && ICON, hasLetters && LETTER].filter((w): w is number => !!w);
+  const lead = [how === "any" && CHECK, hasTiles && icon.width, hasLetters && LETTER].filter((w): w is number => !!w);
   const grid = {
     // auto, as a subgrid row's padding goes into its edge tracks
     gridTemplateColumns: `repeat(${lead.length + columns}, auto) 1fr`,
@@ -296,7 +298,12 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
                 aria-checked={how === "any" ? selected.current.has(i) : undefined}
               >
                 {how === "any" ? <span class="menu-check" /> : null}
-                {hasTiles ? <span class="inv-icon" style={tileStyle(sheet, item.tile, ICON)} /> : null}
+                {hasTiles ? (
+                  <span
+                    class="inv-icon"
+                    style={{ width: `${icon.width}px`, height: `${icon.height}px`, ...tileStyle(sheet, item.tile, icon.width, icon.height) }}
+                  />
+                ) : null}
                 {hasLetters ? <span class="inv-letter">{item.accelerator}</span> : null}
                 {columns > 1 ? (
                   fields(item, textStyle(item.color, item.attr), taken(i))

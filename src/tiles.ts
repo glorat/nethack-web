@@ -82,9 +82,35 @@ export function drawTile(
   ctx.drawImage(sheet.image, sx, sy, sheet.width, sheet.height, dx, dy, width, height);
 }
 
-/** CSS background for a tile shown in a DOM box of the given size, letterboxed to the tile's aspect ratio. */
-export function tileStyle(sheet: TileSheet, tile: number, width: number, height = width): Record<string, string> {
+/** How a tile fits a DOM box: keep its aspect, or fill the box. */
+export type TileFit = "contain" | "fill";
+
+/** The largest box of the sheet's aspect that fits in width by maxHeight; used for tile icons. */
+export function tileBox(sheet: Pick<TileSheet, "width" | "height">, width: number, maxHeight: number): { width: number; height: number } {
+  const height = Math.round((width * sheet.height) / sheet.width);
+  if (height <= maxHeight) return { width, height };
+  return { width: Math.max(1, Math.round((maxHeight * sheet.width) / sheet.height)), height: maxHeight };
+}
+
+/** CSS background for a tile shown in a DOM box of the given size. Small icons fill their box; larger portraits keep the tile's aspect. */
+export function tileStyle(
+  sheet: TileSheet,
+  tile: number,
+  width: number,
+  height = width,
+  fit: TileFit = width <= 32 && height <= 32 ? "fill" : "contain",
+): Record<string, string> {
   if (tile < 0) return {};
+  if (fit === "fill") {
+    const scaleX = width / sheet.width;
+    const scaleY = height / sheet.height;
+    return {
+      imageRendering: width > sheet.width || height > sheet.height ? "pixelated" : "auto",
+      backgroundImage: `url(${sheet.image.src})`,
+      backgroundSize: `${sheet.image.naturalWidth * scaleX}px ${sheet.image.naturalHeight * scaleY}px`,
+      backgroundPosition: `-${(tile % sheet.columns) * width}px -${Math.floor(tile / sheet.columns) * height}px`,
+    };
+  }
   const scale = Math.min(width / sheet.width, height / sheet.height);
   const tileWidth = sheet.width * scale;
   const tileHeight = sheet.height * scale;

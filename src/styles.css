@@ -222,8 +222,8 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 /* equipment */
 .equipment {
   display: grid;
-  grid-template-columns: repeat(3, 32px);
-  grid-auto-rows: 32px;
+  grid-template-columns: repeat(3, auto);
+  grid-auto-rows: auto;
   gap: 1px;
   padding: 10px;
   align-content: start;
