@@ -72,11 +72,13 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
   useEffect(cancelTooltip, [state.map]);
 
   const text = ascii ? asciiCell(cell, asciiFont, scale) : null;
-  const width = text?.width ?? cell;
-  const height = text?.height ?? cell;
+  // the map's columns are always `cell` wide; a non-square sheet makes its rows taller
+  const tileHeight = Math.max(1, Math.round((cell * sheet.height) / sheet.width));
   // the Rogue level is drawn as text even with tiles on, in squares the size of the tiles, as Cocoa does
   const symbols = text ?? (state.status.rogue_level ? { ...asciiCell(cell, null, scale), width: cell } : null);
-  const tiles = useMemo(() => (text ? null : sheetForCell(sheet, cell)), [sheet, cell, !!text]);
+  const width = text?.width ?? cell;
+  const height = text?.height ?? (symbols ? cell : tileHeight);
+  const tiles = useMemo(() => (text ? null : sheetForCell(sheet, width, height)), [sheet, width, height, !!text]);
   // BL_HP is the polymorphed form's while polymorphed, as Cocoa's u.mh
   const cursorStroke = cursorColor(Number(state.status.BL_HP?.text), Number(state.status.BL_HPMAX?.text));
 
@@ -84,7 +86,7 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
   useLayoutEffect(() => {
     const ctx = canvas.current?.getContext("2d");
     if (!ctx) return;
-    ctx.imageSmoothingEnabled = cell < Math.max(sheet.width, sheet.height);
+    ctx.imageSmoothingEnabled = width < sheet.width || height < sheet.height;
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, COLNO * width, ROWNO * height);
     for (let y = 0; y < ROWNO; y++) {
@@ -94,8 +96,8 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
         if (symbols) {
           drawSymbol(ctx, symbols, c.symbol, c.color, x * width, y * height);
         } else if (tiles) {
-          drawTile(ctx, tiles, c.bgTile, x * width, y * height, cell);
-          drawTile(ctx, tiles, c.tile, x * width, y * height, cell);
+          drawTile(ctx, tiles, c.bgTile, x * width, y * height, width, height);
+          drawTile(ctx, tiles, c.tile, x * width, y * height, width, height);
         }
         if (c.marks) drawMarks(ctx, c.marks, x * width, y * height, width, height, petMark);
       }
@@ -105,7 +107,7 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
       ctx.lineWidth = 1;
       ctx.strokeRect(state.cursor.x * width + 0.5, state.cursor.y * height + 0.5, width - 1, height - 1);
     }
-  }, [state.map, state.cursor, cursorStroke, sheet, tiles, cell, symbols?.font, symbols?.width, petMark]);
+  }, [state.map, state.cursor, cursorStroke, sheet, tiles, cell, width, height, symbols?.font, symbols?.width, petMark]);
 
   // the middle of the view in squares, kept as it scrolls: once the canvas has been resized, the browser
   // has already clamped the scroll position to it

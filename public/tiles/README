@@ -10,6 +10,16 @@ Public License (see nethack/dat/license).
 tiles16.bmp: the classic tiles, which scripts/build-wasm.sh draws from the
 core's win/share/*.txt with its tile2bmp tool.
 
+geoduck15x25.bmp: Geoduck's WinHack Tile Set, version 7 for NetHack 5.0.0,
+by Robert M. Cook (Geoduck).
+Source: http://www.geoduckthings.net/nhack/nhack.html
+Original file: http://www.geoduckthings.net/nhack/geoduck25x15-2026.bmp
+SHA-256: 8be40c664afc81e8f3a40644210a48e434889e821abb1504cd9dad4674d73c3e
+The file is unchanged apart from its name; the source names it height by width.
+The author permits posting the relevant .bmps elsewhere with credit:
+"I officially give my permission to post the relevant .bmps elsewhere, as long
+as I get all the credit, fame and glory."
+
 Each sheet uses tile2bmp's order (monsters, objects, other, then a greyscale
 copy of every monster tile for statues), 40 tiles per row; glyph_info's
 gm.tileidx indexes it.
