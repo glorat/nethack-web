@@ -76,15 +76,19 @@ export function GameOverDialog({ text, onNewGame, onQuit, onReplay, scoring }: P
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // not a key held from closing the last window, which the player pressed before this appeared
-      if ((e.key !== "Enter" && e.key !== "Escape") || e.repeat) return;
+      const key = e.key.toLowerCase();
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+      if (!["enter", "escape", "q", "r", "n"].includes(key)) return;
+      if (key === "r" && !onReplay) return;
       // Enter on a link or button is for that, such as the game's page, and for nothing behind the dialog
-      if (e.key === "Enter" && e.target instanceof Element && e.target.closest("a, button")) {
+      if (key === "enter" && e.target instanceof Element && e.target.closest("a, button")) {
         e.stopImmediatePropagation();
         return;
       }
       e.preventDefault();
       e.stopPropagation();
-      if (e.key === "Enter") onNewGame();
+      if (key === "enter" || key === "n") onNewGame();
+      else if (key === "r") onReplay?.();
       else onQuit();
     };
     window.addEventListener("keydown", onKey, true);
@@ -103,10 +107,16 @@ export function GameOverDialog({ text, onNewGame, onQuit, onReplay, scoring }: P
               Sign In…
             </button>
           ) : null}
-          {onReplay ? <button onClick={onReplay}>Replay</button> : null}
-          <button onClick={onQuit}>Quit</button>
-          <button class="primary" onClick={onNewGame}>
-            New Game
+          {onReplay ? (
+            <button aria-keyshortcuts="r" onClick={onReplay}>
+              <span class="answer-key">r</span> Replay
+            </button>
+          ) : null}
+          <button aria-keyshortcuts="q" onClick={onQuit}>
+            <span class="answer-key">q</span> Quit
+          </button>
+          <button class="primary" aria-keyshortcuts="n" onClick={onNewGame}>
+            <span class="answer-key">n</span> New Game
           </button>
         </div>
       </div>

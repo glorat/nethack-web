@@ -1993,6 +1993,46 @@ test("when the game ends, a dialog offers a new game under the same name, or the
   expect(new URL(page.url()).pathname).toBe("/offline/watch/");
 });
 
+test("the game over dialog's q, r and n keys work, with their keys beside the labels", async ({ page }) => {
+  const name = `Over${Date.now() % 100000}`;
+  const over = page.getByRole("dialog", { name: "The game is over" });
+  const quitToOver = async () => {
+    await page.keyboard.press("#");
+    await page.keyboard.type("quit");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("y");
+    await untilGameOver(page);
+    await expect(over).toContainText("Start a new game, or quit to the home page.");
+  };
+
+  await startGame(page, name);
+  await quitToOver();
+  for (const [label, key] of [
+    ["Quit", "q"],
+    ["Replay", "r"],
+    ["New Game", "n"],
+  ] as const) {
+    const button = over.getByRole("button", { name: label });
+    await expect(button).toHaveAttribute("aria-keyshortcuts", key);
+    await expect(button.locator(".answer-key")).toHaveText(key);
+    await expect(button).toHaveText(`${key} ${label}`);
+  }
+
+  await page.keyboard.press("q");
+  await expect(page.getByRole("button", { name: /Play Offline/ })).toBeVisible();
+
+  await startGame(page, name);
+  await quitToOver();
+  await page.keyboard.press("n");
+  await untilPlaying(page);
+  expect(new URL(page.url()).pathname).toBe("/offline/play/");
+
+  await quitToOver();
+  await expect(over.getByRole("button", { name: "Replay" })).toBeVisible();
+  await page.keyboard.press("r");
+  await expect(page.getByRole("toolbar", { name: "Replay" })).toBeVisible();
+});
+
 test("the landing page's marked letters work as keys, but not while typing a name, and Enter with nothing focused plays", async ({ page }) => {
   await page.goto("/offline/");
   await page.evaluate(() => localStorage.setItem("nethack-web.name", "Keys"));
