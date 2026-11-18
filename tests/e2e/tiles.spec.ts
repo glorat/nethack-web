@@ -63,6 +63,8 @@ test("the View menu switches to rectangular Geoduck tiles and back", async ({ pa
   const equipped = page.locator(".equip-slot").nth(3);
   await expect(equipped).toHaveCSS("width", "24px");
   await expect(equipped).toHaveCSS("height", "40px");
+  // the button's border must not shrink the background's painting area
+  await expect(equipped).toHaveCSS("border-top-width", "0px");
   // Geoduck's 15x25 cells fill the map without being squashed into squares.
   await expect.poll(() => mapCellRatio(page)).toBeGreaterThan(1.55);
   await expect.poll(() => mapCellRatio(page)).toBeLessThan(1.78);
@@ -87,7 +89,7 @@ test.describe("on a phone", () => {
   });
 });
 
-test("Geoduck's player picker icons fill their boxes", async ({ page }) => {
+test("Geoduck's picker keeps its own tile aspect ratio", async ({ page }) => {
   await page.goto("/offline/");
   await page.evaluate(() => localStorage.setItem("nethack.tileSet", "geoduck15x25.bmp"));
   await page.reload();
@@ -96,6 +98,8 @@ test("Geoduck's player picker icons fill their boxes", async ({ page }) => {
   const picker = page.getByRole("dialog", { name: "Choose your character" });
   const icon = picker.locator(".player-icon").first();
   await expect(icon).toHaveCSS("background-image", /geoduck15x25\.bmp/);
-  await expect(icon).toHaveCSS("background-size", "1280px 1920px");
+  await expect(icon).toHaveCSS("width", "24px");
+  await expect(icon).toHaveCSS("height", "40px");
+  await expect(icon).toHaveCSS("background-size", "960px 2400px");
   await page.screenshot({ path: "test-results/geoduck-picker.png" });
 });

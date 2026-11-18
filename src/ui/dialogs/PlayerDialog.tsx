@@ -2,7 +2,7 @@ import { useLayoutEffect, useState } from "preact/hooks";
 import { guidebookText } from "../../port/guidebook";
 import { ALIGNS, GENDERS, randomPick, withRace, withRole } from "../../port/player";
 import type { PlayerChoices, PlayerPick } from "../../protocol";
-import { tileStyle, type TileSheet } from "../../tiles";
+import { tileBox, tileStyle, type TileSheet } from "../../tiles";
 
 const ICON = 32;
 const PORTRAIT = 96;
@@ -19,6 +19,8 @@ export function PlayerDialog({ choices, sheet, onDone }: Props) {
   const female = pick.gender === FEMALE;
   const role = choices.roles[pick.role];
   const race = choices.races[pick.race];
+  const icon = tileBox(sheet, ICON, 40);
+  const portrait = tileBox(sheet, PORTRAIT, 160);
 
   // layout effect: listen before the dialog is painted, or a fast key press is lost
   useLayoutEffect(() => {
@@ -45,7 +47,10 @@ export function PlayerDialog({ choices, sheet, onDone }: Props) {
                 class={ro === pick.role ? "player-item selected" : "player-item"}
                 onClick={() => setPick(withRole(choices, pick, ro))}
               >
-                <span class="player-icon" style={tileStyle(sheet, female ? r.femaleTile : r.tile, ICON)} />
+                <span
+                  class="player-icon"
+                  style={{ width: `${icon.width}px`, height: `${icon.height}px`, ...tileStyle(sheet, female ? r.femaleTile : r.tile, icon.width, icon.height) }}
+                />
                 {female ? r.femaleName : r.name}
               </button>
             ))}
@@ -59,13 +64,22 @@ export function PlayerDialog({ choices, sheet, onDone }: Props) {
                 disabled={!choices.validRace[pick.role][ra]}
                 onClick={() => setPick(withRace(choices, pick, ra))}
               >
-                <span class="player-icon" style={tileStyle(sheet, female ? r.femaleTile : r.tile, ICON)} />
+                <span
+                  class="player-icon"
+                  style={{ width: `${icon.width}px`, height: `${icon.height}px`, ...tileStyle(sheet, female ? r.femaleTile : r.tile, icon.width, icon.height) }}
+                />
                 {r.name}
               </button>
             ))}
           </div>
           <div class="player-about" aria-live="polite">
-            {role ? <span class="player-portrait" aria-hidden="true" style={tileStyle(sheet, female ? role.femaleTile : role.tile, PORTRAIT)} /> : null}
+            {role ? (
+              <span
+                class="player-portrait"
+                aria-hidden="true"
+                style={{ width: `${portrait.width}px`, height: `${portrait.height}px`, ...tileStyle(sheet, female ? role.femaleTile : role.tile, portrait.width, portrait.height) }}
+              />
+            ) : null}
             <p>{role ? guidebookText(role.name) : null}</p>
             <p>{race ? guidebookText(race.name) : null}</p>
           </div>
