@@ -19,8 +19,8 @@ export function PlayerDialog({ choices, sheet, onDone }: Props) {
   const female = pick.gender === FEMALE;
   const role = choices.roles[pick.role];
   const race = choices.races[pick.race];
-  const icon = tileBox(sheet, ICON, 40);
-  const portrait = tileBox(sheet, PORTRAIT, 160);
+  const icon = tileBox(sheet, ICON, ICON);
+  const portrait = tileBox(sheet, PORTRAIT, PORTRAIT);
 
   // layout effect: listen before the dialog is painted, or a fast key press is lost
   useLayoutEffect(() => {

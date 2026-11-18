@@ -4,7 +4,6 @@ import { textStyle } from "./colors";
 import { headingStyle } from "./dialogs/MenuDialog";
 
 const ICON = 24;
-const ICON_HEIGHT = 40;
 
 interface Props {
   items: MenuItem[];
@@ -17,7 +16,7 @@ interface Props {
 }
 
 export function InventoryView({ items, sheet, width, onChoose, onHide, onResize }: Props) {
-  const icon = tileBox(sheet, ICON, ICON_HEIGHT);
+  const icon = tileBox(sheet, ICON, ICON);
   const drag = (e: PointerEvent) => {
     if (e.button !== 0) return;
     const handle = e.currentTarget as HTMLElement;

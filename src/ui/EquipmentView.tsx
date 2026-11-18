@@ -11,7 +11,6 @@ const SLOT_NAMES = [
 ];
 
 const CELL = 32;
-const CELL_HEIGHT = 40;
 
 interface Props {
   equipment: EquipmentSlot[];
@@ -21,7 +20,7 @@ interface Props {
 }
 
 export function EquipmentView({ equipment, inventory, sheet, onChoose }: Props) {
-  const icon = tileBox(sheet, CELL, CELL_HEIGHT);
+  const icon = tileBox(sheet, CELL, CELL);
   return (
     <div class="equipment">
       {SLOT_NAMES.map((name, slot) => {

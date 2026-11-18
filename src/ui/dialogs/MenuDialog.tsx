@@ -8,7 +8,6 @@ import { tileBox, tileStyle, type TileSheet } from "../../tiles";
 import { textStyle } from "../colors";
 
 const ICON = 24;
-const ICON_HEIGHT = 40;
 const CHECK = 14;
 const LETTER = 12;
 const GAP = 6;
@@ -195,7 +194,7 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
       </span>
     ));
   // a tile or letter column only if some item has one
-  const icon = tileBox(sheet, ICON, ICON_HEIGHT);
+  const icon = tileBox(sheet, ICON, ICON);
   const hasTiles = items.some((item) => item.identifier !== 0 && item.tile >= 0);
   const hasLetters = items.some((item) => item.identifier !== 0 && item.accelerator.trim() !== "");
   const lead = [how === "any" && CHECK, hasTiles && icon.width, hasLetters && LETTER].filter((w): w is number => !!w);
