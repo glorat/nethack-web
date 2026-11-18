@@ -3,7 +3,7 @@ import type { PageMode } from "../../ui/mode";
 import { linesIn } from "../../port/recording";
 import { pointsIn } from "../../port/xlog";
 import { expectedScoringMs, scoreGame } from "../score";
-import { createOnlineSession, createUploader, loadProfile, scoreFinishedGame } from "../server/api";
+import { createOnlineSession, createUploader, loadProfile, scoreFinishedGame, warmUpScoring } from "../server/api";
 import { homeAddress } from "../../port/modes";
 import { gameWatchAddress } from "../results";
 import type { OnlineSession } from "../session";
@@ -26,6 +26,7 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
   let refused = false;
   let gameId: string | null = null;
   let ended: string | null = null;
+  let warmedUp = false;
   /** The points the game itself counted as it ended. */
   let ownPoints: number | undefined;
   const show = () =>
@@ -94,6 +95,10 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
         if (e.type === "recorded") {
           session?.recorded(e.lines.join("\n"));
           uploader?.add(e.lines, e.atPrompt, e.over);
+          if (e.over && uploader && !warmedUp) {
+            warmedUp = true;
+            warmUpScoring().catch((err) => console.warn("couldn't warm up scoring", err));
+          }
         }
         if (e.type === "scores" && e.last) ownPoints = pointsIn(e.last);
         if (e.type === "recorded_before") {

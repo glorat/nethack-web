@@ -517,6 +517,10 @@ test("a game just ended shows its own score at once, then the server's, with a l
   await online(page);
   await untilPlaying(page, `Sc${Date.now() % 100000}`);
   await pass(page, 3);
+  const scoring: string[] = [];
+  page.on("request", (r) => {
+    if (/\/score$/.test(r.url()) && r.method() === "POST") scoring.push((r.postDataJSON() as { data: { method: string } }).data.method);
+  });
   const over = await endGame(page);
   // the game's own count, while the server confirms it
   await expect(over.getByRole("progressbar", { name: "Confirming your score" })).toBeVisible();
@@ -526,6 +530,10 @@ test("a game just ended shows its own score at once, then the server's, with a l
   await expect(over.getByRole("progressbar")).toHaveCount(0);
   await expect(over.getByRole("status")).toContainText(own!.trim());
   await expect(link).toHaveAttribute("href", /\/g\/[A-Za-z0-9_-]{22}$/);
+  // warmed up at the first question after the death, before it was scored
+  expect(scoring[0]).toBe("warmUp");
+  expect(scoring.filter((m) => m === "warmUp")).toHaveLength(1);
+  expect(scoring).toContain("scoreGame");
   // Enter on the link follows it, rather than starting a new game
   await link.focus();
   await page.keyboard.press("Enter");
