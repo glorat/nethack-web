@@ -52,7 +52,8 @@ export function AboutDialog({ onClose }: { onClose(): void }) {
         </p>
         <p>
           Painted tiles by Kevin Tam, derived from the NetHack tiles and distributed under the NetHack General Public
-          License. Classic tiles from NetHack.
+          License. Classic tiles from NetHack. Geoduck tiles by Robert M. Cook (Geoduck),
+          used with credit.
         </p>
         <div class="dialog-buttons">
           <button class="primary" onClick={onClose}>

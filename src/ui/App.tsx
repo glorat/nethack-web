@@ -553,7 +553,7 @@ export function App({ handedOver, onReplay }: Props) {
             throw new Error(`The tile set "${tileSet.file}" couldn't be read from this browser just now, so the default tile set is shown instead.`);
           },
         )
-      : loadTileSheet(new URL(`${import.meta.env.BASE_URL}tiles/${tileSet.file}`, location.href).href, tileSet.size);
+      : loadTileSheet(new URL(`${import.meta.env.BASE_URL}tiles/${tileSet.file}`, location.href).href, tileSet.size, tileSet.height ?? tileSet.size);
     loading
       .then((loaded) => live && setSheet(loaded))
       .catch((e) => {

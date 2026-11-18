@@ -4,8 +4,10 @@
 export interface TileSet {
   file: string;
   title: string;
-  /** 0 for an imported set, whose size is worked out from its image. */
+  /** The tile width; also the height of a square set. 0 for an imported set. */
   size: number;
+  /** The tile height, when the tiles aren't square. */
+  height?: number;
   /** One the player imported, kept in the browser. */
   imported?: boolean;
 }
@@ -18,6 +20,7 @@ export const TILES_NEEDED = 2303;
 export const TILE_SETS: TileSet[] = [
   { file: "tiles64.png", title: "Painted", size: 64 },
   { file: "tiles16.bmp", title: "Classic", size: 16 },
+  { file: "geoduck15x25.bmp", title: "Geoduck", size: 15, height: 25 },
 ];
 
 export const DEFAULT_TILE_SET = TILE_SETS[0];

@@ -7,6 +7,10 @@ test("tile_file names a set by its file, with or without a path", () => {
   expect(tileSetNamed("mytiles.png")).toBeUndefined();
 });
 
+test("the shipped sets include rectangular Geoduck tiles", () => {
+  expect(tileSetNamed("geoduck15x25.bmp")).toMatchObject({ title: "Geoduck", size: 15, height: 25 });
+});
+
 test("tile_file names an imported set by its file, but a shipped one wins", () => {
   expect(tileSetNamed("~/x/Mine32.png", ["mine32.png"])).toEqual({ file: "mine32.png", title: "mine32.png", size: 0, imported: true });
   expect(tileSetNamed("tiles16.bmp", ["tiles16.bmp"])?.imported).toBeUndefined();

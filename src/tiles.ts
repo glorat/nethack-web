@@ -23,8 +23,8 @@ function sheetOf(image: HTMLImageElement, width: number, height: number): TileSh
   return { image, width, height, columns: Math.floor(image.naturalWidth / width) };
 }
 
-export async function loadTileSheet(url: string, size: number): Promise<TileSheet> {
-  return sheetOf(await loadImage(url), size, size);
+export async function loadTileSheet(url: string, width: number, height = width): Promise<TileSheet> {
+  return sheetOf(await loadImage(url), width, height);
 }
 
 /** A sheet from a file the player chose; it rejects with why it can't be used. */
@@ -48,22 +48,23 @@ export async function loadImportedSheet(name: string, file: Blob): Promise<TileS
 export type DrawableSheet = Omit<TileSheet, "image"> & { image: CanvasImageSource };
 
 /**
- * The sheet redrawn once at `cell` a tile, when that shrinks it. Shrinking every tile from the full
- * painted sheet on each redraw kept some phones' GPUs busy for a third of a second at a time.
+ * The sheet redrawn once at the size of a map cell, when that shrinks it. Shrinking every tile
+ * from the full painted sheet on each redraw kept some phones' GPUs busy for a third of a second
+ * at a time.
  */
-export function sheetForCell(sheet: TileSheet, cell: number): DrawableSheet {
-  if (cell >= Math.max(sheet.width, sheet.height)) return sheet;
+export function sheetForCell(sheet: TileSheet, width: number, height = width): DrawableSheet {
+  if (width >= sheet.width && height >= sheet.height) return sheet;
   const rows = Math.ceil(sheet.image.naturalHeight / sheet.height);
   const canvas = document.createElement("canvas");
-  canvas.width = sheet.columns * cell;
-  canvas.height = rows * cell;
+  canvas.width = sheet.columns * width;
+  canvas.height = rows * height;
   const ctx = canvas.getContext("2d");
   if (!ctx) return sheet;
   ctx.imageSmoothingQuality = "high";
   for (let row = 0; row < rows; row++)
     for (let column = 0; column < sheet.columns; column++)
-      ctx.drawImage(sheet.image, column * sheet.width, row * sheet.height, sheet.width, sheet.height, column * cell, row * cell, cell, cell);
-  return { image: canvas, width: cell, height: cell, columns: sheet.columns };
+      ctx.drawImage(sheet.image, column * sheet.width, row * sheet.height, sheet.width, sheet.height, column * width, row * height, width, height);
+  return { image: canvas, width, height, columns: sheet.columns };
 }
 
 export function drawTile(
@@ -72,24 +73,28 @@ export function drawTile(
   tile: number,
   dx: number,
   dy: number,
-  cell: number,
+  width: number,
+  height = width,
 ): void {
   if (tile < 0) return;
   const sx = (tile % sheet.columns) * sheet.width;
   const sy = Math.floor(tile / sheet.columns) * sheet.height;
-  ctx.drawImage(sheet.image, sx, sy, sheet.width, sheet.height, dx, dy, cell, cell);
+  ctx.drawImage(sheet.image, sx, sy, sheet.width, sheet.height, dx, dy, width, height);
 }
 
-/** CSS background for a tile shown in a DOM element of the given size. */
-export function tileStyle(sheet: TileSheet, tile: number, cell: number): Record<string, string> {
+/** CSS background for a tile shown in a DOM box of the given size, letterboxed to the tile's aspect ratio. */
+export function tileStyle(sheet: TileSheet, tile: number, width: number, height = width): Record<string, string> {
   if (tile < 0) return {};
-  const scaleX = cell / sheet.width;
-  const scaleY = cell / sheet.height;
+  const scale = Math.min(width / sheet.width, height / sheet.height);
+  const tileWidth = sheet.width * scale;
+  const tileHeight = sheet.height * scale;
+  const left = (width - tileWidth) / 2;
+  const top = (height - tileHeight) / 2;
   return {
     // the classic tiles are small, and blur when drawn bigger
-    imageRendering: cell > Math.max(sheet.width, sheet.height) ? "pixelated" : "auto",
+    imageRendering: scale > 1 ? "pixelated" : "auto",
     backgroundImage: `url(${sheet.image.src})`,
-    backgroundSize: `${sheet.image.naturalWidth * scaleX}px ${sheet.image.naturalHeight * scaleY}px`,
-    backgroundPosition: `-${(tile % sheet.columns) * cell}px -${Math.floor(tile / sheet.columns) * cell}px`,
+    backgroundSize: `${sheet.image.naturalWidth * scale}px ${sheet.image.naturalHeight * scale}px`,
+    backgroundPosition: `${left - (tile % sheet.columns) * tileWidth}px ${top - Math.floor(tile / sheet.columns) * tileHeight}px`,
   };
 }
