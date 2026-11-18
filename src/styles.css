@@ -351,6 +351,7 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 .menu-dialog .answer { font-size: calc(14px * var(--text-scale)); }
 .answer.primary .inv-letter { color: inherit; }
 .answer-key { font-family: var(--mono); opacity: 0.7; }
+.dialog-buttons .primary .answer-key { opacity: 1; }
 .dialog-buttons .answer-key + span { white-space: pre; }
 .answer .answer-key { width: 12px; }
 .menu-count { color: var(--accent); font-weight: 600; }
