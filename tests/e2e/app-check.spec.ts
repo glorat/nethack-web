@@ -54,7 +54,7 @@ async function startOnlineGame(page: Page) {
   await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: /Valkyrie/ }).click();
   await picker.getByRole("listbox", { name: "Race" }).locator("button:not([disabled])").first().click();
   for (const group of ["Gender", "Alignment"]) await picker.getByRole("radiogroup", { name: group }).locator("button:not([disabled])").first().click();
-  await page.keyboard.press("Enter");
+  await picker.getByRole("button", { name: "Play" }).click();
   const dialog = page.getByRole("dialog");
   const playing = page.locator(".app[data-commanding]");
   for (;;) {

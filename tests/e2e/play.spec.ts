@@ -43,7 +43,7 @@ async function untilPlaying(page: Page) {
     const text = shown.toLowerCase();
     if (text.includes("choose your character")) {
       await pickCharacter(dialog, /Valkyrie/);
-      await page.keyboard.press("Enter");
+      await dialog.getByRole("button", { name: "Play" }).click();
     }
     else if (text.includes("shall i pick") || text.includes("is this ok")) await page.keyboard.press("y");
     else if (text.includes("tutorial")) await dialog.getByRole("button", { name: /just start play/i }).click();
@@ -395,6 +395,237 @@ for (const [option, keys] of [
     const typed = (await recording(page, name)).match(/^\d+ k (\d+)$/gm)!.map((l) => String.fromCharCode(Number(l.split(" ")[2])));
     expect(typed.slice(-2).join(" ")).toBe(keys);
   });
+
+test("the character picker gives each visible group its tty keys", async ({ page }) => {
+  await enterGame(page, `Tty${Date.now() % 100000}`);
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  const role = picker.getByRole("listbox", { name: "Role" });
+  const race = picker.getByRole("listbox", { name: "Race" });
+  const gender = picker.getByRole("radiogroup", { name: "Gender" });
+  const alignment = picker.getByRole("radiogroup", { name: "Alignment" });
+  const play = picker.getByRole("button", { name: "Play" });
+  const random = picker.getByRole("button", { name: /Random/ });
+  const actions = picker.locator(".player-actions");
+
+  await expect(role).toHaveClass(/active/);
+  await expect(random.locator(".player-key")).toHaveText("*");
+  await expect(actions.getByRole("button", { name: /Random/ })).toHaveCount(0);
+  await expect(actions.getByRole("button", { name: /^q Quit$/ })).toBeVisible();
+  await expect(actions.getByRole("button", { name: /^Esc Quit$/ })).toBeVisible();
+  await expect(role.getByRole("option", { name: "Archeologist" }).locator(".player-key")).toHaveText("a");
+  await expect(role.getByRole("option", { name: "Ranger" }).locator(".player-key")).toHaveText("R");
+  await expect(gender.getByRole("radio", { name: "Male", exact: true }).locator(".player-key")).toHaveText("m");
+  await expect(play.locator(".player-key")).toHaveText("y");
+  await expect(actions.getByRole("button", { name: /Race/ })).toBeVisible();
+
+  // The visible action bar runs the active role's tty extras, and the race
+  // box's own bar has the way back.
+  await expect(actions.getByRole("button", { name: /Role/ })).toHaveCount(0);
+  await actions.getByRole("button", { name: /Race/ }).click();
+  await expect(race).toHaveClass(/active/);
+  await expect(actions.getByRole("button", { name: /^Esc Back$/ })).toBeVisible();
+  await actions.getByRole("button", { name: /Role/ }).click();
+  await expect(role).toHaveClass(/active/);
+
+  // Enter advances the tty menu, rather than starting the game from anywhere.
+  await page.keyboard.press("Enter");
+  await expect(picker).toBeVisible();
+  await expect(role).not.toHaveClass(/active/);
+  await page.keyboard.press("Shift+Slash");
+  await expect(role).toHaveClass(/active/);
+  await page.keyboard.press("m");
+  await expect(role.getByRole("option", { name: "Monk" })).toHaveAttribute("aria-selected", "true");
+  // Monks are human only, so the race menu is skipped.
+  await expect(gender).toHaveClass(/active/);
+  await expect(actions.getByRole("button", { name: /Race/ })).toBeVisible();
+  await page.keyboard.press("Shift+Slash");
+  await expect(role).toHaveClass(/active/);
+
+  await page.keyboard.press("h");
+  await expect(role.getByRole("option", { name: "Healer" })).toHaveAttribute("aria-selected", "true");
+  await expect(race).toHaveClass(/active/);
+  await page.keyboard.press("h");
+  await expect(race.getByRole("option", { name: "human" })).toHaveAttribute("aria-selected", "true");
+  await expect(gender).toHaveClass(/active/);
+  await page.keyboard.press("m");
+  await expect(gender.getByRole("radio", { name: "Male", exact: true })).toHaveAttribute("aria-checked", "true");
+  // Healers are neutral only, so gender is the last box. Play is only a button.
+  await expect(gender).toHaveClass(/active/);
+  await expect(play).not.toHaveClass(/active/);
+  await expect(actions.getByRole("button", { name: /Random/ })).toHaveCount(0);
+
+  await page.keyboard.press("?");
+  await expect(role).toHaveClass(/active/);
+  await page.keyboard.press("c");
+  await expect(role.getByRole("option", { name: "Caveman" })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Shift+Slash");
+  await page.keyboard.press("w");
+  await page.keyboard.press("h");
+  await page.keyboard.press("m");
+  await expect(alignment).toHaveClass(/active/);
+  await page.keyboard.press("c");
+  await expect(alignment.getByRole("radio", { name: "Chaotic" })).toHaveAttribute("aria-checked", "true");
+  await expect(alignment).toHaveClass(/active/);
+  await expect(play).not.toHaveClass(/active/);
+});
+
+test("y starts the game from a selection box", async ({ page }) => {
+  await enterGame(page, `Why${Date.now() % 100000}`);
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  const role = picker.getByRole("listbox", { name: "Role" });
+  const race = picker.getByRole("listbox", { name: "Race" });
+
+  await expect(role).toHaveClass(/active/);
+  await page.keyboard.press("h");
+  await expect(race).toHaveClass(/active/);
+  await page.keyboard.press("y");
+  await expect(picker).toBeHidden();
+  await untilPlaying(page);
+  await expect(page.locator(".app[data-commanding]")).toBeVisible();
+});
+
+test("Tab cycles the active box and arrows choose inside it", async ({ page }) => {
+  await enterGame(page, `Tab${Date.now() % 100000}`);
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  const role = picker.getByRole("listbox", { name: "Role" });
+  const race = picker.getByRole("listbox", { name: "Race" });
+  const gender = picker.getByRole("radiogroup", { name: "Gender" });
+  const alignment = picker.getByRole("radiogroup", { name: "Alignment" });
+
+  // Wizard has every box, so Tab has a fixed route.
+  await expect(role).toHaveClass(/active/);
+  await page.keyboard.press("w");
+  await expect(race).toHaveClass(/active/);
+  await race.getByRole("option", { name: "human" }).click();
+  await page.keyboard.press("ArrowDown");
+  await expect(race.getByRole("option", { name: "elf" })).toHaveAttribute("aria-selected", "true");
+  await expect(race).toHaveClass(/active/);
+  expect(await race.getByRole("option", { name: "human" }).evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("none");
+  await page.keyboard.press("ArrowUp");
+  await expect(race.getByRole("option", { name: "human" })).toHaveAttribute("aria-selected", "true");
+
+  const human = race.getByRole("option", { name: "human" });
+  await page.keyboard.press("Tab");
+  await expect(gender).toHaveClass(/active/);
+  // Tab is intercepted: it moves the active box, not the browser's focus.
+  await expect(human).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(alignment).toHaveClass(/active/);
+  await page.keyboard.press("Tab");
+  await expect(role).toHaveClass(/active/);
+  await page.keyboard.press("Shift+Tab");
+  await expect(alignment).toHaveClass(/active/);
+
+  await page.keyboard.press("Shift+Tab");
+  await expect(gender).toHaveClass(/active/);
+  await gender.getByRole("radio", { name: "Male", exact: true }).click();
+  await page.keyboard.press("ArrowRight");
+  await expect(gender.getByRole("radio", { name: "Female", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(gender).toHaveClass(/active/);
+});
+
+test("Escape backs through the menus and quits at the first box", async ({ page }) => {
+  await enterGame(page, `Esc${Date.now() % 100000}`);
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  const role = picker.getByRole("listbox", { name: "Role" });
+  const race = picker.getByRole("listbox", { name: "Race" });
+
+  await expect(role).toHaveClass(/active/);
+  await page.keyboard.press("Slash");
+  await expect(race).toHaveClass(/active/);
+  await page.keyboard.press("Escape");
+  await expect(role).toHaveClass(/active/);
+  await expect(picker).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: /Continue Offline/ })).toBeVisible();
+});
+
+test("Escape backs from the last visible menu", async ({ page }) => {
+  await enterGame(page, `Back${Date.now() % 100000}`);
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  const role = picker.getByRole("listbox", { name: "Role" });
+  const race = picker.getByRole("listbox", { name: "Race" });
+  const gender = picker.getByRole("radiogroup", { name: "Gender" });
+  const actions = picker.locator(".player-actions");
+
+  await expect(role).toHaveClass(/active/);
+  // Healer, human, male: alignment is forced, so gender is the last menu.
+  await page.keyboard.press("h");
+  await expect(race).toHaveClass(/active/);
+  await page.keyboard.press("h");
+  await expect(gender).toHaveClass(/active/);
+  await page.keyboard.press("m");
+  // Gender is the last box; nothing moves to Play.
+  await expect(gender).toHaveClass(/active/);
+  await actions.getByRole("button", { name: /^Esc Back$/ }).click();
+  await expect(race).toHaveClass(/active/);
+  await page.keyboard.press("Escape");
+  await expect(role).toHaveClass(/active/);
+});
+
+test("choosing with the mouse leaves its box active", async ({ page }) => {
+  await enterGame(page, `Click${Date.now() % 100000}`);
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  const role = picker.getByRole("listbox", { name: "Role" });
+  const race = picker.getByRole("listbox", { name: "Race" });
+  const gender = picker.getByRole("radiogroup", { name: "Gender" });
+  const alignment = picker.getByRole("radiogroup", { name: "Alignment" });
+
+  await expect(role).toHaveClass(/active/);
+  await role.getByRole("option", { name: "Monk" }).click();
+  await expect(role).toHaveClass(/active/);
+  await expect(gender).not.toHaveClass(/active/);
+
+  await race.getByRole("option", { name: "human" }).click();
+  await expect(race).toHaveClass(/active/);
+  await expect(role).not.toHaveClass(/active/);
+
+  await gender.getByRole("radio", { name: "Female", exact: true }).click();
+  await expect(gender).toHaveClass(/active/);
+  await expect(race).not.toHaveClass(/active/);
+
+  await alignment.locator("button:not([disabled])").first().click();
+  await expect(alignment).toHaveClass(/active/);
+  await expect(gender).not.toHaveClass(/active/);
+});
+
+test("a stale option focus does not draw a second ring", async ({ page }) => {
+  await enterGame(page, `Focus${Date.now() % 100000}`);
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  const role = picker.getByRole("listbox", { name: "Role" });
+  const alignment = picker.getByRole("radiogroup", { name: "Alignment" });
+  const caveman = role.getByRole("option", { name: "Archeologist" });
+
+  await expect(role).toHaveClass(/active/);
+  await caveman.click();
+  await expect(caveman).toBeFocused();
+  await page.keyboard.press("BracketLeft");
+  await expect(alignment).toHaveClass(/active/);
+  await expect(caveman).toBeFocused();
+  expect(await caveman.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("none");
+});
+
+test("the character picker never clips its labels", async ({ page }) => {
+  await enterGame(page, `Labels${Date.now() % 100000}`);
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  await expect(picker).toBeVisible();
+  const clipped = () =>
+    picker.locator("button").evaluateAll((buttons) =>
+      buttons
+        .filter((button) => button.scrollWidth > button.clientWidth + 1)
+        .map((button) => button.textContent?.trim()),
+    );
+  expect(await clipped()).toEqual([]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await clipped()).toEqual([]);
+});
+
+test("q leaves the character picker", async ({ page }) => {
+  await enterGame(page, `Quit${Date.now() % 100000}`);
+  await expect(page.getByRole("dialog", { name: "Choose your character" })).toBeVisible();
+  await page.keyboard.press("q");
+  await expect(page.getByRole("button", { name: /Continue Offline/ })).toBeVisible();
+});
 
 test("the character picker starts the chosen role", async ({ page }) => {
   await enterGame(page, `Pick${Date.now() % 100000}`);
