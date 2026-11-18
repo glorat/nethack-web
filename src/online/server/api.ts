@@ -49,6 +49,8 @@ export const listOnlineGames = (): Promise<GameSummary[]> => loadGames({ now: ()
 /** Scores a game that has just ended, through the batch that ended it. */
 export const scoreFinishedGame = async (game: string, through: string) => (await server()).scoreGame({ game, through, sentAt: Date.now() });
 
+export const warmUpScoring = async () => (await server()).warmUpScoring({ sentAt: Date.now() });
+
 /** The player's finished games, latest first; asking waits for no one, as there's nothing to hold up. */
 export const listFinishedGames = async (): Promise<FinishedGame[]> => (await (await server()).finishedGames({ sentAt: Date.now() })).games;
 
