@@ -56,6 +56,13 @@ test("the View menu switches to rectangular Geoduck tiles and back", async ({ pa
 
   await view.getByRole("menuitemcheckbox", { name: /Geoduck Tiles/ }).click();
   await expect(icon).toHaveCSS("background-image", /geoduck15x25\.bmp/);
+  // Geoduck's items keep their 15:25 shape at 24x40 instead of becoming square
+  await expect(icon).toHaveCSS("width", "24px");
+  await expect(icon).toHaveCSS("height", "40px");
+  await expect(icon).toHaveCSS("background-size", "960px 2400px");
+  const equipped = page.locator(".equip-slot").nth(3);
+  await expect(equipped).toHaveCSS("width", "24px");
+  await expect(equipped).toHaveCSS("height", "40px");
   // Geoduck's 15x25 cells fill the map without being squashed into squares.
   await expect.poll(() => mapCellRatio(page)).toBeGreaterThan(1.55);
   await expect.poll(() => mapCellRatio(page)).toBeLessThan(1.78);
@@ -78,4 +85,17 @@ test.describe("on a phone", () => {
     await expect.poll(() => mapCellRatio(page)).toBeGreaterThan(1.55);
     await page.screenshot({ path: "test-results/geoduck-phone.png" });
   });
+});
+
+test("Geoduck's player picker icons fill their boxes", async ({ page }) => {
+  await page.goto("/offline/");
+  await page.evaluate(() => localStorage.setItem("nethack.tileSet", "geoduck15x25.bmp"));
+  await page.reload();
+  await page.getByLabel("Who are you?").fill("Picker");
+  await page.getByRole("button", { name: /^(Play|Continue) Offline/ }).click();
+  const picker = page.getByRole("dialog", { name: "Choose your character" });
+  const icon = picker.locator(".player-icon").first();
+  await expect(icon).toHaveCSS("background-image", /geoduck15x25\.bmp/);
+  await expect(icon).toHaveCSS("background-size", "1280px 1920px");
+  await page.screenshot({ path: "test-results/geoduck-picker.png" });
 });
