@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { randomPick, withRace, withRole } from "../../src/port/player";
+import { cycleStage, moveChoice, nextStage, prevStage, randomPick, randomStage, shownStages, withRace, withRole } from "../../src/port/player";
 import type { PlayerChoices } from "../../src/protocol";
 
 // Valkyrie: human or dwarf, female, lawful or neutral. Wizard: human or elf, neutral or chaotic.
@@ -76,4 +76,83 @@ test("a random pick keeps what the options chose and is always allowed", () => {
     expect(c.validGender[q.role][q.race][q.gender]).toBe(true);
     expect(c.validAlign[q.role][q.race][q.align]).toBe(true);
   }
+});
+
+test("Tab cycles the boxes that are shown, in both directions", () => {
+  const c = choices();
+  const wiz = { role: WIZ, race: HUMAN, gender: MALE, align: NEUTRAL };
+  expect(shownStages(c, wiz)).toEqual(["role", "race", "gender", "align"]);
+  expect(cycleStage(c, wiz, "role")).toBe("race");
+  expect(cycleStage(c, wiz, "race")).toBe("gender");
+  expect(cycleStage(c, wiz, "gender")).toBe("align");
+  expect(cycleStage(c, wiz, "align")).toBe("role");
+  expect(cycleStage(c, wiz, "role", true)).toBe("align");
+  expect(cycleStage(c, wiz, "align", true)).toBe("gender");
+
+  // Valkyries skip gender and wrap from alignment back to role.
+  const valk = { role: VALK, race: HUMAN, gender: FEMALE, align: LAWFUL };
+  expect(shownStages(c, valk)).toEqual(["role", "race", "align"]);
+  expect(cycleStage(c, valk, "race")).toBe("align");
+  expect(cycleStage(c, valk, "align")).toBe("role");
+  expect(cycleStage(c, valk, "role", true)).toBe("align");
+});
+
+test("arrows move only within the active box and skip choices it rules out", () => {
+  const c = choices();
+  const wiz = { role: WIZ, race: HUMAN, gender: MALE, align: NEUTRAL };
+  expect(moveChoice(c, { role: VALK, race: HUMAN, gender: FEMALE, align: LAWFUL }, "role", 1)?.role).toBe(WIZ);
+
+  // Dwarves are not a Wizard race, so down from human lands on elf.
+  expect(moveChoice(c, wiz, "race", 1)).toMatchObject({ role: WIZ, race: ELF, align: CHAOTIC });
+  expect(moveChoice(c, { ...wiz, race: ELF, align: CHAOTIC }, "race", 1)).toBe(null);
+  expect(moveChoice(c, wiz, "gender", 1)?.gender).toBe(FEMALE);
+  expect(moveChoice(c, { role: VALK, race: HUMAN, gender: FEMALE, align: LAWFUL }, "gender", 1)).toBe(null);
+  expect(moveChoice(c, wiz, "align", 1)?.align).toBe(CHAOTIC);
+  expect(moveChoice(c, { ...wiz, race: ELF, align: CHAOTIC }, "align", -1)).toBe(null);
+});
+
+test("the tty sequence skips stages with only one valid choice", () => {
+  const c = choices();
+  // Valkyries allow two races but only female, so gender is skipped.
+  const valk = { role: VALK, race: HUMAN, gender: FEMALE, align: LAWFUL };
+  expect(nextStage(c, valk, "role")).toBe("race");
+  expect(nextStage(c, valk, "race")).toBe("align");
+  expect(nextStage(c, valk, "gender")).toBe("align");
+  expect(nextStage(c, valk, "align")).toBe(null);
+
+  // Wizards allow both genders and more than one alignment, so every stage is shown.
+  const wiz = { role: WIZ, race: HUMAN, gender: MALE, align: NEUTRAL };
+  expect(nextStage(c, wiz, "role")).toBe("race");
+  expect(nextStage(c, wiz, "race")).toBe("gender");
+  expect(nextStage(c, wiz, "gender")).toBe("align");
+  expect(nextStage(c, wiz, "align")).toBe(null);
+});
+
+test("a random stage changes only that facet", () => {
+  const c = choices();
+  const wiz = { role: WIZ, race: HUMAN, gender: MALE, align: NEUTRAL };
+  expect(randomStage(c, wiz, "gender", () => 1)).toEqual({ ...wiz, gender: FEMALE });
+  expect(randomStage(c, wiz, "align", () => 1)).toEqual({ ...wiz, align: CHAOTIC });
+  expect(randomStage(c, wiz, "race", () => 0)).toEqual(wiz);
+  // A random role still settles the other facets to ones it allows.
+  expect(randomStage(c, wiz, "role", () => 0)).toEqual({
+    role: VALK,
+    race: HUMAN,
+    gender: FEMALE,
+    align: NEUTRAL,
+  });
+});
+
+test("escape walks back through the menus that were shown", () => {
+  const c = choices();
+  const valk = { role: VALK, race: HUMAN, gender: FEMALE, align: LAWFUL };
+  // Valkyries skip gender, so alignment goes back to race, and play to alignment.
+  expect(prevStage(c, valk, "role")).toBe(null);
+  expect(prevStage(c, valk, "race")).toBe("role");
+  expect(prevStage(c, valk, "align")).toBe("race");
+
+  const wiz = { role: WIZ, race: HUMAN, gender: MALE, align: NEUTRAL };
+  expect(prevStage(c, wiz, "race")).toBe("role");
+  expect(prevStage(c, wiz, "gender")).toBe("race");
+  expect(prevStage(c, wiz, "align")).toBe("gender");
 });

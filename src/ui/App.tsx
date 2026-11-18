@@ -1069,6 +1069,13 @@ function PendingDialog({
     case "ext_cmd":
       return <ExtCommandDialog commands={r.commands} initial={pending.typed} onDone={(index) => answer({ kind: "ext_cmd", index })} />;
     case "player":
-      return <PlayerDialog choices={r.choices} sheet={sheet} onDone={(pick) => answer({ kind: "player", ...pick })} />;
+      return (
+        <PlayerDialog
+          choices={r.choices}
+          sheet={sheet}
+          onDone={(pick) => answer({ kind: "player", ...pick })}
+          onQuit={() => location.replace(LANDING_PATH)}
+        />
+      );
   }
 }
