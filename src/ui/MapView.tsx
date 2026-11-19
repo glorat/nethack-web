@@ -7,7 +7,7 @@ import { COLNO, ROWNO, type GameState } from "../port/state";
 import { drawTile, sheetForCell, type TileSheet } from "../tiles";
 import { asciiCell, type AsciiFont, drawSymbol } from "./ascii";
 import { drawMarks } from "./marks";
-import { clipAround } from "./scroll";
+import { centerOn, clipAround } from "./scroll";
 import petMarkUrl from "./petmark.png";
 
 interface Props {
@@ -180,10 +180,10 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
     };
   }, []);
 
-  // keep the hero in view when the core asks
+  // follow the hero, centering it whenever the map overflows
   useEffect(() => {
     const el = scroller.current;
-    if (el && state.cursor) clipAround(el, state.cursor.x, state.cursor.y, shown.current.width, shown.current.height);
+    if (el && state.cursor) centerOn(el, state.cursor.x, state.cursor.y, shown.current.width, shown.current.height);
   }, [state.cursor]);
 
   const square = (e: MouseEvent) => {

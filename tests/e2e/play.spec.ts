@@ -897,6 +897,26 @@ test("zooming out from the far corner keeps the middle from before the browser c
   await expectZoomKeepsView(page, "Control+-", 64, 48);
 });
 
+test("the map follows the hero and centers it when it overflows", async ({ page }) => {
+  await startGame(page, `Follow${Date.now() % 100000}`);
+  await settle(page);
+  const metrics = await page.locator(".map").evaluate((el) => {
+    const canvas = el.querySelector("canvas")!;
+    const [x, y] = canvas.dataset.cursor!.split(",").map(Number);
+    const cellW = canvas.width / 80;
+    const cellH = canvas.height / 21;
+    const clamp = (v: number, max: number) => Math.max(0, Math.min(max, v));
+    return {
+      left: el.scrollLeft,
+      expectedLeft: el.scrollWidth > el.clientWidth ? clamp((x + 0.5) * cellW - el.clientWidth / 2, el.scrollWidth - el.clientWidth) : el.scrollLeft,
+      top: el.scrollTop,
+      expectedTop: el.scrollHeight > el.clientHeight ? clamp((y + 0.5) * cellH - el.clientHeight / 2, el.scrollHeight - el.clientHeight) : el.scrollTop,
+    };
+  });
+  expect(Math.abs(metrics.left - metrics.expectedLeft)).toBeLessThanOrEqual(1);
+  expect(Math.abs(metrics.top - metrics.expectedTop)).toBeLessThanOrEqual(1);
+});
+
 test("a stat that changes shows an arrow beside it", async ({ page }) => {
   await startAs(page, `Arrow${Date.now() % 100000}`, /Valkyrie/);
 
