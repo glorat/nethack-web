@@ -17,6 +17,8 @@ interface Props {
   /** How far the map is zoomed from its starting size. */
   scale: number;
   ascii: boolean;
+  /** Whether the map follows the hero, centering it wherever it overflows. */
+  centerHero: boolean;
   /** The player's choice for the ASCII map, else the default. */
   asciiFont: AsciiFont | null;
   /** Absent until the core has read its options, which would overrule a switch made before. */
@@ -47,7 +49,7 @@ const PINCH_STEP = 15;
 const CLICK_PRIMARY = 1;
 const CLICK_SECONDARY = 2;
 
-export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, onClick, describe, onZoom, onShowInventory, toolbar }: Props) {
+export function MapView({ state, sheet, cell, scale, ascii, centerHero, asciiFont, onAscii, onClick, describe, onZoom, onShowInventory, toolbar }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const pane = useRef<HTMLDivElement>(null);
@@ -132,7 +134,10 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
     if (!el || !middle.current) return;
     el.scrollLeft = middle.current.x * width - el.clientWidth / 2;
     el.scrollTop = middle.current.y * height - el.clientHeight / 2;
-    if (state.cursor) clipAround(el, state.cursor.x, state.cursor.y, width, height);
+    if (state.cursor) {
+      if (centerHero) centerOn(el, state.cursor.x, state.cursor.y, width, height);
+      else clipAround(el, state.cursor.x, state.cursor.y, width, height);
+    }
     recordMiddle();
   }, [width, height]);
 
@@ -180,11 +185,13 @@ export function MapView({ state, sheet, cell, scale, ascii, asciiFont, onAscii, 
     };
   }, []);
 
-  // follow the hero, centering it whenever the map overflows
+  // follow the hero, centering it whenever the map overflows and the setting asks for it
   useEffect(() => {
     const el = scroller.current;
-    if (el && state.cursor) centerOn(el, state.cursor.x, state.cursor.y, shown.current.width, shown.current.height);
-  }, [state.cursor]);
+    if (!el || !state.cursor) return;
+    if (centerHero) centerOn(el, state.cursor.x, state.cursor.y, shown.current.width, shown.current.height);
+    else clipAround(el, state.cursor.x, state.cursor.y, shown.current.width, shown.current.height);
+  }, [state.cursor, centerHero]);
 
   const square = (e: MouseEvent) => {
     const rect = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect();

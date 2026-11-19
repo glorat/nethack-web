@@ -899,7 +899,13 @@ test("zooming out from the far corner keeps the middle from before the browser c
 
 test("the map follows the hero and centers it when it overflows", async ({ page }) => {
   await startGame(page, `Follow${Date.now() % 100000}`);
+  const bar = page.getByRole("menubar");
+  await bar.getByRole("menuitem", { name: "View" }).click();
+  const follow = page.getByRole("menu", { name: "View" }).getByRole("menuitemcheckbox", { name: "Center on Hero" });
+  await expect(follow).toHaveAttribute("aria-checked", "false");
+  await follow.click();
   await settle(page);
+  expect(await page.evaluate(() => localStorage.getItem("nethack.centerHero"))).toBe("1");
   const metrics = await page.locator(".map").evaluate((el) => {
     const canvas = el.querySelector("canvas")!;
     const [x, y] = canvas.dataset.cursor!.split(",").map(Number);
