@@ -76,6 +76,7 @@ const ASCII_KEY = "nethack.asciiMap";
 const ASCII_FONT_KEY = "nethack.asciiFont";
 const INVENTORY_KEY = "nethack.showInventory";
 const TOOLBAR_KEY = "nethack.showToolbar";
+const CENTER_HERO_KEY = "nethack.centerHero";
 const INVENTORY_WIDTH_KEY = "nethack.inventoryWidth";
 const TEXT_SIZE_KEY = "nethack.textSize";
 // only the game and watch pages load this, so anywhere else is taken as offline, which reaches nothing
@@ -138,6 +139,14 @@ function savedShowToolbar(): boolean {
     return localStorage.getItem(TOOLBAR_KEY) !== "0";
   } catch {
     return true;
+  }
+}
+
+function savedCenterHero(): boolean {
+  try {
+    return localStorage.getItem(CENTER_HERO_KEY) === "1";
+  } catch {
+    return false;
   }
 }
 
@@ -322,6 +331,13 @@ export function App({ handedOver, onReplay }: Props) {
     setShowToolbarState(show);
     try {
       localStorage.setItem(TOOLBAR_KEY, show ? "1" : "0");
+    } catch {}
+  };
+  const [centerHero, setCenterHeroState] = useState(savedCenterHero);
+  const setCenterHero = (on: boolean) => {
+    setCenterHeroState(on);
+    try {
+      localStorage.setItem(CENTER_HERO_KEY, on ? "1" : "0");
     } catch {}
   };
   // what the hero can do where they stand, as of the last command prompt
@@ -803,6 +819,8 @@ export function App({ handedOver, onReplay }: Props) {
           run: () => setChoosingFont(true),
         },
         null,
+        { title: "Center on Hero", checked: centerHero, run: () => setCenterHero(!centerHero) },
+        null,
         { title: "Zoom In", key: "⌘=", run: () => zoom(1) },
         { title: "Zoom Out", key: "⌘-", run: () => zoom(-1) },
         { title: "Actual Size", key: "⌘0", run: () => zoom(0) },
@@ -903,6 +921,7 @@ export function App({ handedOver, onReplay }: Props) {
             scale={cell / DEFAULT_CELL}
             asciiFont={asciiFont}
             ascii={ascii}
+            centerHero={centerHero}
             onAscii={toggleAscii}
             describe={(x, y) => client.describe(x, y)}
             onZoom={zoom}
