@@ -105,7 +105,7 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 
 .map-pane { position: relative; flex: 1; min-height: 0; display: flex; }
 .map {
-  flex: 1; overflow: auto; background: #000;
+  flex: 1; overflow: auto; background: #0b0b0b;
   /* Safari's double-tap zoom, long-press callout and scroll bounce would fight the game's taps; a pinch is the map's own */
   touch-action: manipulation; overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
@@ -124,7 +124,11 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
   background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
   padding: 3px 8px; font-size: 12px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
 }
-.map canvas { display: block; cursor: crosshair; }
+.map canvas {
+  display: block; cursor: crosshair;
+  /* the map's own bounds, even when its unexplored tile is black */
+  outline: 1px solid #3a3a3a; outline-offset: -1px;
+}
 /* over the menu bar, so a click there closes this menu first */
 .context-backdrop { position: fixed; inset: 0; z-index: 12; }
 .context-menu {
