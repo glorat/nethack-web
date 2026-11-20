@@ -16,6 +16,10 @@ test("the core finds nothing wrong with the template, with the game's own option
   expect(await check(configFile(BASE_OPTIONS, OPTIONS_TEMPLATE))).toEqual([]);
 });
 
+test("a terminal windowtype line is a web no-op, not a core error", async () => {
+  expect(await check(configFile(BASE_OPTIONS, "OPTIONS=windowtype:curses\n"))).toEqual([]);
+});
+
 test("the core says which lines are wrong and why", async () => {
   const file = "# mine\nOPTIONS=number_pad:1\nOPTIONS=bogusopt\nOPTIONS=number_pad:7\nFOO=bar\n";
   expect(await check(configFile(BASE_OPTIONS, file))).toEqual([

@@ -446,9 +446,10 @@ export class Game {
       bgTile: this.backgroundTile(gi.glyph, readGlyphInfo(this.m, bkPtr)),
       ch: gi.ch,
       color: gi.color,
+      customColor: gi.customColor,
       glyphFlags: gi.glyphFlags,
       marks: this.m._nhweb_map_marks(x, y, gi.glyph, gi.glyphFlags),
-      symbol: symbolText(gi.ch, !!this.m._nhweb_dec_graphics()),
+      symbol: symbolText(gi.ch, !!this.m._nhweb_dec_graphics(), !!this.m._nhweb_utf8_graphics()),
     };
     this.cells.set(y * COLNO + x, cell);
     if (this.canBePeaceful(gi.glyph)) this.monsters.set(y * COLNO + x, cell);

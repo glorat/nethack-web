@@ -1,0 +1,53 @@
+import { expect, test } from "@playwright/test";
+
+test("ANSI walls meet without gaps or overhang", async ({ page }) => {
+  await page.goto("/offline/");
+  const result = await page.evaluate(async () => {
+    const { asciiCell, drawSymbol, MAP_BACKGROUND } = await import("/src/ui/ascii.ts");
+    const cell = asciiCell(32, null, 1);
+    const width = cell.width;
+    const height = cell.height;
+    const draw = (cols: number, rows: number, symbols: string[]) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = cols * width;
+      canvas.height = rows * height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = MAP_BACKGROUND;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      symbols.forEach((s, i) => drawSymbol(ctx, cell, s, 7, (i % cols) * width, Math.floor(i / cols) * height));
+      return ctx;
+    };
+    const nonBackground = (data: Uint8ClampedArray) => {
+      let n = 0;
+      for (let i = 0; i < data.length; i += 4) if (data[i] !== 0 || data[i + 1] !== 0 || data[i + 2] !== 0) n++;
+      return n;
+    };
+    const pixels = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) =>
+      ctx.getImageData(x, y, w, h).data;
+
+    const wall = draw(1, 2, ["║", "║"]);
+    const wallRows: number[] = [];
+    for (let y = 0; y < height * 2; y++) wallRows.push(nonBackground(pixels(wall, 0, y, width, 1)));
+
+    const one = draw(2, 1, ["║", " "]);
+    const neighbour = nonBackground(pixels(one, width, 0, width, height));
+
+    const shade = draw(3, 1, ["░", "░", "░"]);
+    const boundary = pixels(shade, width - 1, Math.floor(height / 2), 2, 1);
+    const center = [...pixels(shade, Math.floor(width / 2), Math.floor(height / 2), 1, 1).slice(0, 3)];
+
+    return { width, height, bg: MAP_BACKGROUND, wallRows, neighbour, boundary: [...boundary], center };
+  });
+  expect(result.width / result.height).toBeCloseTo(0.4375, 2);
+  expect(result.bg).toBe("#000");
+  expect(result.wallRows.every((n) => n >= 2)).toBe(true);
+  expect(result.neighbour).toBe(0);
+  expect(result.boundary[0]).not.toBe(0); // shade reaches the shared edge
+  expect(result.boundary[4]).not.toBe(0);
+  expect(result.center[0]).toBeGreaterThan(43);
+  expect(result.center[0]).toBeLessThan(50);
+  expect(result.center[1]).toBeGreaterThan(45);
+  expect(result.center[1]).toBeLessThan(52);
+  expect(result.center[2]).toBeGreaterThan(46);
+  expect(result.center[2]).toBeLessThan(53);
+});

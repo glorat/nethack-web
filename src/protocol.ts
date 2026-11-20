@@ -13,6 +13,8 @@ export interface MapCell {
   bgTile: number;
   ch: number;
   color: number;
+  /** 24-bit foreground when customcolors is in use; 0 otherwise. */
+  customColor?: number;
   glyphFlags: number;
   /** MARK_* bits from port/marks. */
   marks: number;

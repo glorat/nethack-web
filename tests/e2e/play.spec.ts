@@ -1005,6 +1005,14 @@ test("ASCII mode draws the map as text and is kept across a reload", async ({ pa
   await expect(toggle).toHaveAttribute("aria-pressed", "true");
   // text cells are narrower than tiles
   await expect.poll(async () => Number(await canvas.getAttribute("width"))).toBeLessThan(tiled);
+  await expect.poll(async () => {
+    const [w, h] = (await canvas.evaluate((el) => [(el as HTMLCanvasElement).width, (el as HTMLCanvasElement).height]))!;
+    return w / 80 / (h / 21);
+  }).toBeGreaterThan(0.42);
+  await expect.poll(async () => {
+    const [w, h] = (await canvas.evaluate((el) => [(el as HTMLCanvasElement).width, (el as HTMLCanvasElement).height]))!;
+    return w / 80 / (h / 21);
+  }).toBeLessThan(0.46);
   await page.screenshot({ path: "test-results/ascii.png" });
   const ascii = await canvas.getAttribute("width");
 
@@ -1023,6 +1031,23 @@ test("ASCII mode draws the map as text and is kept across a reload", async ({ pa
 
   await page.getByRole("button", { name: "ASCII" }).click();
   await expect(canvas).toHaveAttribute("width", String(tiled));
+});
+
+test("ASCII mode keeps the cursor outline on the hero", async ({ page }) => {
+  await startGame(page, `Cursor${Date.now() % 100000}`);
+  await page.getByRole("button", { name: "ASCII" }).click();
+  const canvas = page.locator(".map canvas");
+  const green = await canvas.evaluate((el) => {
+    const c = el as HTMLCanvasElement;
+    const [x, y] = (c.dataset.cursor ?? "").split(",").map(Number);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    const cellW = c.width / 80;
+    const cellH = c.height / 21;
+    const data = c.getContext("2d")!.getImageData(Math.round(x * cellW + cellW / 2) - 1, Math.round(y * cellH) - 1, 3, 3).data;
+    for (let i = 0; i < data.length; i += 4) if (data[i + 1] > 100 && data[i] < 80 && data[i + 2] < 80) return true;
+    return false;
+  });
+  expect(green).toBe(true);
 });
 
 test("keyboard shortcuts and a pinch zoom the map, and Cmd-0 goes back", async ({ page }) => {
@@ -1169,6 +1194,32 @@ test("the inventory shows blessed items green", async ({ page }) => {
   // a priest starts with holy water and sees that it's blessed
   await expect(page.locator(".inv-text", { hasText: "holy water" })).toHaveCSS("color", "rgb(60, 176, 67)");
 });
+
+for (const setting of [0, 1, 2, 3, 4, 5])
+  test(`menu_objsyms:${setting} keeps inventory headings as headings`, async ({ page }) => {
+    await page.addInitScript((options) => localStorage.setItem("nethack.options", options), `OPTIONS=menu_objsyms:${setting}\n`);
+    await startAs(page, `Sym${setting}${Date.now() % 100000}`, /Priest/);
+    await page.keyboard.press("i");
+    const dialog = page.getByRole("dialog");
+    const heading = dialog.locator(".menu-heading", { hasText: /Weapons/i }).first();
+    await expect(heading).toContainText(/Weapons/i);
+    await expect(dialog.locator(".menu-items")).not.toHaveClass(/tabbed/);
+    await expect(heading).not.toHaveClass(/columns/);
+    await expect(heading).toHaveCSS("text-transform", "uppercase");
+    if (setting % 2) {
+      const symbol = heading.locator(".menu-heading-sym");
+      await expect(symbol).toHaveText(/^\('\S'\)$/);
+      const text = (await heading.locator(".menu-heading-text").boundingBox())!;
+      const glyph = (await symbol.boundingBox())!;
+      // as in tty, the class glyph follows the heading text instead of sitting at the far edge
+      expect(glyph.x).toBeGreaterThanOrEqual(text.x + text.width);
+      // every heading's glyph shares the same column
+      const xs = await dialog.locator(".menu-heading-sym").evaluateAll((els) => els.map((el) => el.getBoundingClientRect().x));
+      expect(Math.max(...xs) - Math.min(...xs)).toBeLessThanOrEqual(1);
+    } else {
+      await expect(dialog.locator(".menu-heading-sym")).toHaveCount(0);
+    }
+  });
 
 test("a count typed before an item's letter in a menu takes only that many", async ({ page }) => {
   await startAs(page, `Count${Date.now() % 100000}`, /Priest/);
@@ -1790,6 +1841,20 @@ test("the options file is edited in the browser and read when a game starts", as
   await expect(page.locator(".menu-dialog")).toHaveCount(0);
   await editor.getByRole("button", { name: "Cancel" }).click();
   await expect(editor).toBeHidden();
+});
+
+test("a terminal windowtype line doesn't block saving the options file", async ({ page }) => {
+  await page.goto("/offline/");
+  await page.getByRole("button", { name: "Game Settings…" }).click();
+  const settings = page.getByRole("dialog", { name: "Game Settings" });
+  const text = settings.getByLabel("Options file", { exact: true });
+  await text.fill("OPTIONS=windowtype:curses\nOPTIONS=autodig\n");
+  await settings.getByRole("button", { name: "OK" }).click();
+  await expect(settings).toBeHidden();
+  await page.getByRole("button", { name: "Game Settings…" }).click();
+  // The line is the player's file to keep; it is only dropped from the config the core reads.
+  await expect(text).toHaveValue(/windowtype:curses/);
+  await expect(settings.getByRole("alert")).toHaveCount(0);
 });
 
 test("Game Settings' choices and the options file show each other's changes, and a file the core finds wrong isn't kept", async ({ page }) => {

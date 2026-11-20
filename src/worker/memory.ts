@@ -56,6 +56,7 @@ export interface NetHackModule {
   _nhweb_ascii_map(): number;
   _nhweb_set_ascii_map(on: number): void;
   _nhweb_dec_graphics(): number;
+  _nhweb_utf8_graphics(): number;
   _nhweb_hero_kind(): number;
   _nhweb_dungeon_name(): number;
   _nhweb_dungeon_level(): number;
@@ -88,22 +89,29 @@ const GI_GLYPH = 0;
 const GI_TTYCHAR = 4;
 const GI_GLYPHFLAGS = 12;
 const GI_COLOR = 16;
+const GI_CUSTOMCOLOR = 24;
 const GI_TILEIDX = 30;
+/* glyph_map.u, only present when ENHANCED_SYMBOLS is compiled in */
+const GI_UNICODE = 32;
 
 export interface GlyphInfo {
   glyph: number;
   ch: number;
   color: number;
+  customColor: number;
   glyphFlags: number;
   tile: number;
 }
 
 export function readGlyphInfo(m: NetHackModule, ptr: number): GlyphInfo | null {
   if (!ptr) return null;
+  const unicode = m.getValue(ptr + GI_UNICODE, "*");
   return {
     glyph: m.getValue(ptr + GI_GLYPH, "i32"),
-    ch: m.getValue(ptr + GI_TTYCHAR, "i32"),
+    // UTF-8 symsets put the real character in glyph_map.u rather than ttychar
+    ch: unicode ? m.getValue(unicode, "i32") : m.getValue(ptr + GI_TTYCHAR, "i32"),
     color: m.getValue(ptr + GI_COLOR, "i32"),
+    customColor: m.getValue(ptr + GI_CUSTOMCOLOR, "i32") >>> 0,
     glyphFlags: m.getValue(ptr + GI_GLYPHFLAGS, "i32") >>> 0,
     tile: m.getValue(ptr + GI_TILEIDX, "i16"),
   };

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { configFile, keptOption, OPTIONS_TEMPLATE, optionNames, optionSettings, savedOptionsFile, withOption } from "../../src/port/options";
+import { configFile, keptOption, OPTIONS_TEMPLATE, optionNames, optionSettings, savedOptionsFile, webOptions, withOption } from "../../src/port/options";
 
 test("the game's options go after the player's, leaving out any the player sets, so theirs win without a duplicate", () => {
   expect(configFile("time,!autopickup,menucolors", "OPTIONS=autopickup,pickup_types:$\nOPTIONS=!time\n")).toBe(
@@ -7,6 +7,12 @@ test("the game's options go after the player's, leaving out any the player sets,
   );
   expect(configFile("time", "OPTIONS=notime")).toBe("OPTIONS=notime");
   expect(configFile("time", "")).toBe("\nOPTIONS=time\n");
+});
+
+test("terminal-only windowtype is dropped before the web core reads the file", () => {
+  expect(webOptions("OPTIONS=windowtype:curses\n")).toBe("");
+  expect(webOptions("OPTIONS=windowtype:curses,autodig\n")).toBe("OPTIONS=autodig\n");
+  expect(configFile("time", "OPTIONS=windowtype:curses\n")).toBe("\nOPTIONS=time\n");
 });
 
 test("an OPTIONS line's names are read past ! and values, and comments are skipped", () => {

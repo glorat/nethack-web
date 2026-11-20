@@ -5,7 +5,7 @@ import { tooltipText, wikiTerm, wikiUrl } from "../port/describe";
 import { useTooltip } from "./tooltip";
 import { COLNO, ROWNO, type GameState } from "../port/state";
 import { drawTile, sheetForCell, type TileSheet } from "../tiles";
-import { asciiCell, type AsciiFont, drawSymbol } from "./ascii";
+import { asciiCell, type AsciiFont, drawSymbol, MAP_BACKGROUND } from "./ascii";
 import { drawMarks } from "./marks";
 import { centerOn, clipAround } from "./scroll";
 import petMarkUrl from "./petmark.png";
@@ -89,14 +89,14 @@ export function MapView({ state, sheet, cell, scale, ascii, centerHero, asciiFon
     const ctx = canvas.current?.getContext("2d");
     if (!ctx) return;
     ctx.imageSmoothingEnabled = width < sheet.width || height < sheet.height;
-    ctx.fillStyle = "#000";
+    ctx.fillStyle = MAP_BACKGROUND;
     ctx.fillRect(0, 0, COLNO * width, ROWNO * height);
     for (let y = 0; y < ROWNO; y++) {
       for (let x = 0; x < COLNO; x++) {
         const c = state.map[y * COLNO + x];
         if (!c) continue;
         if (symbols) {
-          drawSymbol(ctx, symbols, c.symbol, c.color, x * width, y * height);
+          drawSymbol(ctx, symbols, c.symbol, c.color, x * width, y * height, c.customColor);
         } else if (tiles) {
           drawTile(ctx, tiles, c.bgTile, x * width, y * height, width, height);
           drawTile(ctx, tiles, c.tile, x * width, y * height, width, height);
