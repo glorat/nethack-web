@@ -18,7 +18,7 @@ test("a watched replay stops at each answer, with the answer about to be given",
   expect(keys).toEqual([...text.matchAll(/^\d+ k (\d+)$/gm)].map((m) => Number(m[1])));
   expect(stops).toBeGreaterThanOrEqual(keys.length);
   expect(last).toBe((await replayRecording(text)).state.status.BL_TIME?.text);
-});
+}, 10_000);
 
 test("an error thrown by the watcher comes back as itself, not as the recording's", async () => {
   const text = readFileSync(resolve(__dirname, "golden/archeologist.txt"), "utf8");

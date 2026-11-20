@@ -73,6 +73,28 @@ export function optionNames(file: string): Set<string> {
 
 const OPTIONS_LINE = /^(\s*OPTIONS\s*=)(.*)$/i;
 
+/** Options that only a native build can use. The web build has one window port, shim. */
+const WEB_ONLY_DROPPED = new Set(["windowtype"]);
+
+/**
+ * The player's file without native-only options. A terminal .nethackrc usually says windowtype:curses;
+ * the browser has no curses port, and carrying the line over only makes the core reject the whole file.
+ */
+export function webOptions(file: string): string {
+  return file
+    .split("\n")
+    .flatMap((line) => {
+      const m = OPTIONS_LINE.exec(line);
+      if (!m) return [line];
+      const kept = m[2].split(",").filter((option) => {
+        const name = option.split(/[:=]/)[0].trim().replace(/^!/, "").toLowerCase();
+        return !WEB_ONLY_DROPPED.has(name);
+      });
+      return kept.length ? [`${m[1]}${kept.join(",")}`] : [];
+    })
+    .join("\n");
+}
+
 /** Whether an option as written, such as "!number_pad" or "number_pad:3", sets `name`. */
 function sets(option: string, name: string): boolean {
   const written = option.split(/[:=]/)[0].trim().toLowerCase();
@@ -120,12 +142,13 @@ export function keptOption(file: string, option: string): string {
  * an option set twice in a file is an error, and the player's choice wins.
  */
 export function configFile(base: string, player: string): string {
-  const set = optionNames(player);
+  const clean = webOptions(player);
+  const set = optionNames(clean);
   const left = base.split(",").filter((option) => {
     const name = option.split(":")[0].replace(/^!/, "").toLowerCase();
     return !set.has(name) && !set.has(`no${name}`);
   });
-  return left.length ? `${player.replace(/\n?$/, "\n")}OPTIONS=${left.join(",")}\n` : player;
+  return left.length ? `${clean.replace(/\n?$/, "\n")}OPTIONS=${left.join(",")}\n` : clean;
 }
 
 export const OPTIONS_KEY = "nethack.options";

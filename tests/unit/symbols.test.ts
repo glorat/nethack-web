@@ -14,6 +14,13 @@ test("IBM graphics symbols are read as code page 437", () => {
   expect(symbolText(0xf7, false)).toBe("≈");
 });
 
+test("UTF-8 symset symbols are passed through", () => {
+  expect(symbolText(0x2502, false, true)).toBe("│");
+  expect(symbolText(0x2551, false, true)).toBe("║");
+  expect(symbolText(0x2591, false, true)).toBe("░");
+  expect(symbolText(0x00b7, false, true)).toBe("·");
+});
+
 test("DEC graphics symbols are read as DEC line drawing", () => {
   expect(symbolText(0x80 | "x".charCodeAt(0), true)).toBe("│");
   expect(symbolText(0x80 | "q".charCodeAt(0), true)).toBe("─");

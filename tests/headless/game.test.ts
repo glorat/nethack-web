@@ -16,6 +16,16 @@ test("a new game shows the map, status, inventory and equipment", async () => {
   expect(g.state.equipment[0]).toEqual({ letter: "", tile: -1 });
 });
 
+test("Enhanced2 symsets keep their double-line walls", async () => {
+  const g = await (await Session.start({ config: "OPTIONS=symset:Enhanced2\n" })).skipText();
+
+  const symbols = g.state.map.filter((c) => c !== null).map((c) => c.symbol);
+  expect(symbols).toContain("║");
+  expect(symbols).toContain("═");
+  expect(symbols).toContain("╔");
+  expect(symbols).toContain("·");
+});
+
 test("picking an inventory item offers its actions", async () => {
   const g = await (await Session.start()).skipText();
   await g.send("i");

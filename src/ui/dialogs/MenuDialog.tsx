@@ -185,7 +185,16 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
   // the core separates columns with tabs or runs of spaces; a grid lines up every row's,
   // and a row of columns that isn't an item starts where the items' text does
   const split = (item: MenuItem) => splitFields(item.text.trim());
-  const columns = Math.max(...items.map((item) => split(item).length));
+  // menu_objsyms puts the class glyph on inventory headings as a "  ('x')" suffix. That is
+  // decoration on the heading, not a menu column: treating it as one drops the uppercase
+  // and indents the whole heading through the tabbed grid.
+  const headingSymbol = (item: MenuItem, i: number) => {
+    if (item.identifier !== 0 || !isHeading(item, items[i + 1])) return null;
+    const fields = split(item);
+    return fields.length === 2 && /^\('\S'\)$/.test(fields[1]) ? fields[1] : null;
+  };
+  const columns = Math.max(...items.map((item, i) => split(item).length - (headingSymbol(item, i) ? 1 : 0)));
+  const headingWidth = Math.max(1, ...items.map((item, i) => (headingSymbol(item, i) ? split(item)[0].length + 1 : 0)));
   const fields = (item: MenuItem, style?: Record<string, string>, before?: ComponentChildren) =>
     split(item).map((f, n) => (
       <span class="menu-field" style={style}>
@@ -220,6 +229,16 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     const strong = heading && (item.attr === ATR_INVERSE || item.attr === ATR_BOLD);
     const kind = heading ? `menu-heading${strong ? " strong" : ""}` : "menu-line";
     const style = heading ? headingStyle(item) : textStyle(item.color, item.attr);
+    const symbol = headingSymbol(item, i);
+    if (symbol)
+      return (
+        <div class={`${kind} with-symbol`} style={style}>
+          <span class="menu-heading-text" style={{ minWidth: `${headingWidth}ch` }}>
+            {split(item)[0]}
+          </span>
+          <span class="menu-heading-sym">{symbol}</span>
+        </div>
+      );
     if (columns > 1 && split(item).length > 1)
       return (
         <div class={`${kind} columns`} style={{ "--menu-lead": lead.length + 1 }}>
