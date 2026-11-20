@@ -33,8 +33,8 @@ export function asciiCell(cell: number, chosen: AsciiFont | null, scale: number)
   let found = cells.get(key);
   if (!found) {
     const font = chosen
-      ? `${Math.round(chosen.size * scale)}px "${chosen.family}", monospace`
-      : `${Math.round(cell * 0.72)}px ui-monospace, Menlo, Consolas, monospace`;
+      ? `${Math.round(chosen.size * scale)}px "${chosen.family}", "JuliaMono", monospace`
+      : `${Math.round(cell * 0.72)}px ui-monospace, Menlo, Consolas, "JuliaMono", monospace`;
     const ctx = document.createElement("canvas").getContext("2d")!;
     ctx.font = font;
     // The terminal's map cell is 8x18 and its font is about 13px in an 18px row. Keep that cell shape (14x32 here)

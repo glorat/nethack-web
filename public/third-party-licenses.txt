@@ -393,3 +393,14 @@ obstacle to adoption, that text has been removed.
 LLVM compiler-rt, as built by Emscripten, in nethack.wasm, is under the Apache
 License 2.0 with LLVM Exceptions, which waive the notice requirements for
 compiled code. https://llvm.org/LICENSE.txt
+
+==============================================================================
+
+JuliaMono, in public/fonts/JuliaMono-Regular.ttf
+https://github.com/cormullion/juliamono
+
+Copyright (c) 2020 - 2023, cormullion
+with Reserved Font Name JuliaMono.
+
+Licensed under the SIL Open Font License, Version 1.1; the full text and
+notice are in public/fonts/JuliaMono-OFL.txt.
