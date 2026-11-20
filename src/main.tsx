@@ -9,6 +9,17 @@ function Root() {
   return <App key={handedOver === undefined ? "played" : "replayed"} handedOver={handedOver} onReplay={setHandedOver} />;
 }
 
-render(<Root />, document.getElementById("app")!);
-holdOffUpdates();
-registerServiceWorker();
+function start() {
+  render(<Root />, document.getElementById("app")!);
+  holdOffUpdates();
+  registerServiceWorker();
+}
+
+const juliaMono = new FontFace("JuliaMono", "url('/fonts/JuliaMono-Regular.ttf')");
+juliaMono.load().then(
+  (font) => {
+    document.fonts.add(font);
+    start();
+  },
+  start,
+);
