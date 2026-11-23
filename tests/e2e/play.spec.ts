@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { letterAt } from "../../src/port/letters";
 import { PLAY_ANYWAY_KEY } from "../../src/port/screen-fit";
 import { sortKey } from "../../src/port/sort";
 import { clipAround } from "../../src/ui/scroll";
@@ -96,6 +97,71 @@ async function startAs(page: Page, name: string, role: RegExp) {
   await pickCharacter(picker, role);
   await picker.getByRole("button", { name: "Play" }).click();
   await untilPlaying(page);
+}
+
+const DISCOVERY_WISHES = [
+  "potion of healing", "potion of extra healing", "potion of full healing", "potion of gain energy", "potion of speed",
+  "potion of blindness", "potion of hallucination", "potion of invisibility", "potion of levitation", "potion of object detection",
+  "potion of monster detection", "potion of see invisible", "potion of water", "potion of booze", "potion of fruit juice",
+  "potion of acid", "potion of oil", "potion of sickness", "potion of confusion", "potion of paralysis",
+  "ring of protection", "ring of regeneration", "ring of teleportation", "ring of invisibility", "ring of see invisible",
+  "ring of levitation", "ring of free action", "ring of conflict", "ring of polymorph", "ring of polymorph control",
+  "ring of teleport control", "ring of gain strength", "ring of gain dexterity", "ring of gain constitution", "ring of gain intelligence",
+  "ring of gain wisdom", "ring of increase damage", "ring of increase accuracy", "ring of hunger", "ring of aggravate monster",
+  "ring of poison resistance", "ring of shock resistance", "ring of fire resistance", "ring of cold resistance", "ring of sleep resistance",
+  "wand of striking", "wand of magic missile", "wand of fire", "wand of cold", "wand of lightning",
+  "wand of sleep", "wand of death", "wand of polymorph", "wand of cancellation", "wand of teleportation",
+  "scroll of identify", "scroll of light", "scroll of enchant weapon", "scroll of enchant armor", "scroll of remove curse",
+];
+
+/** A real-core menu of every object type the hero has seen, built only through wishes and #name. */
+async function discoveryMenu() {
+  const g = await (await Session.start({ wizard: true, options: "pettype:none" })).skipText();
+  for (const item of DISCOVERY_WISHES) {
+    await g.send("\x17");
+    await g.getlin(item);
+    await g.skipText();
+  }
+  await g.send("#");
+  if (g.prompt?.kind !== "ext_cmd") throw new Error("no extended command prompt");
+  await g.answer({ kind: "ext_cmd", index: g.prompt.commands.find((command) => command.name === "name")!.index });
+  if (g.prompt?.kind !== "menu") throw new Error("no name menu");
+  const types = g.prompt.items.find((item) => /discoveries list/i.test(item.text));
+  if (!types) throw new Error("no object types on the discoveries list");
+  await g.answer({ kind: "menu", selection: [{ identifier: types.identifier, count: -1 }] });
+  if (g.prompt?.kind !== "menu") throw new Error("no object type menu");
+  const { how, prompt, items, unlisted } = g.prompt;
+  if (how !== "one") throw new Error(`the object type menu is ${how}, not one`);
+  return { how, prompt, items, unlisted };
+}
+
+/** A real-core short menu: #name's first question, six options and no tiles. */
+async function shortMenu() {
+  const g = await (await Session.start({ wizard: true, options: "pettype:none" })).skipText();
+  await g.send("#");
+  if (g.prompt?.kind !== "ext_cmd") throw new Error("no extended command prompt");
+  await g.answer({ kind: "ext_cmd", index: g.prompt.commands.find((command) => command.name === "name")!.index });
+  if (g.prompt?.kind !== "menu") throw new Error("no name menu");
+  const { how, prompt, items, unlisted } = g.prompt;
+  return { how, prompt, items, unlisted };
+}
+
+/** The real core's three-answer tutorial question. */
+async function tutorialMenu() {
+  const g = await Session.start({ wizard: true, askTutorial: true });
+  await g.skipText();
+  if (g.prompt?.kind !== "menu") throw new Error("no tutorial menu");
+  const { how, prompt, items, unlisted } = g.prompt;
+  return { how, prompt, items, unlisted };
+}
+
+/** The real core's read-only attributes menu. */
+async function readOnlyMenu() {
+  const g = await (await Session.start({ wizard: true, options: "pettype:none" })).skipText();
+  await g.send("\x18");
+  if (g.prompt?.kind !== "menu") throw new Error("no attributes menu");
+  const { how, prompt, items, unlisted } = g.prompt;
+  return { how, prompt, items, unlisted };
 }
 
 test("the same inputs make the same game, whatever its name", async ({ browser }) => {
@@ -1312,6 +1378,507 @@ test("an item picked by its letter in a menu of several picks is scrolled into v
   await page.keyboard.press((await last.locator(".inv-letter").innerText()).trim());
   await expect(last).toHaveAttribute("aria-checked", "true");
   await expect(last).toBeInViewport({ ratio: 0.9 });
+});
+
+test("a real core menu of more than 52 items letters every row by position and selects a partly visible row", async ({ page }) => {
+  const menu = await discoveryMenu();
+  const selectable = menu.items.filter((item) => item.identifier !== 0);
+  expect(selectable.length).toBeGreaterThan(52);
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto("/offline/");
+  const mount = (request: unknown) =>
+    page.evaluate(async (menuRequest) => {
+      const url = "/tests/e2e/menu-harness.tsx";
+      const { mountMenu } = await import(url);
+      mountMenu(menuRequest);
+    }, request);
+  await mount(menu);
+  const list = page.locator("#qa-menu .menu-items");
+  const rows = list.locator(".menu-item");
+  await expect(rows).toHaveCount(selectable.length);
+  const labels = await list.locator(".menu-item .inv-letter").allInnerTexts();
+  expect(labels.map((label) => label.trim())).toEqual(selectable.map((_, position) => letterAt(position)));
+  await expect(list.locator(".inv-letter")).toHaveCount(selectable.length);
+  await expect(list.locator(".menu-heading .inv-letter, .menu-line .inv-letter")).toHaveCount(0);
+
+  const partial = await list.evaluate((el) => {
+    const z = [...el.querySelectorAll<HTMLElement>(".menu-item")].find((row) => row.querySelector(".inv-letter")?.textContent === "z");
+    if (!z) return null;
+    const box = el.getBoundingClientRect();
+    const rect = z.getBoundingClientRect();
+    el.scrollTop = Math.max(0, rect.top - box.top + el.scrollTop - el.clientHeight + 12);
+    const after = z.getBoundingClientRect();
+    return {
+      label: z.querySelector(".inv-letter")?.textContent ?? "",
+      partial: after.top < box.bottom && after.bottom > box.bottom,
+      labels: [...el.querySelectorAll(".menu-item .inv-letter")].map((label) => label.textContent ?? "").join(""),
+    };
+  });
+  expect(partial).not.toBeNull();
+  expect(partial!.label).toBe("z");
+  expect(partial!.partial).toBe(true);
+  expect(partial!.labels).toBe(selectable.map((_, position) => letterAt(position)).join(""));
+  await page.keyboard.press("z");
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __qaSelection: unknown }).__qaSelection)).toEqual([
+    { identifier: selectable[25].identifier, count: -1 },
+  ]);
+  await expect(page.locator("#qa-menu")).toHaveCount(0);
+
+  // a repeats at 52; the partly visible copy must win, not the first one
+  await page.evaluate(() => { (window as unknown as { __qaSelection: unknown }).__qaSelection = null; });
+  await mount(menu);
+  const again = page.locator("#qa-menu .menu-items");
+  const repeated = await again.evaluate((el) => {
+    const rows = [...el.querySelectorAll<HTMLElement>(".menu-item")].filter((row) => row.querySelector(".inv-letter")?.textContent === "a");
+    const second = rows[1];
+    if (!second) return null;
+    const box = el.getBoundingClientRect();
+    const rect = second.getBoundingClientRect();
+    el.scrollTop = Math.max(0, rect.top - box.top + el.scrollTop - el.clientHeight + 12);
+    const after = second.getBoundingClientRect();
+    return { partial: after.top < box.bottom && after.bottom > box.bottom };
+  });
+  expect(repeated?.partial).toBe(true);
+  await page.keyboard.press("a");
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __qaSelection: unknown }).__qaSelection)).toEqual([
+    { identifier: selectable[52].identifier, count: -1 },
+  ]);
+  await expect(page.locator("#qa-menu")).toHaveCount(0);
+
+  // when neither copy of a repeated label is on screen, the key must not pick an invisible row
+  await page.evaluate(() => { (window as unknown as { __qaSelection: unknown }).__qaSelection = null; });
+  await mount(menu);
+  const away = page.locator("#qa-menu .menu-items");
+  const hiddenAt = await away.evaluate((el) => {
+    const rows = [...el.querySelectorAll<HTMLElement>(".menu-item")].filter((row) => row.querySelector(".inv-letter")?.textContent === "a");
+    for (let top = 40; top <= 400; top += 20) {
+      el.scrollTop = top;
+      const box = el.getBoundingClientRect();
+      const any = rows.some((row) => {
+        const rect = row.getBoundingClientRect();
+        return rect.bottom > box.top && rect.top < box.bottom;
+      });
+      if (!any) return top;
+    }
+    return null;
+  });
+  expect(hiddenAt).not.toBeNull();
+  await expect(page.locator("#qa-menu .menu-items")).toBeVisible();
+  await page.keyboard.press("a");
+  await expect(page.locator("#qa-menu .menu-items")).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __qaSelection: unknown }).__qaSelection)).toBeNull();
+});
+
+// The whole test is a HEAD-passing regression guard: its label/render checks and its one-page
+// page-key block both pass HEAD, because HEAD does nothing to a one-page menu.
+test("short, question and read-only menus keep their own letters and rendering", async ({ page }) => {
+  const short = await shortMenu();
+  const question = await tutorialMenu();
+  const readOnly = await readOnlyMenu();
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto("/offline/");
+  const mount = (request: unknown) =>
+    page.evaluate(async (menuRequest) => {
+      const url = "/tests/e2e/menu-harness.tsx";
+      const { mountMenu } = await import(url);
+      mountMenu(menuRequest);
+    }, request);
+
+  await mount(short);
+  const shortSelectable = short.items.filter((item) => item.identifier !== 0);
+  expect(shortSelectable.length).toBeLessThanOrEqual(52);
+  const shortLabels = await page.locator("#qa-menu .menu-item .inv-letter").allInnerTexts();
+  expect(shortLabels.map((label) => label.trim())).toEqual(shortSelectable.map((item) => item.accelerator));
+  const shortList = page.locator("#qa-menu .menu-items");
+  // HEAD already has no page handling and leaves this list at zero; this is a guard for one-page menus.
+  for (const key of ["<", ">", "^", "|"]) {
+    await page.keyboard.press(key);
+    await expect.poll(() => shortList.evaluate((el) => el.scrollTop)).toBe(0);
+  }
+  await expect(page.locator("#qa-menu .menu-item.highlighted")).toHaveCount(0);
+  await expect(page.locator("#qa-menu .menu-item.selected")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { __qaSelection: unknown }).__qaSelection)).toBeUndefined();
+  await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
+  await expect(page.locator("#qa-menu")).toHaveCount(0);
+
+  await mount(question);
+  await expect(page.locator("#qa-menu .question")).toBeVisible();
+  const answers = question.items.filter((item) => item.identifier !== 0);
+  expect(answers).toHaveLength(3);
+  expect(await page.locator("#qa-menu .answer .inv-letter").allInnerTexts()).toEqual(answers.map((item) => item.accelerator));
+  await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
+  await expect(page.locator("#qa-menu")).toHaveCount(0);
+
+  await mount(readOnly);
+  await expect(page.locator("#qa-menu .menu-items.readonly")).toBeVisible();
+  await expect(page.locator("#qa-menu .inv-letter")).toHaveCount(0);
+});
+
+// HEAD passes this in Chromium; it guards the no-highlight wheel path. The synthetic WebKit event
+// test below covers the Safari-specific failure.
+test("wheel scrolling an unhighlighted selectable menu creates no highlight", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 420 });
+  await startGame(page, `WheelNone${Date.now() % 100000}`);
+  await page.keyboard.press("Shift+O");
+  const list = page.getByRole("dialog").locator(".menu-items");
+  await expect(list.locator(".menu-item").first()).toBeVisible();
+  const heading = list.locator(".menu-heading").first();
+  await heading.hover();
+  await expect(list.locator(".menu-item.highlighted")).toHaveCount(0);
+  await page.mouse.wheel(0, 240);
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  await expect(list.locator(".menu-item.highlighted")).toHaveCount(0);
+});
+
+// HEAD passes this in Chromium too; it guards preserving a hover highlight while scrolling. Safari's
+// synthetic move is covered by the test below.
+test("wheel scrolling moves the menu without moving the hover highlight", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 420 });
+  await startGame(page, `Wheel${Date.now() % 100000}`);
+  await page.mouse.move(1, 1);
+  await page.keyboard.press("Shift+O");
+  const list = page.getByRole("dialog").locator(".menu-items");
+  const row = list.locator(".menu-item").nth(3);
+  await expect(row).toBeVisible();
+  await row.hover();
+  await expect(row).toHaveClass(/highlighted/);
+  const text = (await row.innerText()).replace(/\s+/g, "");
+  await page.mouse.wheel(0, 240);
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  expect(await list.locator(".menu-item.highlighted").innerText().then((shown) => shown.replace(/\s+/g, ""))).toBe(text);
+  await expect(list.locator(".menu-item.highlighted")).toHaveCount(1);
+  const scrolled = await list.evaluate((el) => el.scrollTop);
+  await page.mouse.wheel(0, 120);
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBeGreaterThan(scrolled);
+  await expect(list.locator(".menu-item.highlighted")).toHaveCount(1);
+});
+
+test("long read-only menus page with the page keys", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 420 });
+  await startGame(page, `Read${Date.now() % 100000}`);
+  const readOnly = await readOnlyMenu();
+  await page.goto("/offline/");
+  const mount = (request: unknown) =>
+    page.evaluate(async (menuRequest) => {
+      const url = "/tests/e2e/menu-harness.tsx";
+      const { mountMenu } = await import(url);
+      mountMenu(menuRequest);
+    }, request);
+  await mount(readOnly);
+  const list = page.locator("#qa-menu .menu-items");
+  await expect(list).toBeVisible();
+  await expect(list).toHaveClass(/readonly/);
+  expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  await page.mouse.move(1, 1);
+  const snapshot = () =>
+    list.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const sticky = [...el.querySelectorAll(".menu-heading")]
+        .filter((heading) => heading.getBoundingClientRect().top <= box.top + 1)
+        .at(-1);
+      const covered = sticky ? sticky.getBoundingClientRect().bottom : box.top;
+      return {
+        scrollTop: el.scrollTop,
+        bottom: box.bottom,
+        covered,
+        items: [...el.querySelectorAll(".menu-line")]
+          .map((line) => {
+            const rect = line.getBoundingClientRect();
+            const style = getComputedStyle(line);
+            return {
+              text: line.textContent ?? "",
+              top: rect.top + (parseFloat(style.paddingTop) || 0),
+              bottom: rect.bottom - (parseFloat(style.paddingBottom) || 0),
+            };
+          })
+          .filter((line) => line.top >= covered),
+      };
+    });
+  const first = await snapshot();
+  const cut = first.items.find((line) => line.bottom > first.bottom);
+  expect(cut).toBeTruthy();
+  await expect(list.locator(".highlighted")).toHaveCount(0);
+
+  // guard: wheel scrolling itself also leaves this list unhighlighted
+  const box = await list.boundingBox();
+  expect(box).toBeTruthy();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.wheel(0, 180);
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  await expect(list.locator(".highlighted")).toHaveCount(0);
+  await page.keyboard.press("^");
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBe(0);
+  await page.mouse.move(1, 1);
+
+  await page.keyboard.press(">");
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  const second = await snapshot();
+  expect(second.items[0]?.text).toBe(cut!.text);
+  expect(second.items[0]!.bottom).toBeLessThanOrEqual(second.bottom);
+  expect(second.items[0]!.top).toBeGreaterThanOrEqual(second.covered);
+  await expect(list.locator(".highlighted")).toHaveCount(0);
+
+  await page.keyboard.press("<");
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBe(0);
+  expect((await snapshot()).items[0]?.text).toBe(first.items[0]?.text);
+  await page.keyboard.press("|");
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  const end = await list.evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    const last = [...el.querySelectorAll<HTMLElement>(".menu-line")].at(-1);
+    const style = last ? getComputedStyle(last) : null;
+    return {
+      scrollTop: el.scrollTop,
+      max: el.scrollHeight - el.clientHeight,
+      gap: last && style ? box.bottom - (last.getBoundingClientRect().bottom - (parseFloat(style.paddingBottom) || 0)) : Infinity,
+    };
+  });
+  expect(end.scrollTop).toBe(end.max);
+  expect(end.gap).toBeLessThanOrEqual(4);
+  await page.keyboard.press("^");
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBe(0);
+  await expect(list.locator(".highlighted")).toHaveCount(0);
+});
+
+test("menu page keys move exactly one page and never add a highlight", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 420 });
+  await startGame(page, `Page${Date.now() % 100000}`);
+  await page.keyboard.press("Shift+O");
+  const list = page.getByRole("dialog").locator(".menu-items");
+  await expect(list.locator(".menu-item").first()).toBeVisible();
+  await page.mouse.move(1, 1);
+  type Page = {
+    scrollTop: number;
+    bottom: number;
+    covered: number;
+    items: { text: string; top: number; bottom: number }[];
+  };
+  const snapshot = (): Promise<Page> =>
+    list.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const sticky = [...el.querySelectorAll(".menu-heading")]
+        .filter((heading) => heading.getBoundingClientRect().top <= box.top + 1)
+        .at(-1);
+      const covered = sticky ? sticky.getBoundingClientRect().bottom : box.top;
+      return {
+        scrollTop: el.scrollTop,
+        bottom: box.bottom,
+        covered,
+        items: [...el.querySelectorAll(".menu-item")]
+          .map((row) => {
+            const rect = row.getBoundingClientRect();
+            const style = getComputedStyle(row);
+            return {
+              text: [...row.querySelectorAll(".menu-field, .menu-text")].map((field) => field.textContent ?? "").join(" ").trim(),
+              top: rect.top + (parseFloat(style.paddingTop) || 0),
+              bottom: rect.bottom - (parseFloat(style.paddingBottom) || 0),
+            };
+          })
+          .filter((row) => row.top >= covered),
+      };
+    });
+  const noHighlight = () => expect(list.locator(".menu-item.highlighted")).toHaveCount(0);
+  const noSelection = () => expect(list.locator(".menu-item.selected")).toHaveCount(0);
+  const atFinalPage = async () => {
+    const page = await list.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const last = [...el.querySelectorAll<HTMLElement>(".menu-item")].at(-1);
+      if (!last) return null;
+      const style = getComputedStyle(last);
+      return {
+        scrollTop: el.scrollTop,
+        max: el.scrollHeight - el.clientHeight,
+        bottomGap: box.bottom - (last.getBoundingClientRect().bottom - (parseFloat(style.paddingBottom) || 0)),
+      };
+    });
+    expect(page).not.toBeNull();
+    expect(page!.scrollTop).toBe(page!.max);
+    expect(page!.bottomGap).toBeGreaterThanOrEqual(-1);
+    // the final row's own padding can leave a couple of pixels; no blank page is acceptable
+    expect(page!.bottomGap).toBeLessThanOrEqual(4);
+  };
+  const atPageStart = (page: Page, cut: { text: string }) => {
+    expect(page.items[0]?.text).toBe(cut.text);
+    expect(page.items[0]!.bottom).toBeLessThanOrEqual(page.bottom);
+    expect(page.items[0]!.top).toBeGreaterThanOrEqual(page.covered);
+  };
+  const walk = async (firstPage: Page) => {
+    const pages = [firstPage];
+    const max = await list.evaluate((el) => el.scrollHeight - el.clientHeight);
+    let pageNow = firstPage;
+    for (let n = 0; n < 20; n++) {
+      const cut = pageNow.items.find((row) => row.bottom > pageNow.bottom);
+      if (!cut) break;
+      await page.keyboard.press(">");
+      const next = await snapshot();
+      expect(next.scrollTop).toBeGreaterThan(pageNow.scrollTop);
+      if (next.scrollTop >= max - 1) {
+        // a short final page is pulled up to the end so no blank space is left below it
+        expect(next.items[0]!.bottom).toBeLessThanOrEqual(next.bottom);
+        expect(next.items[0]!.top).toBeGreaterThanOrEqual(next.covered);
+        await atFinalPage();
+        pages.push(next);
+        break;
+      }
+      atPageStart(next, cut);
+      await noHighlight();
+      pages.push(next);
+      pageNow = next;
+    }
+    return pages;
+  };
+
+  const first = await snapshot();
+  const firstCut = first.items.find((row) => row.bottom > first.bottom);
+  expect(firstCut).toBeTruthy();
+  await noHighlight();
+  await page.keyboard.press("<");
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBe(0);
+
+  await page.keyboard.press(">");
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  const second = await snapshot();
+  atPageStart(second, firstCut!);
+  await noHighlight();
+
+  // every forward transition, including into the last page
+  const pages = [first, ...(await walk(second))];
+  let last = pages.at(-1)!;
+  await atFinalPage();
+  await page.keyboard.press(">");
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBe(last.scrollTop);
+  await noHighlight();
+
+  // every backward transition, all the way to the first page
+  for (let i = pages.length - 2; i >= 0; i--) {
+    await page.keyboard.press("<");
+    await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBe(pages[i].scrollTop);
+    expect((await snapshot()).items[0]?.text).toBe(pages[i].items[0]?.text);
+    await noHighlight();
+  }
+  await page.keyboard.press("<");
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBe(0);
+
+  await page.keyboard.press("^");
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBe(0);
+  await page.keyboard.press("|");
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBe(last.scrollTop);
+  expect((await snapshot()).items[0]?.text).toBe(last.items[0]?.text);
+  await noHighlight();
+  await noSelection();
+
+  // a resize invalidates the measured page stops; grow and shrink the viewport
+  for (const size of [{ width: 1200, height: 600 }, { width: 1000, height: 400 }]) {
+    await page.keyboard.press("^");
+    await page.setViewportSize(size);
+    await page.waitForTimeout(50);
+    const resizedFirst = await snapshot();
+    const cut = resizedFirst.items.find((row) => row.bottom > resizedFirst.bottom);
+    expect(cut, JSON.stringify(size)).toBeTruthy();
+    await page.keyboard.press(">");
+    const resizedNext = await snapshot();
+    expect(resizedNext.scrollTop).toBeGreaterThan(0);
+    atPageStart(resizedNext, cut!);
+    await noHighlight();
+  }
+
+  // a tall viewport leaves the last page short; it must start at its cut row too
+  await page.keyboard.press("^");
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.waitForTimeout(50);
+  const tallFirst = await snapshot();
+  const tallPages = [tallFirst, ...(await walk(tallFirst))];
+  expect(tallPages.length).toBeGreaterThan(1);
+  last = tallPages.at(-1)!;
+  await atFinalPage();
+  await page.keyboard.press("|");
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBe(last.scrollTop);
+  expect((await snapshot()).items[0]?.text).toBe(last.items[0]?.text);
+  for (let i = tallPages.length - 2; i >= 0; i--) {
+    await page.keyboard.press("<");
+    await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBe(tallPages[i].scrollTop);
+    expect((await snapshot()).items[0]?.text).toBe(tallPages[i].items[0]?.text);
+    await noHighlight();
+  }
+});
+
+test("a stationary pointer's synthetic mousemove never highlights a row", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 420 });
+  await startGame(page, `Synth${Date.now() % 100000}`);
+  await page.mouse.move(1, 1);
+  await page.keyboard.press("Shift+O");
+  const list = page.getByRole("dialog").locator(".menu-items");
+  const rows = list.locator(".menu-item");
+  const heading = list.locator(".menu-heading").first();
+  await expect(rows.first()).toBeVisible();
+  await heading.hover();
+  await expect(list.locator(".menu-item.highlighted")).toHaveCount(0);
+  const headingBox = await heading.boundingBox();
+  expect(headingBox).toBeTruthy();
+  const headingX = headingBox!.x + headingBox!.width / 2;
+  const headingY = headingBox!.y + headingBox!.height / 2;
+
+  // WebKit fires a mousemove with no movement when content scrolls under a stationary pointer.
+  // https://bugs.webkit.org/show_bug.cgi?id=320739 (Safari 26.5); Playwright's WebKit does not
+  // reproduce the synthetic event, so dispatch the event Safari sends. HEAD fails at this first
+  // dispatch, before any page-key behavior is involved.
+  await page.mouse.wheel(0, 240);
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  await rows.nth(2).dispatchEvent("mousemove", { bubbles: true, movementX: 0, movementY: 0, clientX: headingX, clientY: headingY });
+  await expect(list.locator(".menu-item.highlighted")).toHaveCount(0);
+
+  await rows.nth(3).hover();
+  await expect(rows.nth(3)).toHaveClass(/highlighted/);
+  const text = (await rows.nth(3).innerText()).replace(/\s+/g, "");
+  const stayed = await rows.nth(3).boundingBox();
+  await rows.nth(6).dispatchEvent("mousemove", {
+    bubbles: true,
+    movementX: 0,
+    movementY: 0,
+    clientX: stayed!.x + stayed!.width / 2,
+    clientY: stayed!.y + stayed!.height / 2,
+  });
+  expect(await list.locator(".menu-item.highlighted").innerText().then((shown) => shown.replace(/\s+/g, ""))).toBe(text);
+  await expect(list.locator(".menu-item.highlighted")).toHaveCount(1);
+
+  // the same thing with the pointer resting on a heading rather than a row
+  await heading.hover();
+  const beforeHeadingScroll = await list.evaluate((el) => el.scrollTop);
+  await page.mouse.wheel(0, 240);
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBeGreaterThan(beforeHeadingScroll);
+  await rows.nth(8).dispatchEvent("mousemove", { bubbles: true, movementX: 0, movementY: 0, clientX: headingX, clientY: headingY });
+  expect(await list.locator(".menu-item.highlighted").innerText().then((shown) => shown.replace(/\s+/g, ""))).toBe(text);
+  await expect(list.locator(".menu-item.highlighted")).toHaveCount(1);
+});
+
+test("page keys move the list and keep an existing highlight on its row", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 420 });
+  await startGame(page, `Keep${Date.now() % 100000}`);
+  await page.keyboard.press("Shift+O");
+  const list = page.getByRole("dialog").locator(".menu-items");
+  const row = list.locator(".menu-item").nth(2);
+  await expect(row).toBeVisible();
+  await row.hover();
+  await expect(row).toHaveClass(/highlighted/);
+  const text = (await row.innerText()).replace(/\s+/g, "");
+  const scrollTop = () => list.evaluate((el) => el.scrollTop);
+  const stillOn = async () => {
+    expect(await list.locator(".menu-item.highlighted").innerText().then((shown) => shown.replace(/\s+/g, ""))).toBe(text);
+    await expect(list.locator(".menu-item.highlighted")).toHaveCount(1);
+  };
+
+  await page.keyboard.press(">");
+  await expect.poll(scrollTop).toBeGreaterThan(0);
+  await stillOn();
+  await page.keyboard.press("<");
+  await expect.poll(scrollTop).toBe(0);
+  await stillOn();
+  await page.keyboard.press("|");
+  await expect.poll(scrollTop).toBeGreaterThan(0);
+  await stillOn();
+  await page.keyboard.press("^");
+  await expect.poll(scrollTop).toBe(0);
+  await stillOn();
 });
 
 test("a menu's heading stays at the top while its items scroll under it", async ({ page }) => {
