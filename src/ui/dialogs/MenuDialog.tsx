@@ -1,6 +1,8 @@
 import type { ComponentChildren } from "preact";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { MenuHow, MenuItem, MenuSelection } from "../../protocol";
+import { positionalLetters } from "../../port/letters";
+import { scrollPoints, type MenuPoint } from "../../port/pages";
 import { isHeading, isQuestion, splitFields } from "../../port/question";
 import { sortedOrder } from "../../port/sort";
 import { listsStack } from "../../port/stack";
@@ -15,6 +17,9 @@ const ATR_BOLD = 1;
 const ATR_INVERSE = 7;
 const MAX_COUNT = 0x7fffffff;
 const SCROLL_KEYS = { ArrowUp: 1, ArrowDown: 1, PageUp: 1, PageDown: 1, Home: 1, End: 1 };
+const PAGE_KEYS = { "<": "prev", ">": "next", "^": "first", "|": "last" } as const;
+// how long after a scroll a zero-movement mousemove is still Safari's synthetic one
+const SCROLL_HUSH = 250;
 
 /** A heading's inverse (menu_headings' default) is drawn as a strong heading instead. */
 export function headingStyle(item: MenuItem): Record<string, string> {
@@ -43,6 +48,11 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
   const [, rerender] = useState(0);
   const [sorted, setSorted] = useState(false);
   const order = sorted ? sortedOrder(items) : items.map((_, i) => i);
+  // a menu too long for the core to letter gets a fixed letter by position, shown or not
+  const selectable = order.filter((i) => items[i].identifier !== 0);
+  const positional = how !== "none" && selectable.length > 52;
+  const labels = positionalLetters(items, order, how);
+  const label = (i: number) => labels.get(i) ?? "";
   // only lists of things are worth sorting
   const sortable = how !== "none" && items.some((item) => item.tile >= 0);
   const update = () => rerender((n) => n + 1);
@@ -84,6 +94,27 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
 
   // a read-only list is read like a text view: selected, copied and scrolled by key
   const list = useRef<HTMLDivElement>(null);
+  const pages = useRef<MenuPoint[]>([]);
+  const scrolledAt = useRef(0);
+  const pointerAt = useRef<{ x: number; y: number } | null>(null);
+  const pointerBefore = useRef<{ x: number; y: number } | null>(null);
+  const markScroll = () => {
+    scrolledAt.current = performance.now();
+  };
+  const pageAt = (el: HTMLElement) => {
+    let at = 0;
+    for (let i = 0; i < pages.current.length; i++) if (pages.current[i].top <= el.scrollTop + 1) at = i;
+    return at;
+  };
+  const snapPage = (where: "prev" | "next" | "first" | "last") => {
+    const el = list.current;
+    if (!el || !pages.current.length) return;
+    const at = where === "first" ? 0 : where === "last" ? pages.current.length - 1
+      : Math.max(0, Math.min(pages.current.length - 1, pageAt(el) + (where === "next" ? 1 : -1)));
+    // whole pixels, rounded down, so sub-pixel layout cannot tuck the first row under the heading
+    el.scrollTop = Math.floor(pages.current[at].top);
+    markScroll();
+  };
   const selectList = () => {
     if (!list.current) return;
     const range = document.createRange();
@@ -97,6 +128,7 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     const page = el.clientHeight * 0.9;
     const by: Record<string, number> = { ArrowUp: -20, ArrowDown: 20, PageUp: -page, PageDown: page, Home: -el.scrollHeight, End: el.scrollHeight };
     el.scrollTop += by[key];
+    markScroll();
   };
   // copied as Cocoa's text view holds it: a letter, a tab and the item, columns tab-separated
   const copyList = (e: ClipboardEvent) => {
@@ -105,7 +137,7 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     const lines = [...list.current.children].flatMap((row, n) => {
       if (!selection.containsNode(row, true)) return [];
       const item = items[order[n]];
-      return [item.identifier === 0 ? item.text : `${item.accelerator}\t${item.text}`];
+      return [item.identifier === 0 ? item.text : `${label(order[n])}\t${item.text}`];
     });
     if (!lines.length) return;
     e.preventDefault();
@@ -137,6 +169,50 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     if (highlight.current !== null) reveal(highlight.current);
   }, [sorted]);
 
+  // Track the pointer over the whole list, including headings and padding, so a scroll under a
+  // still pointer is not mistaken for a move onto a row.
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (!el || how !== "one") return;
+    const track = (e: MouseEvent) => {
+      pointerBefore.current = pointerAt.current;
+      pointerAt.current = { x: e.clientX, y: e.clientY };
+    };
+    el.addEventListener("mousemove", track, true);
+    return () => el.removeEventListener("mousemove", track, true);
+  }, [how]);
+
+  // Measure each row's content once per layout; the page keys then only move by whole pages.
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (!el) return;
+    const measure = () => {
+      const box = el.getBoundingClientRect();
+      const rows = [...el.children].map((child, n) => {
+        const rect = child.getBoundingClientRect();
+        const style = getComputedStyle(child);
+        const top = rect.top - box.top + el.scrollTop;
+        return {
+          height: rect.height,
+          selectable: items[order[n]]?.identifier !== 0,
+          heading: child.classList.contains("menu-heading"),
+          contentTop: top + (parseFloat(style.paddingTop) || 0),
+          contentBottom: top + rect.height - (parseFloat(style.paddingBottom) || 0),
+        };
+      });
+      // A page that would leave less than a viewport below is pulled to the end instead: the last
+      // item ends at the bottom, rather than leaving blank space under a short final page.
+      const max = Math.max(0, el.scrollHeight - el.clientHeight);
+      pages.current = scrollPoints(rows, el.clientHeight, how !== "none")
+        .map((point) => ({ ...point, top: Math.min(point.top, max) }))
+        .filter((point, i, all) => i === 0 || point.top > all[i - 1].top);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [items, sorted]);
+
   // layout effect: listen before the dialog is painted, or a fast key press is lost
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -144,6 +220,7 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
       if (how === "none" && (e.metaKey || e.ctrlKey) && e.key === "c") return;
       e.preventDefault();
       if (how === "none" && (e.metaKey || e.ctrlKey) && e.key === "a") return selectList();
+      if (e.key in PAGE_KEYS) return snapPage(PAGE_KEYS[e.key as keyof typeof PAGE_KEYS]);
       if (how === "none" && e.key in SCROLL_KEYS) return scrollList(e.key);
       if (e.key === "Escape") return onDone(null);
       // not keys typed before the menu opened, replayed into it: they can't have meant a row they hadn't seen
@@ -157,8 +234,22 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
         return finish(selected.current);
       }
       if (how === "none") return;
-      const letters = items.flatMap((item, i) => (item.identifier !== 0 && item.accelerator === e.key ? [i] : []));
+      const letters = items.flatMap((item, i) => (item.identifier !== 0 && label(i) === e.key ? [i] : []));
       const group = items.flatMap((item, i) => (item.identifier !== 0 && item.groupAccelerator === e.key ? [i] : []));
+      if (positional && letters.length > 1 && list.current) {
+        // the same letter repeats every 52 rows; take the copy the player can actually see
+        const box = list.current.getBoundingClientRect();
+        const sticky = [...list.current.querySelectorAll<HTMLElement>(".menu-heading")]
+          .filter((heading) => heading.getBoundingClientRect().top <= box.top + 1)
+          .at(-1);
+        const covered = sticky ? sticky.getBoundingClientRect().bottom : box.top;
+        const shown = letters.find((i) => {
+          const rect = list.current?.children[order.indexOf(i)]?.getBoundingClientRect();
+          return rect && rect.bottom > covered && rect.top < box.bottom;
+        });
+        if (!shown) return;
+        letters.splice(0, letters.length, shown);
+      }
       // a digit is a group's symbol, such as 0 for iron balls, only before a count is started, as in tty
       const digit = e.key >= "0" && e.key <= "9" && !(count.current === 0 && group.length);
       if (!letters.length && digit) {
@@ -205,7 +296,7 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
   // a tile or letter column only if some item has one
   const icon = tileBox(sheet, ICON, ICON);
   const hasTiles = items.some((item) => item.identifier !== 0 && item.tile >= 0);
-  const hasLetters = items.some((item) => item.identifier !== 0 && item.accelerator.trim() !== "");
+  const hasLetters = items.some((item, i) => item.identifier !== 0 && label(i) !== "");
   const lead = [how === "any" && CHECK, hasTiles && icon.width, hasLetters && LETTER].filter((w): w is number => !!w);
   const grid = {
     // auto, as a subgrid row's padding goes into its edge tracks
@@ -293,6 +384,8 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
         <div
           ref={list}
           onCopy={how === "none" ? copyList : undefined}
+          onScroll={markScroll}
+          onWheel={markScroll}
           onMouseLeave={how === "one" ? () => setHighlight(null) : undefined}
           class={`menu-items${columns > 1 ? " tabbed" : ""}${how === "none" ? " readonly" : ""}${how === "any" ? " pick-any" : ""}`}
           style={columns > 1 ? grid : undefined}
@@ -311,7 +404,15 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
                         choose(i);
                       }
                 }
-                onMouseMove={how === "one" ? () => setHighlight(i) : undefined}
+                onMouseMove={how === "one" ? (e) => {
+                  // WebKit sends a mousemove with no movement just after scrolling when the row
+                  // moves under a still pointer; that is not the player pointing at a new row.
+                  const samePlace = pointerBefore.current?.x === e.clientX && pointerBefore.current?.y === e.clientY;
+                  const first = pointerBefore.current === null;
+                  if (!e.movementX && !e.movementY && (samePlace || (first && performance.now() - scrolledAt.current < SCROLL_HUSH)))
+                    return;
+                  setHighlight(i);
+                } : undefined}
                 role={how === "any" ? "menuitemcheckbox" : undefined}
                 aria-checked={how === "any" ? selected.current.has(i) : undefined}
               >
@@ -322,7 +423,7 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
                     style={{ width: `${icon.width}px`, height: `${icon.height}px`, ...tileStyle(sheet, item.tile, icon.width, icon.height) }}
                   />
                 ) : null}
-                {hasLetters ? <span class="inv-letter">{item.accelerator}</span> : null}
+                {hasLetters ? <span class="inv-letter">{label(i)}</span> : null}
                 {columns > 1 ? (
                   fields(item, textStyle(item.color, item.attr), taken(i))
                 ) : (
