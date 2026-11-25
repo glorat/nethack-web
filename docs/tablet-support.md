@@ -69,5 +69,5 @@ In landscape every iPad is at least 1133px wide, so it gets the desktop layout, 
 
 ## Not supported
 
-- **Phones, and portrait on a tablet.** Below 900px the inventory sidebar is hidden, and the map sits in a corner.
+- **Phones, and portrait on a tablet.** Below 900px the inventory sidebar is hidden, and the map sits in a corner. The homes say so before a game (`docs/design-system.md`, Layout).
 - **Map tooltips by touch.**

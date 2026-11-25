@@ -19,6 +19,7 @@ import { AboutDialog } from "./dialogs/AboutDialog";
 import { GameSettingsDialog } from "./dialogs/GameSettingsDialog";
 import { Scene } from "./landing/Scene";
 import { PITCH } from "../port/pitch";
+import { PLAY_ANYWAY_KEY, screenAdvice } from "../port/screen-fit";
 import { cookie, omens, rumors } from "../port/omens";
 import RUMORS from "../../nethack/dat/rumors.tru?raw";
 import "@fontsource/vt323/latin-400.css";
@@ -52,6 +53,8 @@ export function Landing() {
   const [deletions, setDeletions] = useState(0);
   const [about, setAbout] = useState(false);
   const [choosingOnline, setChoosingOnline] = useState(false);
+  const advice = useScreenAdvice();
+  const [playAnyway, setPlayAnyway] = useState(() => localStorage.getItem(PLAY_ANYWAY_KEY) === "1");
   const returning = RETURNING;
   const [refused] = useState(() => online && new URLSearchParams(location.search).has("refused"));
   const [inProgress, setInProgress] = useState<GameSummary[]>([]);
@@ -279,7 +282,15 @@ export function Landing() {
                 {gameToContinue ? "" : `${PITCH} `}
                 {online ? `Finished games go on the public high scores.${profile?.signedIn ? "" : " Sign in, and your games follow you to any device."}` : "Your games stay in this browser, seen by no one else, and aren't backed up."}
               </p>
-              {choosingOnline ? (
+              {advice !== "none" && !playAnyway && !choosingOnline ? (
+                <SmallScreen
+                  advice={advice}
+                  onPlayAnyway={() => {
+                    localStorage.setItem(PLAY_ANYWAY_KEY, "1");
+                    setPlayAnyway(true);
+                  }}
+                />
+              ) : choosingOnline ? (
                 <OnlineChoice name={playerName(name)} onBack={backFromOnline} />
               ) : (
                 <>
@@ -440,6 +451,49 @@ export function Landing() {
 }
 
 /** A label whose first letter is its key on this page, as the game's menus mark theirs, and words only a screen reader needs. */
+/** Whether this screen is too narrow for a game, and what would fit, kept up to date as a tablet turns. */
+function useScreenAdvice() {
+  const read = () => screenAdvice(innerWidth, Math.max(screen.width, screen.height), matchMedia("(pointer: coarse)").matches);
+  const [advice, setAdvice] = useState(read);
+  useEffect(() => {
+    const changed = () => setAdvice(read());
+    addEventListener("resize", changed);
+    return () => removeEventListener("resize", changed);
+  }, []);
+  return advice;
+}
+
+function SmallScreen({ advice, onPlayAnyway }: { advice: "turn" | "bigger"; onPlayAnyway: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const sendLink = async () => {
+    const url = `${location.origin}${location.pathname}`;
+    if (navigator.share) {
+      // cancelling the share sheet rejects, and needs no answer
+      await navigator.share({ title: "nethack.app", url }).catch(() => undefined);
+      return;
+    }
+    await navigator.clipboard.writeText(url).then(() => setCopied(true), () => undefined);
+  };
+  return (
+    <>
+      <p class="start-advice">{advice === "turn" ? "Turn your tablet sideways to play." : "NetHack needs a bigger screen. Play on a computer, or on a tablet held sideways."}</p>
+      {advice === "bigger" ? (
+        <div class="start-buttons">
+          <button type="button" class="primary" onClick={() => void sendLink()}>
+            Send Me the Link
+          </button>
+        </div>
+      ) : null}
+      {copied ? <p class="start-sub" role="status">Link copied.</p> : null}
+      <div class="start-links">
+        <button type="button" onClick={onPlayAnyway}>
+          Play Anyway
+        </button>
+      </div>
+    </>
+  );
+}
+
 function Keyed({ label, hidden }: { label: string; hidden?: string }) {
   return (
     <>

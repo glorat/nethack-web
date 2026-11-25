@@ -475,6 +475,7 @@ details.frame:not([open]) { padding-bottom: 6px; }
 .start-card { display: flex; flex-direction: column; gap: 12px; overflow-wrap: anywhere; }
 .start-card h1 { margin: 0; font: 400 38px/1.05 var(--display); color: var(--bright); }
 .start-sub { margin: 0; color: var(--muted); font-size: 12.5px; }
+.start-advice { margin: 0; color: var(--bright); }
 .start-card label { color: var(--muted); font-size: 12.5px; }
 .start-buttons { display: flex; flex-wrap: wrap; gap: 12px; }
 .landing button.primary { padding: 8px 22px; font-weight: 600; }
