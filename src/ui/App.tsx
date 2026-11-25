@@ -9,6 +9,7 @@ import { applyEvents, initialState, nextBatch } from "../port/state";
 import { biggerTextSize, DEFAULT_TEXT_SIZE, nearestTextSize, smallerTextSize, textSizeFromOptions } from "../port/textsize";
 import type { Answer, GameRequest, ReplayProgress, ShadowStatus } from "../protocol";
 import { buildDebugPackage, debugPackageName, namedBones } from "../port/debug-package";
+import { isHighScoreList } from "../port/high-score-list";
 import { homeAddress, keepLastMode, placeOf, playAddress } from "../port/modes";
 import { lastGame } from "../offline/last-game";
 import { offlineMode } from "../offline/ui/mode";
@@ -81,6 +82,8 @@ const TEXT_SIZE_KEY = "nethack.textSize";
 const PLACE = placeOf(location.pathname) ?? { mode: "offline", page: "play" };
 const LANDING_PATH = homeAddress(PLACE.mode);
 keepLastMode(PLACE.mode);
+// online, the core's list holds only this browser's games, while the site's high scores hold everyone's
+const unshown = (request: GameRequest) => PLACE.mode === "online" && request.kind === "text" && isHighScoreList(request.lines);
 // with Cmd or Ctrl and Option, as Cocoa's View menu has them; 0 is back to the default
 const TEXT_SIZE_KEYS: Record<string, (size: number) => number> = {
   Equal: biggerTextSize,
@@ -464,6 +467,7 @@ export function App({ handedOver, onReplay }: Props) {
           waitForKey(false);
           setInventoryKey(0);
           setCommandKey(0);
+          if (unshown(request)) return client.answer(id, { kind: "text" });
           // an arrow held as a dialog opens is its first key, as it was before chords
           typeAhead.current.push(...chords.current.up());
           if (command && request.kind === "ext_cmd")
@@ -490,7 +494,7 @@ export function App({ handedOver, onReplay }: Props) {
         replay: (message) => {
           if (message.type === "replay_prompt") {
             const r = message.request;
-            show(r && r.kind !== "key" && r.kind !== "poskey" ? { id: 0, request: r } : null);
+            show(r && r.kind !== "key" && r.kind !== "poskey" && !unshown(r) ? { id: 0, request: r } : null);
           }
           else if (message.type === "replay_state") setState(message.state);
           else setReplayProgress(message.progress);
