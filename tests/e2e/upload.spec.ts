@@ -1174,3 +1174,28 @@ test("the landing page shows the player's latest achievements once they've earne
   await expect(dialog).toBeHidden();
   await expect(all).toBeFocused();
 });
+
+test("the core's own high-score list isn't shown online, and the game still scores", async ({ page }) => {
+  await online(page);
+  await untilPlaying(page, `Hs${Date.now() % 100000}`);
+  await pass(page, 3);
+  await page.keyboard.press("#");
+  await page.keyboard.type("quit");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("y");
+  const dialog = page.getByRole("dialog");
+  const over = page.getByRole("dialog", { name: "The game is over" });
+  const seen: string[] = [];
+  for (;;) {
+    await dialog.first().waitFor();
+    if (await over.isVisible()) break;
+    const shown = await dialog.innerText();
+    seen.push(shown);
+    await page.keyboard.press("n");
+    await page.waitForFunction((shown) => document.querySelector<HTMLElement>('[role="dialog"]')?.innerText !== shown, shown, { polling: "raf" });
+  }
+  expect(seen.some((s) => /You quit in/.test(s))).toBe(true);
+  expect(seen.some((s) => /Points +Name/.test(s))).toBe(false);
+  // the server's replay reaches the end, so the list was answered in the recording
+  await expect(over.getByRole("link", { name: "See your game's page" })).toBeVisible({ timeout: 60_000 });
+});

@@ -2349,3 +2349,24 @@ test("the game worker gives a bot driving the page #terrain's known map", async 
   // the page carries on playing
   await expect(page.locator(".app[data-commanding]")).toBeAttached();
 });
+
+test("offline, the core's own high-score list still shows at the end", async ({ page }) => {
+  await startGame(page, `Hs${Date.now() % 100000}`);
+  await page.keyboard.press("#");
+  await page.keyboard.type("quit");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("y");
+  const dialog = page.getByRole("dialog");
+  const over = page.getByRole("dialog", { name: "The game is over" });
+  const seen: string[] = [];
+  for (;;) {
+    await dialog.first().waitFor();
+    if (await over.isVisible()) break;
+    const shown = await dialog.innerText();
+    seen.push(shown);
+    // Escape at the first question would skip everything after it, the list included
+    await page.keyboard.press(/really quit/i.test(shown) ? "y" : /\bNo\b/.test(shown) ? "n" : "Escape");
+    await page.waitForFunction((shown) => document.querySelector<HTMLElement>('[role="dialog"]')?.innerText !== shown, shown, { polling: "raf" });
+  }
+  expect(seen.some((s) => /Points +Name/.test(s))).toBe(true);
+});
