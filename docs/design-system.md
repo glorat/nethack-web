@@ -70,7 +70,7 @@ The game uses the system font, as Cocoa does, and keeps its own monospace for ke
 - Two columns: Play and the player's own frames on the left, and the room with its messages and status lines on the right. Online, the high scores go under the room, and your finished games go across both columns below them, as a row needs the width for its death and its actions.
 - An iPad in landscape keeps both columns.
 - Below 900px the columns stack in this order: Play, the room, then the rest.
-- Phones get no special handling.
+- On a touch screen 900px wide or less, the Play frame asks for a bigger screen in place of Play: a tablet to be turned sideways, a phone to be swapped for a computer or tablet, with Send Me the Link. Play Anyway lets the player past, and is remembered (`src/port/screen-fit.ts`).
 
 ## Voice
 

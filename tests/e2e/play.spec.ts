@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { PLAY_ANYWAY_KEY } from "../../src/port/screen-fit";
 import { sortKey } from "../../src/port/sort";
 import { clipAround } from "../../src/ui/scroll";
 import { TOOLTIP_DELAY } from "../../src/ui/tooltip";
@@ -467,6 +468,7 @@ test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
   test("a long message log scrolls rather than pushing the map off the screen", async ({ page }) => {
+    await page.addInitScript((key) => localStorage.setItem(key, "1"), PLAY_ANYWAY_KEY);
     await startGame(page, `Phone${Date.now() % 100000}`);
     const mapHeight = async () => (await page.locator(".map-pane").boundingBox())!.height;
     const look = async (times: number) => {
@@ -481,6 +483,18 @@ test.describe("on a phone", () => {
     expect(await mapHeight()).toBe(before);
     const messages = page.locator(".messages");
     expect(await messages.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop)).toBeLessThanOrEqual(1);
+  });
+
+  test("the home asks for a bigger screen in place of Play, offers the link, and Play Anyway is remembered", async ({ page }) => {
+    await page.goto("/offline/");
+    await expect(page.getByText("NetHack needs a bigger screen.")).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Play Offline/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Send Me the Link" })).toBeVisible();
+    await page.getByRole("button", { name: "Play Anyway" }).click();
+    await expect(page.getByRole("button", { name: /^Play Offline/ })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("button", { name: /^Play Offline/ })).toBeVisible();
+    await expect(page.getByText("NetHack needs a bigger screen.")).toHaveCount(0);
   });
 });
 
@@ -2369,4 +2383,23 @@ test("offline, the core's own high-score list still shows at the end", async ({ 
     await page.waitForFunction((shown) => document.querySelector<HTMLElement>('[role="dialog"]')?.innerText !== shown, shown, { polling: "raf" });
   }
   expect(seen.some((s) => /Points +Name/.test(s))).toBe(true);
+});
+
+test.describe("on a tablet held upright", () => {
+  test.use({ viewport: { width: 820, height: 1180 }, screen: { width: 820, height: 1180 }, hasTouch: true, isMobile: true });
+
+  test("the home asks for it to be turned, and offers Play once it is", async ({ page }) => {
+    await page.goto("/offline/");
+    await expect(page.getByText("Turn your tablet sideways to play.")).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Play Offline/ })).toHaveCount(0);
+    await page.setViewportSize({ width: 1180, height: 820 });
+    await expect(page.getByRole("button", { name: /^Play Offline/ })).toBeVisible();
+    await expect(page.getByText("Turn your tablet sideways to play.")).toHaveCount(0);
+  });
+});
+
+test("a narrow desktop window still offers Play", async ({ page }) => {
+  await page.setViewportSize({ width: 700, height: 900 });
+  await page.goto("/offline/");
+  await expect(page.getByRole("button", { name: /^Play Offline/ })).toBeVisible();
 });
