@@ -450,7 +450,6 @@ export function Landing() {
   );
 }
 
-/** A label whose first letter is its key on this page, as the game's menus mark theirs, and words only a screen reader needs. */
 /** Whether this screen is too narrow for a game, and what would fit, kept up to date as a tablet turns. */
 function useScreenAdvice() {
   const read = () => screenAdvice(innerWidth, Math.max(screen.width, screen.height), matchMedia("(pointer: coarse)").matches);
@@ -494,6 +493,7 @@ function SmallScreen({ advice, onPlayAnyway }: { advice: "turn" | "bigger"; onPl
   );
 }
 
+/** A label whose first letter is its key on this page, as the game's menus mark theirs, and words only a screen reader needs. */
 function Keyed({ label, hidden }: { label: string; hidden?: string }) {
   return (
     <>
