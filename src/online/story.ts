@@ -45,6 +45,12 @@ export async function loadChapters(game: string): Promise<Chapter[]> {
   return chaptersOf(chronicle);
 }
 
+/** Starts the server's public data while a player is at the questions after their death, so their game's page doesn't wait for it. */
+export function warmUpGamePage(game: string): Promise<unknown> {
+  // not scored yet, so it's "not found", which no cache keeps and so reaches the server
+  return fetch(`/v1/games/${encodeURIComponent(game)}.json`);
+}
+
 /** Where an address asks the replay to start, by recording line or by turn, and whether to play on from there. */
 export function startingPoint(search: string): ({ line: number } | { turn: number }) & { play: boolean } | null {
   const params = new URLSearchParams(search);

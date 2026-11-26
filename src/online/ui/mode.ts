@@ -8,6 +8,7 @@ import { homeAddress } from "../../port/modes";
 import { gameWatchAddress } from "../results";
 import type { OnlineSession } from "../session";
 import type { LogUploader, UploadNotice } from "../upload";
+import { warmUpGamePage } from "../story";
 import { chosenZone } from "../zones";
 
 /** How long Save & Quit waits for the save to reach the server, as a player offline can't be kept here. */
@@ -98,6 +99,7 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
           if (e.over && uploader && !warmedUp) {
             warmedUp = true;
             warmUpScoring().catch((err) => console.warn("couldn't warm up scoring", err));
+            if (gameId) warmUpGamePage(gameId).catch((err) => console.warn("couldn't warm up the game's page", err));
           }
         }
         if (e.type === "scores" && e.last) ownPoints = pointsIn(e.last);
