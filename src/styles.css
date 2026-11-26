@@ -375,17 +375,19 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 .player-dialog { width: min(720px, 92vw); }
 /* the lists stay side by side, and scroll with the text when it wraps below them on a small screen */
 .player-lists { display: flex; flex-wrap: wrap; gap: 10px; min-height: 0; overflow-y: auto; container-type: inline-size; padding: 4px; margin: -4px; }
-.player-list { flex: 1 1 0; min-width: 140px; display: flex; flex-direction: column; overflow-y: auto; max-height: 52vh; border: 1px solid var(--border); border-radius: 6px; }
+.player-column { flex: 1 1 0; min-width: 140px; display: flex; flex-direction: column; gap: 4px; }
+.player-list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 6px; }
 /* Archeologist needs the room; at 390px the two 180+140 columns still fit side by side */
-.player-list[aria-label="Role"] { min-width: 180px; }
+.player-column.role { min-width: 180px; }
+.player-heading, .player-choice-label { color: var(--muted); }
+.player-choice-label { width: 100px; }
+.player-dialog kbd { font-family: var(--mono); font-size: 11px; padding: 0 4px; border: 1px solid var(--border-hover); border-radius: 3px; }
+.dialog-buttons .player-quit { margin-right: auto; }
 .player-list.active, .player-choice.active { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* the active box's ring is the picker's focus indicator, so options draw no second ring */
 .player-list .player-item:focus-visible,
 .player-choice button:focus-visible { outline: none; }
 .player-key { flex: none; min-width: 12px; font-family: var(--mono); color: var(--muted); text-align: center; }
-.player-actions { display: flex; flex-wrap: wrap; gap: 4px; }
-.player-action { min-height: 24px; padding: 1px 5px; font-size: 11px; background: none; }
-.player-action kbd { font-family: var(--mono); color: var(--muted); margin-right: 3px; }
 .player-dialog .primary .player-key { color: inherit; }
 .player-item {
   display: flex; align-items: center; gap: 8px; width: 100%;
@@ -394,7 +396,7 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
 .player-item:hover:not(:disabled) { background: var(--hover); }
 .player-item.selected, .player-item.selected:hover { background: var(--selected); }
 .player-item:disabled { opacity: 0.35; }
-.player-about { flex: 1 1 240px; max-height: 52vh; overflow-y: auto; color: var(--muted); line-height: 1.45; }
+.player-about { flex: 1 1 240px; color: var(--muted); line-height: 1.45; }
 .player-about p { margin: 0 0 10px; }
 .player-portrait { display: block; width: 96px; height: 96px; margin-bottom: 8px; background-repeat: no-repeat; }
 /* where the text has wrapped below the lists, the portrait would only push the buttons down */
@@ -404,18 +406,19 @@ input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
   /* 13 roles at 32px each fit the phone's list; the icons already carry the row */
   .player-item { padding-top: 0; padding-bottom: 0; }
 }
+.player-icon { width: 32px; height: 32px; flex: none; background-repeat: no-repeat; }
+.player-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; border-radius: 6px; align-self: flex-start; }
+.player-choice button, .dialog-buttons button { white-space: nowrap; }
+.player-choice button.selected { background: var(--selected); border-color: var(--accent); }
+.player-choice button:disabled { opacity: 0.35; }
 @media (max-width: 520px) {
   .player-choice { gap: 4px; }
   .player-choice-label { width: 70px; }
+  /* a phone has no keyboard, and "Alignment [" would push Chaotic onto its own line */
+  .player-heading kbd, .player-choice-label kbd { display: none; }
   /* 170px still fits Archeologist, and keeps the race list beside it at 390px */
-  .player-list[aria-label="Role"] { min-width: 170px; }
+  .player-column.role { min-width: 170px; }
 }
-.player-icon { width: 32px; height: 32px; flex: none; background-repeat: no-repeat; }
-.player-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; border-radius: 6px; align-self: flex-start; }
-.player-choice button, .player-action, .dialog-buttons button { white-space: nowrap; }
-.player-choice-label { width: 80px; color: var(--muted); }
-.player-choice button.selected { background: var(--selected); border-color: var(--accent); }
-.player-choice button:disabled { opacity: 0.35; }
 
 /* landing page: its own darker dungeon, labelled frames, and the terminal faces */
 .landing {
