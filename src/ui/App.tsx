@@ -243,6 +243,8 @@ export function App({ handedOver, onReplay }: Props) {
   const [scoring, setScoring] = useState<{ startedAt: number; expectedMs: number; preview?: number; score: FinishedScore | null } | null>(null);
   // a developer's option: a second core follows the game by its recording, to catch one that would replay differently
   const shadow = useRef<ShadowClient | null>(null);
+  /** The player has gone on from the end of the game, to replay it here. */
+  const replayingEnd = useRef(false);
   const shadowRecording = useRef("");
   const [shadowStatus, setShadowStatus] = useState<ShadowStatus | null>(null);
   const [shadowing] = useState(() => !replay && shadowWanted());
@@ -425,7 +427,13 @@ export function App({ handedOver, onReplay }: Props) {
               const pending = replay ? null : mode?.score?.();
               if (pending) {
                 setScoring({ startedAt: Date.now(), expectedMs: pending.expectedMs, ...(pending.preview === undefined ? {} : { preview: pending.preview }), score: null });
-                void pending.score.then((score) => setScoring((s) => s && { ...s, score }));
+                void pending.score.then(async (score) => {
+                  setScoring((s) => s && { ...s, score });
+                  // a scored game's own page is where it ends, unless the player is already watching it here
+                  if (score.kind !== "scored" || replayingEnd.current) return;
+                  await mode?.leaving();
+                  if (!replayingEnd.current) location.assign(score.address);
+                });
               }
             }
             if (e.type === "recorded_before") {
@@ -510,6 +518,7 @@ export function App({ handedOver, onReplay }: Props) {
     [],
   );
   const replayHere = (text: string) => {
+    replayingEnd.current = true;
     // what leaving the page would have done, and what it still has to do once the replay's page goes
     mode?.closing();
     window.addEventListener("pagehide", () => mode?.closing());

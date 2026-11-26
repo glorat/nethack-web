@@ -8,6 +8,7 @@ import { homeAddress } from "../../port/modes";
 import { type GameResult, gameWatchAddress } from "../results";
 import type { OnlineSession } from "../session";
 import type { LogUploader, UploadNotice } from "../upload";
+import { JUST_FINISHED, type JustFinished } from "../share";
 import { warmUpGamePage } from "../story";
 import { chosenZone } from "../zones";
 
@@ -143,7 +144,14 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
           }),
           loadProfile().catch((e) => console.warn("couldn't read the profile", e)),
         ]);
-        return scored.kind === "scored" && profile && !profile.signedIn ? { ...scored, signIn: `${homeAddress("online")}?signin` } : scored;
+        const done = scored.kind === "scored" && profile && !profile.signedIn ? { ...scored, signIn: `${homeAddress("online")}?signin` } : scored;
+        if (done.kind === "scored") {
+          const finished: JustFinished = { game: id, again: location.pathname + location.search, ...(done.signIn ? { signIn: done.signIn } : {}) };
+          try {
+            sessionStorage.setItem(JUST_FINISHED, JSON.stringify(finished));
+          } catch {}
+        }
+        return done;
       })();
       return { expectedMs, ...(ownPoints === undefined ? {} : { preview: ownPoints }), score };
     },

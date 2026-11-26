@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page, type Route, test } from "@playwright/test";
 import { rebuildRecording } from "../rebuild-recording";
 
 const FIRESTORE = "http://127.0.0.1:8299";
@@ -50,16 +50,32 @@ async function pass(page: Page, turns: number) {
 }
 
 async function quit(page: Page): Promise<string> {
-  const over = await endGame(page);
+  const { over, release } = await endGame(page);
   // the recording comes from the game's end, with what's still to send carrying on behind its replay
   await over.getByRole("button", { name: "Replay" }).click();
   const bar = page.getByRole("toolbar", { name: "Replay" });
   const [download] = await Promise.all([page.waitForEvent("download"), bar.getByRole("button", { name: "Download" }).click()]);
+  // a score that comes once the player is watching leaves them there
+  await release();
   return readFileSync(await download.path(), "utf8");
 }
 
 /** Quits the game, as far as the end screen. */
+const SCORING = /\/score$/;
+const GAME_PAGE = /\/g\/[A-Za-z0-9_-]{22}$/;
+
+/**
+ * Quits the game, as far as the end screen, which stays while the server's scoring is held. `release` lets it through,
+ * and the game's page opens; the dev server has none, so a stand-in answers for it.
+ */
 async function endGame(page: Page) {
+  const held: Route[] = [];
+  await page.route(SCORING, (route) => void held.push(route));
+  await page.route(GAME_PAGE, (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>The game's page</title>" }));
+  const release = async () => {
+    await page.unroute(SCORING);
+    for (const route of held) await route.continue();
+  };
   await page.keyboard.press("#");
   await page.keyboard.type("quit");
   await page.keyboard.press("Enter");
@@ -73,7 +89,7 @@ async function endGame(page: Page) {
     await page.keyboard.press("n");
     await page.waitForFunction((shown) => document.querySelector<HTMLElement>('[role="dialog"]')?.innerText !== shown, shown, { polling: "raf" });
   }
-  return over;
+  return { over, release };
 }
 
 interface Stored {
@@ -513,9 +529,11 @@ test("seeds are injected from the server on the timetable the recording holds, a
   expect(validation).toMatchObject({ replayed: true, matches: ALL_MATCH });
 });
 
-test("a game just ended shows its own score at once, then the server's, with a link to its page", async ({ page }) => {
+test("a game just ended shows its own score at once, then opens its page once the server has scored it", async ({ page }) => {
   await online(page);
   await untilPlaying(page, `Sc${Date.now() % 100000}`);
+  const game = await gameId(page);
+  const playing = new URL(page.url());
   await pass(page, 3);
   const scoring: string[] = [];
   const throughs: string[] = [];
@@ -527,27 +545,22 @@ test("a game just ended shows its own score at once, then the server's, with a l
     }
     if (/\/v1\/games\/[^/]+\.json$/.test(r.url())) scoring.push("gamePage");
   });
-  const over = await endGame(page);
+  const { over, release } = await endGame(page);
   // the game's own count, while the server confirms it
   await expect(over.getByRole("progressbar", { name: "Confirming your score" })).toBeVisible();
-  const own = await over.getByText(/You scored [\d,]+ points?\./).textContent();
-  const link = over.getByRole("link", { name: "See your game's page" });
-  await expect(link).toBeVisible({ timeout: 60_000 });
-  await expect(over.getByRole("progressbar")).toHaveCount(0);
-  await expect(over.getByRole("status")).toContainText(own!.trim());
-  await expect(link).toHaveAttribute("href", /\/g\/[A-Za-z0-9_-]{22}$/);
+  await expect(over.getByText(/You scored [\d,]+ points?\./)).toBeVisible();
+  await release();
+  await page.waitForURL(GAME_PAGE, { timeout: 60_000 });
+  // the page knows it's this tab's game, to offer the next one
+  expect(JSON.parse((await page.evaluate(() => sessionStorage.getItem("nethack.justFinished")))!)).toEqual({ game, again: playing.pathname + playing.search, signIn: "/online/?signin" });
   // scored once, through the batch that reached the first question after the death, before the game's end was sent
   expect(scoring.filter((m) => m === "scoreGame")).toHaveLength(1);
-  const batches = await stored(page, await gameId(page));
+  const batches = await stored(page, game);
   const through = batches.find((b) => b.id === throughs[0])!;
   expect(through.lines).not.toMatch(/ end over$/m);
   expect(batches.some((b) => / end over$/m.test(b.lines) && b.id > through.id)).toBe(true);
-  // with its page's data asked for then too, so the link doesn't wait for it
+  // with its page's data asked for then too, so the page doesn't wait for it
   expect(scoring.filter((m) => m === "gamePage")).toHaveLength(1);
-  // Enter on the link follows it, rather than starting a new game
-  await link.focus();
-  await page.keyboard.press("Enter");
-  await page.waitForURL(/\/g\/[A-Za-z0-9_-]{22}$/, { waitUntil: "commit" });
 });
 
 test("a real game that was cut back still validates, with the cut-back noted", async ({ page }) => {
@@ -611,7 +624,8 @@ test("the landing page lists games in flight, goes back to one, and starts a new
   await page.locator(".stats-title").waitFor({ timeout: 15_000 });
   await afterPrompts(page);
   expect(await gameId(page)).toBe(game);
-  const over = await endGame(page);
+  // with the score held, the end screen stays to start a new game from
+  const { over } = await endGame(page);
   await expect.poll(async () => (await stored(page, game)).map((b) => b.lines).join("\n"), { timeout: 10_000 }).toMatch(/ session new \S+ tz=\+09:00/);
 
   // New Game reloads this page
@@ -728,9 +742,10 @@ test("a finished online game is listed on the landing page, scored as it ended, 
   await untilPlaying(page, name);
   const game = await gameId(page);
   await pass(page, 2);
-  const over = await endGame(page);
+  const { release } = await endGame(page);
+  await release();
   // confirmed by the server, not just the game's own count
-  await expect(over.getByRole("link", { name: "See your game's page" })).toBeVisible({ timeout: 60_000 });
+  await page.waitForURL(GAME_PAGE, { timeout: 60_000 });
   await expect.poll(async () => (await stored(page, game)).map((b) => b.lines).join("\n"), { timeout: 10_000 }).toMatch(/\d+ end over/);
 
   await page.goto("/online/");
@@ -1000,13 +1015,15 @@ test("a Google account that already has an account is left alone, then signed in
   await second.close();
 });
 
-test("an anonymous player's scored game offers to sign in, at the end and at home", async ({ page }) => {
+test("an anonymous player's scored game offers to sign in, on its page and at home", async ({ page }) => {
   await online(page);
   await untilPlaying(page, `Ag${Date.now() % 100000}`);
   await pass(page, 2);
-  const over = await endGame(page);
-  await expect(over.getByText("It's public as Anonymous. Sign in to put your handle on it.")).toBeVisible({ timeout: 60_000 });
-  await over.getByRole("button", { name: "Sign In…" }).click();
+  await (await endGame(page)).release();
+  await page.waitForURL(GAME_PAGE, { timeout: 60_000 });
+  // the stand-in for the game's page has no link, so this follows where the real one's sign-in goes
+  const { signIn } = JSON.parse((await page.evaluate(() => sessionStorage.getItem("nethack.justFinished")))!) as { signIn: string };
+  await page.goto(signIn);
   await expect(page.getByRole("tab", { name: "New Account" })).toHaveAttribute("aria-selected", "true", { timeout: 20_000 });
   await expect(page.getByRole("dialog")).toContainText("Your game comes with you.");
   await expect.poll(() => new URL(page.url()).searchParams.has("signin")).toBe(false);
@@ -1215,5 +1232,5 @@ test("the core's own high-score list isn't shown online, and the game still scor
   expect(seen.some((s) => /You quit in/.test(s))).toBe(true);
   expect(seen.some((s) => /Points +Name/.test(s))).toBe(false);
   // the server's replay reaches the end, so the list was answered in the recording
-  await expect(over.getByRole("link", { name: "See your game's page" })).toBeVisible({ timeout: 60_000 });
+  await page.waitForURL(GAME_PAGE, { waitUntil: "commit", timeout: 60_000 });
 });
