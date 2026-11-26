@@ -5,6 +5,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import preact from "@preact/preset-vite";
+import { DEFAULT_TILE_SET, TILE_SETS } from "./src/port/tilesets";
 
 function publicFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -14,6 +15,9 @@ function publicFiles(dir: string): string[] {
     return ["README", "404.html", "social.jpg", "_routes.json"].includes(name) || name.startsWith(".") ? [] : [path];
   });
 }
+
+/** Few players use these, so the worker keeps each once it's used rather than fetching them all in advance. */
+const ON_USE = [...TILE_SETS.filter((s) => s !== DEFAULT_TILE_SET).map((s) => `tiles/${s.file}`), "fonts/JuliaMono-Regular.ttf"];
 
 /** Every page, by its directory: the root, which opens the last mode, and each mode's home, game and replay. */
 const PAGES = ["", ...["online", "offline"].flatMap((mode) => [`${mode}/`, `${mode}/play/`, `${mode}/watch/`]), "terms/", "privacy/"];
@@ -32,7 +36,10 @@ function serviceWorker(): Plugin {
       const files = [
         ...PAGES.map((page) => `./${page}`),
         ...Object.keys(bundle).filter((f) => !/\.(map|html)$/.test(f)).map((f) => `./${f}`),
-        ...publicFiles(publicDir).map((f) => `./${relative(publicDir, f).split("\\").join("/")}`),
+        ...publicFiles(publicDir)
+          .map((f) => relative(publicDir, f).split("\\").join("/"))
+          .filter((f) => !ON_USE.includes(f))
+          .map((f) => `./${f}`),
       ];
       const hash = createHash("sha256");
       for (const f of Object.values(bundle)) hash.update(f.type === "chunk" ? f.code : f.source);
@@ -43,7 +50,7 @@ function serviceWorker(): Plugin {
       this.emitFile({
         type: "asset",
         fileName: "sw.js",
-        source: `const PRECACHE = ${JSON.stringify([...new Set(files)])};\nconst VERSION = "${hash.digest("hex").slice(0, 12)}";\n${source}`,
+        source: `const PRECACHE = ${JSON.stringify([...new Set(files)])};\nconst ON_USE = ${JSON.stringify(ON_USE.map((f) => `./${f}`))};\nconst VERSION = "${hash.digest("hex").slice(0, 12)}";\n${source}`,
       });
     } },
   };
