@@ -51,3 +51,10 @@ test("ANSI walls meet without gaps or overhang", async ({ page }) => {
   expect(result.center[2]).toBeGreaterThan(46);
   expect(result.center[2]).toBeLessThan(53);
 });
+
+test("the page doesn't wait for the map's fallback font, which only the ASCII map uses", async ({ page }) => {
+  // a font that never arrives, as on a slow first visit
+  await page.route(/JuliaMono/, () => {});
+  await page.goto("/offline/play/?name=Fonts");
+  await expect(page.getByRole("dialog", { name: "Choose your character" })).toBeVisible({ timeout: 10_000 });
+});

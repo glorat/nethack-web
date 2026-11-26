@@ -9,17 +9,8 @@ function Root() {
   return <App key={handedOver === undefined ? "played" : "replayed"} handedOver={handedOver} onReplay={setHandedOver} />;
 }
 
-function start() {
-  render(<Root />, document.getElementById("app")!);
-  holdOffUpdates();
-  registerServiceWorker();
-}
-
-const juliaMono = new FontFace("JuliaMono", "url('/fonts/JuliaMono-Regular.ttf')");
-juliaMono.load().then(
-  (font) => {
-    document.fonts.add(font);
-    start();
-  },
-  start,
-);
+// the ASCII map's last resort for characters its font lacks, fetched once the map asks for it; the map redraws when it comes
+document.fonts.add(new FontFace("JuliaMono", `url("${import.meta.env.BASE_URL}fonts/JuliaMono-Regular.ttf")`));
+render(<Root />, document.getElementById("app")!);
+holdOffUpdates();
+registerServiceWorker();

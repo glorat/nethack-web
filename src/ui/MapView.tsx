@@ -84,6 +84,14 @@ export function MapView({ state, sheet, cell, scale, ascii, centerHero, asciiFon
   // BL_HP is the polymorphed form's while polymorphed, as Cocoa's u.mh
   const cursorStroke = cursorColor(Number(state.status.BL_HP?.text), Number(state.status.BL_HPMAX?.text));
 
+  // a font the canvas asked for draws only once it has come
+  const [fontsLoaded, setFontsLoaded] = useState(0);
+  useEffect(() => {
+    const loaded = () => setFontsLoaded((n) => n + 1);
+    document.fonts.addEventListener("loadingdone", loaded);
+    return () => document.fonts.removeEventListener("loadingdone", loaded);
+  }, []);
+
   // before paint: resizing the canvas has cleared it
   useLayoutEffect(() => {
     const ctx = canvas.current?.getContext("2d");
@@ -109,7 +117,7 @@ export function MapView({ state, sheet, cell, scale, ascii, centerHero, asciiFon
       ctx.lineWidth = 1;
       ctx.strokeRect(state.cursor.x * width + 0.5, state.cursor.y * height + 0.5, width - 1, height - 1);
     }
-  }, [state.map, state.cursor, cursorStroke, sheet, tiles, cell, width, height, symbols?.font, symbols?.width, petMark]);
+  }, [state.map, state.cursor, cursorStroke, sheet, tiles, cell, width, height, symbols?.font, symbols?.width, petMark, fontsLoaded]);
 
   // the middle of the view in squares, kept as it scrolls: once the canvas has been resized, the browser
   // has already clamped the scroll position to it
