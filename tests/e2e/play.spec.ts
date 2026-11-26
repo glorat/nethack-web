@@ -471,26 +471,24 @@ test("the character picker gives each visible group its tty keys", async ({ page
   const alignment = picker.getByRole("radiogroup", { name: "Alignment" });
   const play = picker.getByRole("button", { name: "Play" });
   const random = picker.getByRole("button", { name: /Random/ });
-  const actions = picker.locator(".player-actions");
+  const quit = picker.getByRole("button", { name: "Quit" });
 
   await expect(role).toHaveClass(/active/);
+  // Each box shows the tty key that jumps to it, and the buttons show theirs.
+  for (const [label, key] of [["Role", "?"], ["Race", "/"], ["Gender", '"'], ["Alignment", "["]])
+    await expect(picker.getByText(`${label} ${key}`, { exact: true })).toBeVisible();
   await expect(random.locator(".player-key")).toHaveText("*");
-  await expect(actions.getByRole("button", { name: /Random/ })).toHaveCount(0);
-  await expect(actions.getByRole("button", { name: /^q Quit$/ })).toBeVisible();
-  await expect(actions.getByRole("button", { name: /^Esc Quit$/ })).toBeVisible();
+  await expect(quit.locator(".player-key")).toHaveText("q");
   await expect(role.getByRole("option", { name: "Archeologist" }).locator(".player-key")).toHaveText("a");
   await expect(role.getByRole("option", { name: "Ranger" }).locator(".player-key")).toHaveText("R");
   await expect(gender.getByRole("radio", { name: "Male", exact: true }).locator(".player-key")).toHaveText("m");
   await expect(play.locator(".player-key")).toHaveText("y");
-  await expect(actions.getByRole("button", { name: /Race/ })).toBeVisible();
+  // Every role fits without scrolling.
+  await expect(role.getByRole("option", { name: "Wizard" })).toBeInViewport({ ratio: 1 });
 
-  // The visible action bar runs the active role's tty extras, and the race
-  // box's own bar has the way back.
-  await expect(actions.getByRole("button", { name: /Role/ })).toHaveCount(0);
-  await actions.getByRole("button", { name: /Race/ }).click();
+  await page.keyboard.press("/");
   await expect(race).toHaveClass(/active/);
-  await expect(actions.getByRole("button", { name: /^Esc Back$/ })).toBeVisible();
-  await actions.getByRole("button", { name: /Role/ }).click();
+  await page.keyboard.press("?");
   await expect(role).toHaveClass(/active/);
 
   // Enter advances the tty menu, rather than starting the game from anywhere.
@@ -503,7 +501,6 @@ test("the character picker gives each visible group its tty keys", async ({ page
   await expect(role.getByRole("option", { name: "Monk" })).toHaveAttribute("aria-selected", "true");
   // Monks are human only, so the race menu is skipped.
   await expect(gender).toHaveClass(/active/);
-  await expect(actions.getByRole("button", { name: /Race/ })).toBeVisible();
   await page.keyboard.press("Shift+Slash");
   await expect(role).toHaveClass(/active/);
 
@@ -518,7 +515,6 @@ test("the character picker gives each visible group its tty keys", async ({ page
   // Healers are neutral only, so gender is the last box. Play is only a button.
   await expect(gender).toHaveClass(/active/);
   await expect(play).not.toHaveClass(/active/);
-  await expect(actions.getByRole("button", { name: /Random/ })).toHaveCount(0);
 
   await page.keyboard.press("?");
   await expect(role).toHaveClass(/active/);
@@ -612,7 +608,6 @@ test("Escape backs from the last visible menu", async ({ page }) => {
   const role = picker.getByRole("listbox", { name: "Role" });
   const race = picker.getByRole("listbox", { name: "Race" });
   const gender = picker.getByRole("radiogroup", { name: "Gender" });
-  const actions = picker.locator(".player-actions");
 
   await expect(role).toHaveClass(/active/);
   // Healer, human, male: alignment is forced, so gender is the last menu.
@@ -623,10 +618,14 @@ test("Escape backs from the last visible menu", async ({ page }) => {
   await page.keyboard.press("m");
   // Gender is the last box; nothing moves to Play.
   await expect(gender).toHaveClass(/active/);
-  await actions.getByRole("button", { name: /^Esc Back$/ }).click();
+  await page.keyboard.press("Escape");
   await expect(race).toHaveClass(/active/);
   await page.keyboard.press("Escape");
   await expect(role).toHaveClass(/active/);
+  // Quit leaves from any box, as q does.
+  await page.keyboard.press("Slash");
+  await picker.getByRole("button", { name: "Quit" }).click();
+  await expect(page.getByRole("button", { name: /Continue Offline/ })).toBeVisible();
 });
 
 test("choosing with the mouse leaves its box active", async ({ page }) => {

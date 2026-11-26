@@ -23,28 +23,8 @@ const RACE_KEYS = "hedgo";
 const GENDER_KEYS = ["m", "f"];
 const ALIGN_KEYS = ["l", "n", "c"];
 
-const JUMPS: Record<PlayerStage, { key: string; label: string; stage: PlayerStage }[]> = {
-  role: [
-    { key: "/", label: "Race", stage: "race" },
-    { key: '"', label: "Gender", stage: "gender" },
-    { key: "[", label: "Alignment", stage: "align" },
-  ],
-  race: [
-    { key: "?", label: "Role", stage: "role" },
-    { key: '"', label: "Gender", stage: "gender" },
-    { key: "[", label: "Alignment", stage: "align" },
-  ],
-  gender: [
-    { key: "?", label: "Role", stage: "role" },
-    { key: "/", label: "Race", stage: "race" },
-    { key: "[", label: "Alignment", stage: "align" },
-  ],
-  align: [
-    { key: "?", label: "Role", stage: "role" },
-    { key: "/", label: "Race", stage: "race" },
-    { key: '"', label: "Gender", stage: "gender" },
-  ],
-};
+const JUMPS: Record<string, PlayerStage> = { "?": "role", "/": "race", '"': "gender", "[": "align" };
+const JUMP_KEY: Record<PlayerStage, string> = { role: "?", race: "/", gender: '"', align: "[" };
 
 const ICON = 32;
 const PORTRAIT = 96;
@@ -141,74 +121,21 @@ export function PlayerDialog({ choices, sheet, onDone, onQuit }: Props) {
         randomize(active);
         return;
       }
-      if (active === "role") {
-        const i = ROLE_KEYS.indexOf(k);
-        if (i >= 0) {
-          handled();
-          chooseRole(i);
-        } else if (k === "/") {
-          handled();
-          setActive("race");
-        } else if (k === '"') {
-          handled();
-          setActive("gender");
-        } else if (k === "[") {
-          handled();
-          setActive("align");
-        } else if (k.length === 1) {
-          beep();
-        }
-      } else if (active === "race") {
-        const i = RACE_KEYS.indexOf(k.toLowerCase());
-        if (i >= 0 && k.length === 1) {
-          handled();
-          chooseRace(i);
-        } else if (k === "?") {
-          handled();
-          setActive("role");
-        } else if (k === '"') {
-          handled();
-          setActive("gender");
-        } else if (k === "[") {
-          handled();
-          setActive("align");
-        } else if (k.length === 1) {
-          beep();
-        }
-      } else if (active === "gender") {
-        const i = GENDER_KEYS.indexOf(k.toLowerCase());
-        if (i >= 0 && k.length === 1) {
-          handled();
-          chooseGender(i);
-        } else if (k === "?") {
-          handled();
-          setActive("role");
-        } else if (k === "/") {
-          handled();
-          setActive("race");
-        } else if (k === "[") {
-          handled();
-          setActive("align");
-        } else if (k.length === 1) {
-          beep();
-        }
-      } else if (active === "align") {
-        const i = ALIGN_KEYS.indexOf(k.toLowerCase());
-        if (i >= 0 && k.length === 1) {
-          handled();
-          chooseAlign(i);
-        } else if (k === "?") {
-          handled();
-          setActive("role");
-        } else if (k === "/") {
-          handled();
-          setActive("race");
-        } else if (k === '"') {
-          handled();
-          setActive("gender");
-        } else if (k.length === 1) {
-          beep();
-        }
+      if (Object.hasOwn(JUMPS, k)) {
+        handled();
+        setActive(JUMPS[k]);
+        return;
+      }
+      const keys = active === "role" ? ROLE_KEYS : active === "race" ? RACE_KEYS : active === "gender" ? GENDER_KEYS : ALIGN_KEYS;
+      const i = k.length === 1 ? [...keys].indexOf(active === "role" ? k : k.toLowerCase()) : -1;
+      if (i >= 0) {
+        handled();
+        if (active === "role") chooseRole(i);
+        else if (active === "race") chooseRace(i);
+        else if (active === "gender") chooseGender(i);
+        else chooseAlign(i);
+      } else if (k.length === 1) {
+        beep();
       }
     };
     window.addEventListener("keydown", onKey, true);
@@ -219,18 +146,14 @@ export function PlayerDialog({ choices, sheet, onDone, onQuit }: Props) {
     <div class="dialog-backdrop">
       <div class="dialog player-dialog" role="dialog" aria-label="Choose your character">
         <div class="dialog-title">Choose your character</div>
-        <PlayerActions
-          focus={active}
-          back={back}
-          onJump={(stage) => setActive(stage)}
-          onEscape={escape}
-          onQuit={onQuit}
-        />
         <div class="player-lists">
+          <div class="player-column role">
+          <Heading label="Role" stage="role" />
           <div
             class={active === "role" ? "player-list active" : "player-list"}
             role="listbox"
             aria-label="Role"
+            aria-keyshortcuts={JUMP_KEY.role}
             onPointerDown={() => setActive("role")}
             onFocusCapture={() => setActive("role")}
           >
@@ -253,10 +176,14 @@ export function PlayerDialog({ choices, sheet, onDone, onQuit }: Props) {
               </button>
             ))}
           </div>
+          </div>
+          <div class="player-column">
+          <Heading label="Race" stage="race" />
           <div
             class={active === "race" ? "player-list active" : "player-list"}
             role="listbox"
             aria-label="Race"
+            aria-keyshortcuts={JUMP_KEY.race}
             onPointerDown={() => setActive("race")}
             onFocusCapture={() => setActive("race")}
           >
@@ -280,6 +207,7 @@ export function PlayerDialog({ choices, sheet, onDone, onQuit }: Props) {
               </button>
             ))}
           </div>
+          </div>
           <div class="player-about" aria-live="polite">
             {role ? (
               <span
@@ -296,6 +224,7 @@ export function PlayerDialog({ choices, sheet, onDone, onQuit }: Props) {
           label="Gender"
           names={GENDERS}
           keys={GENDER_KEYS}
+          jump={JUMP_KEY.gender}
           value={pick.gender}
           allowed={choices.validGender[pick.role][pick.race]}
           active={active === "gender"}
@@ -306,6 +235,7 @@ export function PlayerDialog({ choices, sheet, onDone, onQuit }: Props) {
           label="Alignment"
           names={ALIGNS}
           keys={ALIGN_KEYS}
+          jump={JUMP_KEY.align}
           value={pick.align}
           allowed={choices.validAlign[pick.role][pick.race]}
           active={active === "align"}
@@ -313,6 +243,12 @@ export function PlayerDialog({ choices, sheet, onDone, onQuit }: Props) {
           onChange={(i) => chooseAlign(i, false)}
         />
         <div class="dialog-buttons">
+          <button class="player-quit" aria-keyshortcuts="q" onClick={onQuit}>
+            <span class="player-key" aria-hidden="true">
+              q
+            </span>{" "}
+            Quit
+          </button>
           <button aria-keyshortcuts="*" onClick={randomizeActive}>
             <span class="player-key" aria-hidden="true">
               *
@@ -335,27 +271,10 @@ export function PlayerDialog({ choices, sheet, onDone, onQuit }: Props) {
   );
 }
 
-function PlayerActions(props: {
-  focus: PlayerFocus;
-  back: PlayerStage | null;
-  onJump(stage: PlayerStage): void;
-  onEscape(): void;
-  onQuit(): void;
-}) {
-  const escapeLabel = props.back ? "Back" : "Quit";
+function Heading({ label, stage }: { label: string; stage: PlayerStage }) {
   return (
-    <div class="player-actions" role="group" aria-label="Character choice actions">
-      {JUMPS[props.focus].map((jump) => (
-        <button class="player-action" aria-keyshortcuts={jump.key} onClick={() => props.onJump(jump.stage)}>
-          <kbd>{jump.key}</kbd> {jump.label}
-        </button>
-      ))}
-      <button class="player-action" aria-keyshortcuts="Escape" onClick={props.onEscape}>
-        <kbd>Esc</kbd> {escapeLabel}
-      </button>
-      <button class="player-action" aria-keyshortcuts="q" onClick={props.onQuit}>
-        <kbd>q</kbd> Quit
-      </button>
+    <div class="player-heading" aria-hidden="true">
+      {label} <kbd>{JUMP_KEY[stage]}</kbd>
     </div>
   );
 }
@@ -364,6 +283,7 @@ function Choice(props: {
   label: string;
   names: string[];
   keys: string[];
+  jump: string;
   value: number;
   allowed: boolean[];
   active: boolean;
@@ -375,10 +295,13 @@ function Choice(props: {
       class={props.active ? "player-choice active" : "player-choice"}
       role="radiogroup"
       aria-label={props.label}
+      aria-keyshortcuts={props.jump}
       onPointerDown={props.onActivate}
       onFocusCapture={props.onActivate}
     >
-      <span class="player-choice-label">{props.label}</span>
+      <span class="player-choice-label">
+        {props.label} <kbd aria-hidden="true">{props.jump}</kbd>
+      </span>
       {props.names.map((name, i) => (
         <button
           role="radio"
