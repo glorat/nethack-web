@@ -213,6 +213,26 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     return () => observer.disconnect();
   }, [items, sorted]);
 
+  // the headings' class symbols share one column, past the widest heading as the font draws it, which a width in ch can't know
+  useLayoutEffect(() => {
+    const texts = [...(list.current?.querySelectorAll<HTMLElement>(".menu-heading-text") ?? [])];
+    if (!texts.length) return;
+    const range = document.createRange();
+    const align = () => {
+      const widest = Math.max(
+        ...texts.map((t) => {
+          range.selectNodeContents(t);
+          return range.getBoundingClientRect().width;
+        }),
+      );
+      for (const t of texts) t.style.minWidth = `${Math.ceil(widest)}px`;
+    };
+    align();
+    const resized = new ResizeObserver(align);
+    for (const t of texts) resized.observe(t);
+    return () => resized.disconnect();
+  });
+
   // layout effect: listen before the dialog is painted, or a fast key press is lost
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -285,7 +305,6 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     return fields.length === 2 && /^\('\S'\)$/.test(fields[1]) ? fields[1] : null;
   };
   const columns = Math.max(...items.map((item, i) => split(item).length - (headingSymbol(item, i) ? 1 : 0)));
-  const headingWidth = Math.max(1, ...items.map((item, i) => (headingSymbol(item, i) ? split(item)[0].length + 1 : 0)));
   const fields = (item: MenuItem, style?: Record<string, string>, before?: ComponentChildren) =>
     split(item).map((f, n) => (
       <span class="menu-field" style={style}>
@@ -324,7 +343,7 @@ export function MenuDialog({ how, prompt, items, unlisted = "", sheet, onDone }:
     if (symbol)
       return (
         <div class={`${kind} with-symbol`} style={style}>
-          <span class="menu-heading-text" style={{ minWidth: `${headingWidth}ch` }}>
+          <span class="menu-heading-text">
             {split(item)[0]}
           </span>
           <span class="menu-heading-sym">{symbol}</span>
