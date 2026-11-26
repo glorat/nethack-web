@@ -35,6 +35,7 @@ export function sameCheck(a: string, b: string): boolean {
 
 /** A promise that never settles; a fresh one each time, as one shared would keep every core waiting on it alive. */
 export const never = <T>() => new Promise<T>(() => {});
+const ESC = 27;
 const MARKS = new Set(["ckpt", "T", "=", "lv", "asc", "back", "now", "reseed"]);
 // as long as Game pauses for the core's delay_output
 const DELAY_MS = 50;
@@ -248,6 +249,11 @@ export interface ReplayHooks {
   more?(): Promise<void>;
   /** Each event the core reports, in the order it reports them. */
   event?(event: ReplayedEvent): void;
+  /**
+   * The game ends at its first wait with the game over, as at the questions after a death: the rest is answered as
+   * cancelled, and nothing more of the recording is read. Nothing the player answers there changes the result.
+   */
+  endAtGameOver?: boolean;
 }
 
 /** How a session's replay stopped: at its recorded end, or where its recording ran out. */
@@ -272,6 +278,8 @@ export class ReplayHost implements GameHost {
   /** Went differently from the recording, or the core stopped before its end. */
   diverged = false;
   private clock: number | null = null;
+  /** At or past the first wait with the game over, under `endAtGameOver`. */
+  private closed = false;
 
   constructor(
     private readonly session: RecordedSession,
@@ -293,6 +301,7 @@ export class ReplayHost implements GameHost {
 
   // what goes wrong in here is the replay's to report: Game would answer the core ESC and carry on
   async request(request: GameRequest): Promise<Answer | null> {
+    if (this.closing()) return this.done ? never() : null;
     const line = await this.next([ANSWER_TAGS[request.kind]], request);
     // a null inside the array is a cancelled prompt; guard's own null means it couldn't be read
     const parsed = this.guard(() => [parseAnswer(request, line.rest)], line);
@@ -300,12 +309,14 @@ export class ReplayHost implements GameHost {
   }
 
   async nextInput(): Promise<Input> {
+    if (this.closing()) return this.done ? never() : { key: ESC };
     const line = await this.next(["k", "c"]);
     return this.guard(() => parseInput(line), line) ?? never();
   }
 
   async persist(exiting = false): Promise<void> {
     if (!exiting || this.done) return;
+    if (this.closing()) return this.stopWith("end");
     const line = this.take("end");
     if (!line) return;
     const how = this.m._nhweb_game_over() ? "over" : "save";
@@ -332,6 +343,7 @@ export class ReplayHost implements GameHost {
 
   /** The next recorded time; as the core's reads of the clock aren't the game, one with none left to take gets the last. */
   now(): number {
+    if (this.closed) return this.clock ?? Number(this.session.recorded.first("now")?.rest ?? 0);
     let ahead = this.at;
     let line = this.session.recorded.get(ahead);
     while (line && line.tag !== "now" && MARKS.has(line.tag)) line = this.session.recorded.get(++ahead);
@@ -343,10 +355,12 @@ export class ReplayHost implements GameHost {
   }
 
   randomSeed(): number {
+    if (this.closed) return 0;
     return Number(this.take("seed")?.rest ?? 0);
   }
 
   uuid(): string {
+    if (this.closed) return "";
     return this.take("uuid")?.rest ?? "";
   }
 
@@ -355,6 +369,7 @@ export class ReplayHost implements GameHost {
   }
 
   async bonesWanted(name: string): Promise<Uint8Array | null> {
+    if (this.closed) return null;
     const line = this.take("bones");
     if (!line) return never();
     const [recorded, hash] = line.rest.split(" ");
@@ -381,6 +396,12 @@ export class ReplayHost implements GameHost {
 
   delayOutput(): Promise<void> {
     return this.hooks.delay?.() ?? new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+  }
+
+  /** Whether the game has ended under `endAtGameOver`, so the recording is read no further. */
+  private closing(): boolean {
+    if (!this.closed && this.hooks.endAtGameOver && !this.done && this.m._nhweb_game_over()) this.closed = true;
+    return this.closed;
   }
 
   /**

@@ -56,6 +56,8 @@ Seeds to inject follow the server's timetable, which the recording holds. The fi
 
 `src/worker/replayer.ts` plays a recording again. Each session runs on a fresh core whose host answers from the recording and checks each `T`, `=` and `end` against the core. Every line is read once before the replay starts, so a malformed line fails the recording at once. After that only where each line starts is kept, so a replay needs little more memory than the recording's text. A restore starts from the files the replay itself saved. The replay stops at the line where the game went differently.
 
+The server's replay ends a game at its first wait with the game over, as at the questions after a death (`endAtGameOver`). It answers the rest as cancelled and reads no more of the recording, as nothing the player answers there changes the game's result, so a game is scored from the lines up to there.
+
 The sum on each `T` covers the main random generator and the hero's position, so a game that goes differently stops within a turn or so. A `=` also compares the figures on the status line (HP, AC, attributes, gold, turn and so on) by name, leaving out wording, glyph numbers and any field one side lacks. A difference elsewhere, such as a stored value no roll has used yet, shows once it reaches one of these.
 
 `tests/headless/golden/` holds long recorded games that every test run replays exactly. To add one, add it to `GAMES` in `tests/headless/golden.test.ts` and run `GOLDEN=write pnpm test golden`, which records each game that has no file yet.
