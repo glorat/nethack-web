@@ -518,8 +518,13 @@ test("a game just ended shows its own score at once, then the server's, with a l
   await untilPlaying(page, `Sc${Date.now() % 100000}`);
   await pass(page, 3);
   const scoring: string[] = [];
+  const throughs: string[] = [];
   page.on("request", (r) => {
-    if (/\/score$/.test(r.url()) && r.method() === "POST") scoring.push((r.postDataJSON() as { data: { method: string } }).data.method);
+    if (/\/score$/.test(r.url()) && r.method() === "POST") {
+      const { method, input } = (r.postDataJSON() as { data: { method: string; input: { through?: string } } }).data;
+      scoring.push(method);
+      if (input.through) throughs.push(input.through);
+    }
     if (/\/v1\/games\/[^/]+\.json$/.test(r.url())) scoring.push("gamePage");
   });
   const over = await endGame(page);
@@ -531,13 +536,14 @@ test("a game just ended shows its own score at once, then the server's, with a l
   await expect(over.getByRole("progressbar")).toHaveCount(0);
   await expect(over.getByRole("status")).toContainText(own!.trim());
   await expect(link).toHaveAttribute("href", /\/g\/[A-Za-z0-9_-]{22}$/);
-  // warmed up at the first question after the death, before it was scored
-  expect(scoring.indexOf("warmUp")).toBeLessThan(scoring.indexOf("scoreGame"));
-  expect(scoring.filter((m) => m === "warmUp")).toHaveLength(1);
-  // and its page's data, so the link doesn't wait for it
-  expect(scoring.indexOf("gamePage")).toBeLessThan(scoring.indexOf("scoreGame"));
+  // scored once, through the batch that reached the first question after the death, before the game's end was sent
+  expect(scoring.filter((m) => m === "scoreGame")).toHaveLength(1);
+  const batches = await stored(page, await gameId(page));
+  const through = batches.find((b) => b.id === throughs[0])!;
+  expect(through.lines).not.toMatch(/ end over$/m);
+  expect(batches.some((b) => / end over$/m.test(b.lines) && b.id > through.id)).toBe(true);
+  // with its page's data asked for then too, so the link doesn't wait for it
   expect(scoring.filter((m) => m === "gamePage")).toHaveLength(1);
-  expect(scoring).toContain("scoreGame");
   // Enter on the link follows it, rather than starting a new game
   await link.focus();
   await page.keyboard.press("Enter");
