@@ -34,6 +34,23 @@ test("the production build plays offline after one visit", async ({ page, contex
   await expect(page.getByText("Ready to play offline")).toBeVisible();
 });
 
+test("tile sets other than the default, and the map's fallback font, are kept offline once used rather than fetched in advance", async ({ page, context }) => {
+  const precache = JSON.parse(/const PRECACHE = (\[.*?\]);/.exec(readFileSync("dist/sw.js", "utf8"))![1]) as string[];
+  expect(precache).toContain("./tiles/tiles64.png");
+  expect(precache).not.toContain("./tiles/geoduck15x25.bmp");
+  expect(precache).not.toContain("./fonts/JuliaMono-Regular.ttf");
+  await page.goto(`${PROD}offline/`);
+  await expect(page.getByText("Ready to play offline")).toBeVisible({ timeout: 15_000 });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  const ok = (path: string) => page.evaluate(async (path) => (await fetch(path).catch(() => null))?.ok ?? false, path);
+  expect(await ok("/tiles/geoduck15x25.bmp")).toBe(true);
+
+  await context.setOffline(true);
+  expect(await ok("/tiles/geoduck15x25.bmp")).toBe(true);
+  expect(await ok("/fonts/JuliaMono-Regular.ttf")).toBe(false);
+});
+
 test("a production build has each mode's pages, and its root only sends the visitor on", async ({ page }) => {
   const titles: Record<string, string> = {
     "online/": "nethack.app · Online",
