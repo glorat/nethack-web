@@ -10,7 +10,8 @@ function Root() {
 }
 
 // the ASCII map's last resort for characters its font lacks, fetched once the map asks for it; the map redraws when it comes
-document.fonts.add(new FontFace("JuliaMono", `url("${import.meta.env.BASE_URL}fonts/JuliaMono-Regular.ttf")`));
+// beyond ASCII only, which every monospace font draws, so a machine without the map's usual fonts doesn't fetch it for plain text
+document.fonts.add(new FontFace("JuliaMono", `url("${import.meta.env.BASE_URL}fonts/JuliaMono-Regular.ttf")`, { unicodeRange: "U+0080-10FFFF" }));
 render(<Root />, document.getElementById("app")!);
 holdOffUpdates();
 registerServiceWorker();
