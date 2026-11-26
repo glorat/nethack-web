@@ -105,7 +105,8 @@ export interface GlyphInfo {
 
 export function readGlyphInfo(m: NetHackModule, ptr: number): GlyphInfo | null {
   if (!ptr) return null;
-  const unicode = m.getValue(ptr + GI_UNICODE, "*");
+  // the Rogue level's own symset isn't Unicode, though the primary set's characters are still there
+  const unicode = m._nhweb_utf8_graphics() ? m.getValue(ptr + GI_UNICODE, "*") : 0;
   return {
     glyph: m.getValue(ptr + GI_GLYPH, "i32"),
     // UTF-8 symsets put the real character in glyph_map.u rather than ttychar
