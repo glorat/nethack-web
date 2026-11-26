@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { shortId } from "../../src/online/game-id";
-import { ending, type PublicGame, shareAddress, sharePage, title } from "../../src/online/share";
+import { ending, JUST_FINISHED, type PublicGame, shareAddress, sharePage, title } from "../../src/online/share";
 
 const GAME = "3f9c2a7e-5b1d-4c8e-9a62-7d0e4b81c3f5";
 const died: PublicGame = {
@@ -90,6 +90,14 @@ describe("the share page", () => {
     expect(html).toContain(`href="https://x.com/intent/post?text=glorat%27s+Valkyrie%3A+48%2C210+points&#38;url=${link}"`);
     expect(html).toContain(`id="share-link" title="Copy link"`);
     expect(sharePage("https://nethack.app", "whatever", null)).not.toContain("Share");
+  });
+
+  test("names its game for the tab that just played it, which alone sees Play Again and the way to sign in", () => {
+    const html = sharePage("https://nethack.app", GAME, died);
+    expect(html).toContain(`<main data-game="${GAME}">`);
+    expect(html).toContain(`id="again" href="/online/" hidden>Play Again</a>`);
+    expect(html).toContain(`id="sign-in" hidden>`);
+    expect(html).toContain(`sessionStorage.getItem("${JUST_FINISHED}")`);
   });
 
   test("for a game it can't show, gives the site's own preview", () => {

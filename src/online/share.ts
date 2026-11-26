@@ -25,6 +25,15 @@ export interface PublicGame {
 
 export const shareAddress = (origin: string, game: string) => `${origin}/g/${shortId(game)}`;
 
+/** Kept in this tab by a game that has just been scored, so that game's page offers to play again, and to sign in. */
+export const JUST_FINISHED = "nethack.justFinished";
+export interface JustFinished {
+  game: string;
+  /** The page that starts the next game. */
+  again: string;
+  signIn?: string;
+}
+
 const who = (g: PublicGame) => g.handle ?? "Anonymous";
 const n = (x: number) => x.toLocaleString("en-US");
 const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -114,6 +123,7 @@ dd { margin: 0; color: var(--bright); font-weight: 600; font-variant-numeric: ta
 .earned li { display: grid; gap: 2px; padding: 8px; border: 1px solid var(--earned); }
 .earned strong { color: var(--bright); font-weight: 600; }
 .earned span { color: var(--muted); font-size: 12.5px; }
+.sign-in { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
 .lost { display: grid; gap: 12px; max-width: 560px; }
 .lost h1 { font-size: 38px; }
 .lost p { margin: 0; }
@@ -130,7 +140,7 @@ interface Head {
   themeColor: string;
 }
 
-function page(head: Head, body: string, script?: string): string {
+function page(head: Head, body: string, script?: string, game?: string): string {
   const meta = (attr: "name" | "property", key: string, content: string) => `<meta ${attr}="${key}" content="${html(content)}" />`;
   return `<!doctype html>
 <html lang="en">
@@ -158,7 +168,7 @@ ${meta("name", "twitter:card", "summary_large_image")}
 </head>
 <body>
 <header class="bar"><div class="title"><a class="wordmark" href="/online/">nethack.app</a><span class="badge">Online</span></div><a class="bar-link" href="/online/">Play NetHack</a></header>
-<main>
+<main${game ? ` data-game="${html(game)}"` : ""}>
 ${body}
 </main>${script ?? ""}
 </body>
@@ -169,9 +179,32 @@ ${body}
 /** How many turns before the end "the last moments" start. */
 const LAST_MOMENTS = 30;
 
-/** The device's share sheet where there is one, or else a copy of the page's link. */
-const SHARE_SCRIPT = `<script>
+/**
+ * The device's share sheet where there is one, or else a copy of the page's link. In the tab whose game this is, just
+ * finished, Play Again (and Enter) and the way to sign in.
+ */
+const SCRIPT = `<script>
 (() => {
+  let mine = null;
+  try {
+    mine = JSON.parse(sessionStorage.getItem("${JUST_FINISHED}"));
+  } catch {}
+  const again = document.getElementById("again");
+  if (mine && mine.game === document.querySelector("main").dataset.game && /^\\/(?!\\/)/.test(mine.again)) {
+    for (const b of document.querySelectorAll(".actions .primary")) if (b !== again) b.classList.remove("primary");
+    again.href = mine.again;
+    again.hidden = false;
+    if (mine.signIn && /^\\/(?!\\/)/.test(mine.signIn)) {
+      document.querySelector("#sign-in a").href = mine.signIn;
+      document.getElementById("sign-in").hidden = false;
+    }
+    addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || e.repeat || (e.target instanceof Element && e.target.closest("a, button"))) return;
+      e.preventDefault();
+      location.assign(again.href);
+    });
+  }
+
   const button = document.getElementById("share-link"), said = document.getElementById("share-said");
   const url = document.querySelector('link[rel="canonical"]').href;
   if (navigator.share) button.title = "Share";
@@ -253,6 +286,7 @@ export function sharePage(origin: string, id: string, g: PublicGame | null, stor
   ].join("");
   const lastMoments = result.turns !== undefined && result.turns > LAST_MOMENTS ? watchAddress(g.game, `&turn=${result.turns - LAST_MOMENTS}&play=1`) : null;
   const actions = [
+    `<a class="button primary" id="again" href="/online/" hidden>Play Again</a>`,
     lastMoments ? `<a class="button primary" href="${html(lastMoments)}">Watch the Last Moments</a>` : "",
     `<a class="button ${lastMoments ? "" : "primary"}" href="${html(watchAddress(g.game))}">${lastMoments ? "Watch from the Start" : "Watch the Game"}</a>`,
   ].join("");
@@ -262,6 +296,7 @@ ${character ? `<div class="character">${html(character)}</div>` : ""}
 <p class="end">${html(ending(g))}${html(ended)}</p>
 <div class="actions">${actions}</div>
 ${share(url, title(g))}
+<p class="sign-in" id="sign-in" hidden>It's public as Anonymous. <a href="/online/?signin">Sign in</a> to put your handle on it.</p>
 </div>`;
   return page(
     {
@@ -277,6 +312,7 @@ ${share(url, title(g))}
 <div>${journey(g.game, chaptersOf(story?.chronicle ?? []))}</div>
 <div>${stats ? frame("The score", `<dl>${stats}</dl>`) : ""}${earned(story?.achievements ?? [])}</div>
 </div>`,
-    SHARE_SCRIPT,
+    SCRIPT,
+    g.game,
   );
 }
