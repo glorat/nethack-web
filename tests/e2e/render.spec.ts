@@ -58,3 +58,24 @@ test("the page doesn't wait for the map's fallback font, which only the ASCII ma
   await page.goto("/offline/play/?name=Fonts");
   await expect(page.getByRole("dialog", { name: "Choose your character" })).toBeVisible({ timeout: 10_000 });
 });
+
+test("the map's fallback font is fetched for a character the map's font lacks, never for ASCII", async ({ page }) => {
+  const fetched: string[] = [];
+  page.on("request", (r) => {
+    if (/JuliaMono/.test(r.url())) fetched.push(r.url());
+  });
+  await page.goto("/offline/play/?name=Fonts");
+  await page.getByRole("dialog", { name: "Choose your character" }).waitFor();
+  const status = (text: string) =>
+    page.evaluate(async (text) => {
+      const ctx = document.createElement("canvas").getContext("2d")!;
+      // as on a machine with none of the map's usual fonts, such as Linux
+      ctx.font = `20px "No Such Font", "JuliaMono", monospace`;
+      ctx.fillText(text, 0, 20);
+      await new Promise((r) => setTimeout(r, 1000));
+      return [...document.fonts].find((f) => f.family === "JuliaMono")!.status;
+    }, text);
+  expect(await status("@ #.|-+ abc 123")).toBe("unloaded");
+  expect(fetched).toEqual([]);
+  expect(await status("⯑")).not.toBe("unloaded");
+});
