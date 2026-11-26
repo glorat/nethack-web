@@ -1279,9 +1279,12 @@ for (const setting of [0, 1, 2, 3, 4, 5])
       const glyph = (await symbol.boundingBox())!;
       // as in tty, the class glyph follows the heading text instead of sitting at the far edge
       expect(glyph.x).toBeGreaterThanOrEqual(text.x + text.width);
-      // every heading's glyph shares the same column
-      const xs = await dialog.locator(".menu-heading-sym").evaluateAll((els) => els.map((el) => el.getBoundingClientRect().x));
-      expect(Math.max(...xs) - Math.min(...xs)).toBeLessThanOrEqual(1);
+      // every heading's glyph shares the same column, however wide the font draws the headings
+      const xs = () => dialog.locator(".menu-heading-sym").evaluateAll((els) => els.map((el) => el.getBoundingClientRect().x));
+      const spread = async () => ((x) => Math.max(...x) - Math.min(...x))(await xs());
+      expect(await spread()).toBeLessThanOrEqual(1);
+      await page.addStyleTag({ content: ".menu-heading { letter-spacing: 0.4em }" });
+      await expect.poll(spread).toBeLessThanOrEqual(1);
     } else {
       await expect(dialog.locator(".menu-heading-sym")).toHaveCount(0);
     }
