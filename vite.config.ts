@@ -49,6 +49,20 @@ function serviceWorker(): Plugin {
   };
 }
 
+/** The landing pages' fonts at fixed addresses, for the game pages that Pages Functions render outside Vite. */
+function shareFonts(): Plugin {
+  const FONTS = ["vt323/files/vt323-latin-400-normal.woff2", "ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2", "ibm-plex-mono/files/ibm-plex-mono-latin-600-normal.woff2"];
+  return {
+    name: "nethack-share-fonts",
+    apply: "build",
+    generateBundle() {
+      for (const font of FONTS) {
+        this.emitFile({ type: "asset", fileName: `fonts/${font.split("/").pop()}`, source: readFileSync(new URL(`./node_modules/@fontsource/${font}`, import.meta.url)) });
+      }
+    },
+  };
+}
+
 /** "5.0.0", from the core's patchlevel.h. */
 function nethackVersion(): string {
   const header = readFileSync(new URL("./nethack/include/patchlevel.h", import.meta.url), "utf8");
@@ -81,7 +95,7 @@ export default defineConfig({
     __CORE_COMMIT__: JSON.stringify(coreCommit()),
     __GUIDEBOOK_CHARACTERS__: JSON.stringify(guidebookCharacters()),
   },
-  plugins: [preact(), serviceWorker()],
+  plugins: [preact(), shareFonts(), serviceWorker()],
   worker: { format: "es" },
   // in production the site's Pages Functions put the server's public data here; in development, the emulator's
   server: { proxy: { "/v1/": { target: "http://127.0.0.1:5299", rewrite: (path) => `/demo-nethack/europe-west1/publicData${path}` } } },

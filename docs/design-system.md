@@ -2,7 +2,7 @@
 
 The site has two looks:
 
-- **The landing pages** (`/offline/`, `/online/`) are nethack.app's own, the brand.
+- **The landing pages** (`/offline/`, `/online/`) are nethack.app's own, the brand. A finished online game's page (`/g/<id>`, `src/online/share.ts`) takes the online home's look, with its own copy of the tokens, as a Pages Function renders it outside Vite. The build puts its fonts at fixed addresses under `/fonts/` for it.
 - **The game** keeps the Cocoa port's look, as `docs/cocoa-parity.md` describes.
 
 Both take their colours from tokens in `src/styles.css`. The landing pages set their own tokens on `.landing`, so a change there doesn't reach the game.

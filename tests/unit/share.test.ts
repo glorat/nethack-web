@@ -33,9 +33,9 @@ describe("the share page", () => {
     expect(meta(html, "og:description")).toBe(ending(died));
     expect(meta(html, "og:image")).toBe(`https://nethack.app/v1/games/${id}/card.png`);
     expect(meta(html, "og:url")).toBe(`https://nethack.app/g/${id}`);
-    expect(meta(html, "theme-color")).toBe("#e5534b");
+    expect(meta(html, "theme-color")).toBe("#e0603f");
     expect(meta(html, "twitter:card")).toBe("summary_large_image");
-    expect(meta(sharePage("https://nethack.app", id, ascended), "theme-color")).toBe("#e3b341");
+    expect(meta(sharePage("https://nethack.app", id, ascended), "theme-color")).toBe("#e8a33a");
     expect(html).toContain(`href="/online/watch/?game=${GAME}"`);
     expect(sharePage("https://nethack.app", id, null)).not.toContain("/online/watch/");
   });
@@ -55,11 +55,11 @@ describe("the share page", () => {
     expect(html).toContain(`href="/online/watch/?game=${GAME}&#38;line=914"`);
     expect(html).toContain("Killed by a &#60;dwarf&#62;");
     expect(html).not.toContain("<dwarf>");
-    expect(html).toContain("<b>Into the Mines</b>");
-    expect(html).toContain("<dd>#1 of 5</dd>");
+    expect(html).toContain("<strong>Into the Mines</strong>");
+    expect(html).toContain("<dt>High scores</dt><dd>#1 of 5</dd>");
     // the last moments start 30 turns before the end, and play on
-    expect(html).toContain(`href="/online/watch/?game=${GAME}&#38;turn=${8412 - 30}&#38;play=1">Watch the last moments`);
-    expect(html).toContain(`href="/online/watch/?game=${GAME}">Watch from the start`);
+    expect(html).toContain(`href="/online/watch/?game=${GAME}&#38;turn=${8412 - 30}&#38;play=1">Watch the Last Moments`);
+    expect(html).toContain(`href="/online/watch/?game=${GAME}">Watch from the Start`);
   });
 
   test("without a story, or for a short game, shows what it can", () => {
@@ -67,7 +67,7 @@ describe("the share page", () => {
     expect(html).not.toContain("The journey");
     expect(html).not.toContain("Earned in this game");
     expect(html).not.toContain("Watch the last moments");
-    expect(html).toContain(">Watch the game</a>");
+    expect(html).toContain(">Watch the Game</a>");
   });
 
   test("never shows the character's name", () => {
@@ -78,8 +78,18 @@ describe("the share page", () => {
 
   test("escapes what the game wrote", () => {
     const html = sharePage("https://nethack.app", GAME, { ...died, result: { ...died.result, death: 'killed by a <script>"x"</script>' } });
-    expect(html).not.toContain("<script>");
+    expect(html).not.toContain('<script>"x"');
     expect(html).toContain("<b>   killed by a    </b>|");
+  });
+
+  test("shares the game on Reddit and X, with its title, and copies its link", () => {
+    const id = shortId(GAME);
+    const html = sharePage("https://nethack.app", id, died);
+    const link = encodeURIComponent(`https://nethack.app/g/${id}`);
+    expect(html).toContain(`href="https://www.reddit.com/submit?url=${link}&#38;title=glorat%27s+Valkyrie%3A+48%2C210+points"`);
+    expect(html).toContain(`href="https://x.com/intent/post?text=glorat%27s+Valkyrie%3A+48%2C210+points&#38;url=${link}"`);
+    expect(html).toContain(`id="share-link" title="Copy link"`);
+    expect(sharePage("https://nethack.app", "whatever", null)).not.toContain("Share");
   });
 
   test("for a game it can't show, gives the site's own preview", () => {
