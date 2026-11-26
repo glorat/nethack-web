@@ -26,7 +26,7 @@ async function untilPlaying(page: Page, name: string, mode: "online" | "offline"
   await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: /Valkyrie/ }).click();
   await picker.getByRole("listbox", { name: "Race" }).locator("button:not([disabled])").first().click();
   for (const group of ["Gender", "Alignment"]) await picker.getByRole("radiogroup", { name: group }).locator("button:not([disabled])").first().click();
-  await page.keyboard.press("Enter");
+  await picker.getByRole("button", { name: "Play" }).click();
   await afterPrompts(page);
 }
 
@@ -595,7 +595,7 @@ test("the landing page lists games in flight, goes back to one, and starts a new
   await picker.getByRole("listbox", { name: "Role" }).getByRole("option", { name: /Valkyrie/ }).click();
   await picker.getByRole("listbox", { name: "Race" }).locator("button:not([disabled])").first().click();
   for (const group of ["Gender", "Alignment"]) await picker.getByRole("radiogroup", { name: group }).locator("button:not([disabled])").first().click();
-  await page.keyboard.press("Enter");
+  await picker.getByRole("button", { name: "Play" }).click();
   await afterPrompts(page);
   const game = await gameId(page);
   await pass(page, 2);
