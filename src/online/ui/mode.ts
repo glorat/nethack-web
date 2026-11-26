@@ -3,9 +3,9 @@ import type { PageMode } from "../../ui/mode";
 import { linesIn } from "../../port/recording";
 import { pointsIn } from "../../port/xlog";
 import { expectedScoringMs, scoreGame } from "../score";
-import { createOnlineSession, createUploader, loadProfile, scoreFinishedGame, warmUpScoring } from "../server/api";
+import { createOnlineSession, createUploader, loadProfile, scoreFinishedGame } from "../server/api";
 import { homeAddress } from "../../port/modes";
-import { gameWatchAddress } from "../results";
+import { type GameResult, gameWatchAddress } from "../results";
 import type { OnlineSession } from "../session";
 import type { LogUploader, UploadNotice } from "../upload";
 import { warmUpGamePage } from "../story";
@@ -27,7 +27,8 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
   let refused = false;
   let gameId: string | null = null;
   let ended: string | null = null;
-  let warmedUp = false;
+  /** Asked for at the first wait with the game over, where the server ends the game: the batch that got there, and its score. */
+  let early: { through: Promise<string | null>; scored: Promise<{ result?: GameResult }> } | null = null;
   /** The points the game itself counted as it ended. */
   let ownPoints: number | undefined;
   const show = () =>
@@ -96,10 +97,15 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
         if (e.type === "recorded") {
           session?.recorded(e.lines.join("\n"));
           uploader?.add(e.lines, e.atPrompt, e.over);
-          if (e.over && uploader && !warmedUp) {
-            warmedUp = true;
-            warmUpScoring().catch((err) => console.warn("couldn't warm up scoring", err));
-            if (gameId) warmUpGamePage(gameId).catch((err) => console.warn("couldn't warm up the game's page", err));
+          if (e.over && uploader && gameId && !early) {
+            const up = uploader;
+            const id = gameId;
+            // scored while the player is still at the questions, as nothing they answer there changes it
+            const through = up.settled().then(() => up.lastBatch());
+            const scored = through.then((t) => (t ? scoreFinishedGame(id, t) : Promise.reject(new Error("nothing was sent"))));
+            scored.catch(() => {});
+            early = { through, scored };
+            warmUpGamePage(id).catch((err) => console.warn("couldn't warm up the game's page", err));
           }
         }
         if (e.type === "scores" && e.last) ownPoints = pointsIn(e.last);
@@ -121,12 +127,17 @@ export function onlineMode(notice: (text: ServerNotice) => void): PageMode {
       const expectedMs = expectedScoringMs(linesIn(ended));
       const giveUpMs = Math.max(SCORE_WAIT_MS, 3 * expectedMs);
       const score = (async () => {
-        await Promise.race([up.settled(), new Promise((r) => setTimeout(r, giveUpMs))]);
-        const through = up.lastBatch();
+        const sent = early?.through ?? up.settled().then(() => up.lastBatch());
+        const through = await Promise.race([sent, new Promise<string | null>((r) => setTimeout(() => r(up.lastBatch()), giveUpMs))]);
         if (!through) return { kind: "later" as const };
+        let first = early?.scored ?? null;
         const [scored, profile] = await Promise.all([
           scoreGame(id, location.origin, giveUpMs, {
-            ask: () => scoreFinishedGame(id, through),
+            ask: () => {
+              const asked = first ?? scoreFinishedGame(id, through);
+              first = null;
+              return asked;
+            },
             sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
             now: () => Date.now(),
           }),

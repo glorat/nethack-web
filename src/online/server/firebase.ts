@@ -263,12 +263,6 @@ export async function scoreGame(input: { game: string; through: string; sentAt: 
   return (await httpsCallable<unknown, { result?: GameResult }>(functions, "score", { timeout: 310_000 })({ method: "scoreGame", input })).data;
 }
 
-/** Starts the scoring function while the player is still at the questions after their death. */
-export async function warmUpScoring(input: { sentAt: number }): Promise<void> {
-  await signedIn();
-  await httpsCallable(functions, "score")({ method: "warmUp", input });
-}
-
 export const leaderboard = (input: { sentAt: number }) => publicRequest<{ entries: LeaderboardEntry[] }>("leaderboard", input);
 
 export const achievements = () => userRequest<{ achievements: Achievement[] }>("achievements", {});
